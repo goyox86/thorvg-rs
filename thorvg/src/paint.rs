@@ -361,25 +361,11 @@ pub trait Paint {
         }
     }
 
-    /// Increments the reference count.
-    fn paint_ref(&self) -> u16 {
-        unsafe { ffi::tvg_paint_ref(self.raw()) }
-    }
-
-    /// Decrements the reference count.
-    fn paint_unref(&self, free: bool) -> u16 {
-        unsafe { ffi::tvg_paint_unref(self.raw(), free) }
-    }
-
-    /// Gets the current reference count.
-    fn ref_cnt(&self) -> u16 {
-        unsafe { ffi::tvg_paint_get_ref(self.raw()) }
-    }
-
-    /// Gets the parent paint object, if any.
-    fn parent_raw(&self) -> ffi::Tvg_Paint {
-        unsafe { ffi::tvg_paint_get_parent(self.raw()) }
-    }
+    // Note: paint_ref/paint_unref/ref_cnt/parent_raw are intentionally
+    // not exposed. They manipulate ThorVG's internal reference counting
+    // which conflicts with Rust's ownership model. Misuse (e.g.
+    // paint_unref(true)) causes double-free when Drop runs. Use
+    // thorvg-sys directly if you need low-level refcount control.
 
     /// Constructs a new owned instance from a raw `Tvg_Paint` pointer.
     ///
