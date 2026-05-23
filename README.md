@@ -1,5 +1,7 @@
 # thorvg-rs
 
+> **⚠️ Work in progress** — This crate is under active development and not yet ready for production use. APIs may change without notice.
+
 Rust bindings for [ThorVG](https://github.com/thorvg/thorvg), a production-ready vector graphics engine supporting SVG, Lottie animations, shapes, text, gradients, effects, and more.
 
 ## Crates
