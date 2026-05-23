@@ -4,7 +4,7 @@ use crate::paint::{Paint, Point};
 use thorvg_sys as ffi;
 
 /// Fill rule for determining the interior of a shape.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FillRule {
     /// Non-zero winding rule.
@@ -30,7 +30,7 @@ impl FillRule {
 }
 
 /// Stroke line cap style.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum StrokeCap {
     Butt,
@@ -57,7 +57,7 @@ impl StrokeCap {
 }
 
 /// Stroke line join style.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum StrokeJoin {
     Miter,

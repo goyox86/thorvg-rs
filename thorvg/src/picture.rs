@@ -5,7 +5,7 @@ use crate::paint::Paint;
 use thorvg_sys as ffi;
 
 /// Image filtering method used during scaling or transformation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FilterMethod {
     /// Smooth interpolation using surrounding pixels.

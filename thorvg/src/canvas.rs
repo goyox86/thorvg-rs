@@ -3,7 +3,7 @@ use crate::paint::Paint;
 use thorvg_sys as ffi;
 
 /// Color space for the rendering buffer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ColorSpace {
     /// Alpha, Blue, Green, Red (premultiplied alpha).
@@ -28,7 +28,7 @@ impl ColorSpace {
 }
 
 /// Engine rendering options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum EngineOption {
     /// No options.
@@ -303,7 +303,7 @@ impl_canvas_ops!(GlCanvas);
 // ── WgCanvas ───────────────────────────────────────────────────────
 
 /// WebGPU target type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum WgTargetType {
     /// Use a `WGPUSurface` as the presentable target.

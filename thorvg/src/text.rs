@@ -6,7 +6,7 @@ use crate::paint::{Paint, Point};
 use thorvg_sys as ffi;
 
 /// Text wrapping mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TextWrap {
     None,
