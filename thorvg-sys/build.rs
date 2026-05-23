@@ -31,6 +31,17 @@ fn build_vendored(thorvg_src: &Path, out_dir: &Path) {
         "ninja is required to build thorvg. Install it with your package manager.",
     );
 
+    // Create stub directories for meson subdirs that we excluded from
+    // the crates.io package (test/, tools/). Meson's subdir() fails
+    // if the directory doesn't exist, even with -Dtests=false.
+    for stub in &["test", "tools"] {
+        let stub_dir = thorvg_src.join(stub);
+        if !stub_dir.exists() {
+            std::fs::create_dir_all(&stub_dir).ok();
+            std::fs::write(stub_dir.join("meson.build"), "").ok();
+        }
+    }
+
     // Configure with meson (only if not already configured)
     if !build_dir.join("build.ninja").exists() {
         let status = Command::new("meson")

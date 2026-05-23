@@ -10,6 +10,20 @@ documentation = "https://docs.rs/thorvg-sys"
 categories = ["external-ffi-bindings", "graphics", "rendering"]
 keywords = ["thorvg", "vector-graphics", "svg", "lottie", "ffi"]
 links = "thorvg"
+include = [
+    "/LICENSE",
+    "/build.rs",
+    "/src/",
+    # Vendored ThorVG: source, headers, build files, and licenses
+    "thorvg/LICENSE",
+    "thorvg/meson.build",
+    "thorvg/meson_options.txt",
+    "thorvg/**/meson.build",
+    "thorvg/**/*.cpp",
+    "thorvg/**/*.h",
+    "thorvg/**/*.c",
+    "thorvg/**/LICENSE",
+]
 
 [features]
 default = ["vendored"]
