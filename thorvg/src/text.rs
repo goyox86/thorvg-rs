@@ -220,11 +220,6 @@ impl Text {
     }
 }
 
-impl Default for Text {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Paint for Text {
     fn raw(&self) -> ffi::Tvg_Paint {

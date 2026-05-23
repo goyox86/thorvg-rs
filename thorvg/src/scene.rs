@@ -131,11 +131,6 @@ impl Scene {
     }
 }
 
-impl Default for Scene {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Paint for Scene {
     fn raw(&self) -> ffi::Tvg_Paint {

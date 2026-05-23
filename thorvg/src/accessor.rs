@@ -87,11 +87,6 @@ impl Accessor {
     }
 }
 
-impl Default for Accessor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Drop for Accessor {
     fn drop(&mut self) {

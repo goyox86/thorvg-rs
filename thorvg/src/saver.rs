@@ -69,11 +69,6 @@ impl Saver {
     }
 }
 
-impl Default for Saver {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Drop for Saver {
     fn drop(&mut self) {

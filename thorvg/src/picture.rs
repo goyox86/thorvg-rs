@@ -156,11 +156,6 @@ impl Picture {
     }
 }
 
-impl Default for Picture {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Paint for Picture {
     fn raw(&self) -> ffi::Tvg_Paint {

@@ -78,11 +78,6 @@ impl Animation {
     }
 }
 
-impl Default for Animation {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Drop for Animation {
     fn drop(&mut self) {

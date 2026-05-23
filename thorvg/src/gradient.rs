@@ -221,11 +221,6 @@ impl LinearGradient {
     }
 }
 
-impl Default for LinearGradient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Drop for LinearGradient {
     fn drop(&mut self) {
@@ -334,11 +329,6 @@ impl RadialGradient {
     }
 }
 
-impl Default for RadialGradient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Drop for RadialGradient {
     fn drop(&mut self) {

@@ -365,11 +365,6 @@ impl Shape {
     }
 }
 
-impl Default for Shape {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl Paint for Shape {
     fn raw(&self) -> ffi::Tvg_Paint {
