@@ -13,6 +13,14 @@ impl Animation {
         self.raw
     }
 
+    /// Wraps an existing raw animation pointer.
+    ///
+    /// # Safety
+    /// `raw` must be a valid, owned `Tvg_Animation`.
+    pub(crate) unsafe fn from_raw(raw: ffi::Tvg_Animation) -> Self {
+        Self { raw }
+    }
+
     /// Creates a new Animation object.
     pub fn new() -> Self {
         let raw = unsafe { ffi::tvg_animation_new() };
