@@ -1,0 +1,3 @@
+[workspace]
+members = ["thorvg-sys", "thorvg"]
+resolver = "2"

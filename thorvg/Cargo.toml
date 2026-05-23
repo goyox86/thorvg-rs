@@ -1,0 +1,16 @@
+[package]
+name = "thorvg"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Safe Rust bindings to the ThorVG vector graphics library"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+thorvg-sys = { path = "../thorvg-sys" }
+
+[dev-dependencies]
+png = "0.17"

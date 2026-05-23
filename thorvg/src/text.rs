@@ -1,0 +1,229 @@
+use alloc::ffi::CString;
+
+use crate::error::{Error, Result};
+use crate::gradient::{LinearGradient, RadialGradient};
+use crate::paint::{Paint, Point};
+use thorvg_sys as ffi;
+
+/// Text wrapping mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextWrap {
+    None,
+    Character,
+    Word,
+    Smart,
+    Ellipsis,
+}
+
+impl TextWrap {
+    fn to_raw(self) -> ffi::Tvg_Text_Wrap {
+        match self {
+            TextWrap::None => ffi::Tvg_Text_Wrap::TVG_TEXT_WRAP_NONE,
+            TextWrap::Character => ffi::Tvg_Text_Wrap::TVG_TEXT_WRAP_CHARACTER,
+            TextWrap::Word => ffi::Tvg_Text_Wrap::TVG_TEXT_WRAP_WORD,
+            TextWrap::Smart => ffi::Tvg_Text_Wrap::TVG_TEXT_WRAP_SMART,
+            TextWrap::Ellipsis => ffi::Tvg_Text_Wrap::TVG_TEXT_WRAP_ELLIPSIS,
+        }
+    }
+}
+
+/// Font metrics for a text object.
+#[derive(Debug, Clone, Copy)]
+pub struct TextMetrics {
+    pub ascent: f32,
+    pub descent: f32,
+    pub linegap: f32,
+    pub advance: f32,
+}
+
+/// Layout metrics of a glyph.
+#[derive(Debug, Clone, Copy)]
+pub struct GlyphMetrics {
+    pub advance: f32,
+    pub bearing: f32,
+    pub min: Point,
+    pub max: Point,
+}
+
+/// A text object for rendering unicode text.
+pub struct Text {
+    raw: ffi::Tvg_Paint,
+    owned: bool,
+}
+
+impl Text {
+    /// Creates a new Text object.
+    pub fn new() -> Self {
+        let raw = unsafe { ffi::tvg_text_new() };
+        assert!(!raw.is_null(), "failed to create Text");
+        Self { raw, owned: true }
+    }
+
+    /// Sets the font family name.
+    pub fn set_font(&mut self, name: &str) -> Result<()> {
+        let c_name = CString::new(name).map_err(|_| Error::InvalidArguments)?;
+        Error::from_raw(unsafe { ffi::tvg_text_set_font(self.raw, c_name.as_ptr()) })
+    }
+
+    /// Sets the font size in points.
+    pub fn set_size(&mut self, size: f32) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_set_size(self.raw, size) })
+    }
+
+    /// Sets the text content (UTF-8).
+    pub fn set_text(&mut self, text: &str) -> Result<()> {
+        let c_text = CString::new(text).map_err(|_| Error::InvalidArguments)?;
+        Error::from_raw(unsafe { ffi::tvg_text_set_text(self.raw, c_text.as_ptr()) })
+    }
+
+    /// Sets the text fill color.
+    pub fn set_color(&mut self, r: u8, g: u8, b: u8) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_set_color(self.raw, r, g, b) })
+    }
+
+    /// Sets text alignment / anchor.
+    pub fn set_align(&mut self, x: f32, y: f32) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_align(self.raw, x, y) })
+    }
+
+    /// Sets the layout constraints (virtual layout box).
+    pub fn set_layout(&mut self, w: f32, h: f32) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_layout(self.raw, w, h) })
+    }
+
+    /// Sets the italic shear factor (0.0–0.5, recommended: 0.18).
+    pub fn set_italic(&mut self, shear: f32) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_set_italic(self.raw, shear) })
+    }
+
+    /// Sets the text wrapping mode.
+    pub fn set_wrap(&mut self, mode: TextWrap) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_wrap_mode(self.raw, mode.to_raw()) })
+    }
+
+    /// Returns the number of text lines after layout and wrapping.
+    pub fn line_count(&self) -> u32 {
+        unsafe { ffi::tvg_text_line_count(self.raw) }
+    }
+
+    /// Sets letter and line spacing scale factors.
+    pub fn set_spacing(&mut self, letter: f32, line: f32) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_spacing(self.raw, letter, line) })
+    }
+
+    /// Sets an outline (stroke) around the text.
+    pub fn set_outline(&mut self, width: f32, r: u8, g: u8, b: u8) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_set_outline(self.raw, width, r, g, b) })
+    }
+
+    /// Sets a linear gradient fill for the text.
+    pub fn set_linear_gradient(&mut self, grad: LinearGradient) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_set_gradient(self.raw, grad.into_raw()) })
+    }
+
+    /// Sets a radial gradient fill for the text.
+    pub fn set_radial_gradient(&mut self, grad: RadialGradient) -> Result<()> {
+        Error::from_raw(unsafe { ffi::tvg_text_set_gradient(self.raw, grad.into_raw()) })
+    }
+
+    /// Gets font metrics (ascent, descent, linegap, advance).
+    pub fn text_metrics(&self) -> Result<TextMetrics> {
+        let mut m = ffi::Tvg_Text_Metrics {
+            ascent: 0.0, descent: 0.0, linegap: 0.0, advance: 0.0,
+        };
+        Error::from_raw(unsafe { ffi::tvg_text_get_text_metrics(self.raw, &raw mut m) })?;
+        Ok(TextMetrics { ascent: m.ascent, descent: m.descent, linegap: m.linegap, advance: m.advance })
+    }
+
+    /// Gets glyph metrics for a UTF-8 character.
+    pub fn glyph_metrics(&self, ch: &str) -> Result<GlyphMetrics> {
+        let c_ch = CString::new(ch).map_err(|_| Error::InvalidArguments)?;
+        let mut m = ffi::Tvg_Glyph_Metrics {
+            advance: 0.0,
+            bearing: 0.0,
+            min: ffi::Tvg_Point { x: 0.0, y: 0.0 },
+            max: ffi::Tvg_Point { x: 0.0, y: 0.0 },
+        };
+        Error::from_raw(unsafe {
+            ffi::tvg_text_get_glyph_metrics(self.raw, c_ch.as_ptr(), &raw mut m)
+        })?;
+        Ok(GlyphMetrics {
+            advance: m.advance,
+            bearing: m.bearing,
+            min: Point { x: m.min.x, y: m.min.y },
+            max: Point { x: m.max.x, y: m.max.y },
+        })
+    }
+
+    // ── Font loading (static methods) ──────────────────────────────
+
+    /// Loads a font from a file path string.
+    pub fn load_font_from_str(path: &str) -> Result<()> {
+        let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        Error::from_raw(unsafe { ffi::tvg_font_load(c_path.as_ptr()) })
+    }
+
+    /// Loads a font from a file path.
+    #[cfg(feature = "std")]
+    pub fn load_font<P: AsRef<std::path::Path>>(path: P) -> Result<()> {
+        Self::load_font_from_str(&path.as_ref().to_string_lossy())
+    }
+
+    /// Unloads a previously loaded font by path string.
+    pub fn unload_font_from_str(path: &str) -> Result<()> {
+        let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        Error::from_raw(unsafe { ffi::tvg_font_unload(c_path.as_ptr()) })
+    }
+
+    /// Unloads a previously loaded font.
+    #[cfg(feature = "std")]
+    pub fn unload_font<P: AsRef<std::path::Path>>(path: P) -> Result<()> {
+        Self::unload_font_from_str(&path.as_ref().to_string_lossy())
+    }
+
+    /// Loads a font from memory.
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn load_font_data(
+        name: &str, data: &[u8], mimetype: Option<&str>, copy: bool,
+    ) -> Result<()> {
+        let c_name = CString::new(name).map_err(|_| Error::InvalidArguments)?;
+        let c_mime = mimetype
+            .map(|m| CString::new(m).map_err(|_| Error::InvalidArguments))
+            .transpose()?;
+        let mime_ptr = c_mime.as_ref().map_or(core::ptr::null(), |c| c.as_ptr());
+        Error::from_raw(unsafe {
+            ffi::tvg_font_load_data(
+                c_name.as_ptr(),
+                data.as_ptr().cast::<core::ffi::c_char>(),
+                data.len() as u32,
+                mime_ptr,
+                copy,
+            )
+        })
+    }
+}
+
+impl Default for Text {
+    fn default() -> Self { Self::new() }
+}
+
+impl Paint for Text {
+    fn raw(&self) -> ffi::Tvg_Paint { self.raw }
+
+    fn into_raw(mut self) -> ffi::Tvg_Paint {
+        self.owned = false;
+        self.raw
+    }
+
+    unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self {
+        Self { raw, owned: true }
+    }
+}
+
+impl Drop for Text {
+    fn drop(&mut self) {
+        if self.owned {
+            unsafe { ffi::tvg_paint_rel(self.raw); }
+        }
+    }
+}

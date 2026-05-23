@@ -1,0 +1,15 @@
+[package]
+name = "thorvg-sys"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Raw FFI bindings to the ThorVG vector graphics library"
+links = "thorvg"
+
+[features]
+default = ["vendored"]
+vendored = []
+
+[build-dependencies]
+bindgen = "0.71"
+pkg-config = "0.3"
