@@ -14,9 +14,7 @@ fn main() {
     let (w, h) = (400u32, 400u32);
     let mut buffer = vec![0u32; (w * h) as usize];
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
-    canvas
-        .set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // White background
     let mut bg = Shape::new();

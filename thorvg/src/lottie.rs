@@ -30,7 +30,7 @@ pub struct Marker {
 /// let _engine = Thorvg::init(0).unwrap();
 /// let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
 /// let mut buffer = vec![0u32; 800 * 600];
-/// canvas.set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888).unwrap();
+/// unsafe { canvas.set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888).unwrap() };
 ///
 /// let mut lottie = LottieAnimation::new();
 /// let mut pic = lottie.picture();

@@ -25,9 +25,12 @@
 //! // Create a canvas with a buffer
 //! let mut canvas = SwCanvas::new(Default::default()).expect("Failed to create canvas");
 //! let mut buffer = vec![0u32; 800 * 600];
-//! canvas
-//!     .set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888)
-//!     .expect("Failed to set target");
+//! // Safety: buffer outlives the canvas.
+//! unsafe {
+//!     canvas
+//!         .set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888)
+//!         .expect("Failed to set target");
+//! }
 //!
 //! // Draw a red rectangle
 //! let mut shape = Shape::new();

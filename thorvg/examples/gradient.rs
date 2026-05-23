@@ -22,9 +22,7 @@ fn main() {
     let mut buffer = vec![0u32; (width * height) as usize];
 
     let mut canvas = SwCanvas::new(EngineOption::Default).expect("Failed to create canvas");
-    canvas
-        .set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Dark background ────────────────────────────────────────────
     let mut bg = Shape::new();

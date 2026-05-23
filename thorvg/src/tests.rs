@@ -41,9 +41,7 @@ fn test_canvas_draw_shape() {
     let (width, height) = (100u32, 100u32);
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    canvas
-        .set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = Shape::new();
     shape
@@ -66,9 +64,7 @@ fn test_canvas_clear_all() {
     let _guard = init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
-    canvas
-        .set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     // Push multiple shapes
     for _ in 0..5 {
@@ -97,9 +93,7 @@ fn test_shape_ownership_transfer_to_canvas() {
     let _guard = init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
-    canvas
-        .set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = Shape::new();
     shape
@@ -259,9 +253,7 @@ fn test_scene_nested_drop() {
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
-    canvas
-        .set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888) }.unwrap();
 
     // Scene containing shapes, pushed to canvas
     let mut scene = Scene::new();
@@ -587,9 +579,7 @@ fn test_clip_lifecycle() {
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
-    canvas
-        .set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = Shape::new();
     shape
@@ -615,9 +605,7 @@ fn test_full_pipeline_scene_with_effects() {
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
-    canvas
-        .set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888)
-        .unwrap();
+    unsafe { canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888) }.unwrap();
 
     let mut scene = Scene::new();
 

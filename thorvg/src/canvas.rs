@@ -71,7 +71,14 @@ impl SwCanvas {
     /// Sets the rendering target buffer.
     ///
     /// The buffer must be at least `stride * height` elements.
-    pub fn set_target(
+    ///
+    /// # Safety
+    /// The caller must ensure that `buffer` remains valid and is not moved,
+    /// reallocated, or dropped for the entire lifetime of the canvas (or until
+    /// `set_target` is called again with a different buffer). The canvas stores
+    /// the pointer internally and writes to it during [`draw`](Self::draw) and
+    /// [`sync`](Self::sync).
+    pub unsafe fn set_target(
         &mut self,
         buffer: &mut [u32],
         stride: u32,
