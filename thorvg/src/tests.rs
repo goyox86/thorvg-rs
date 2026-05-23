@@ -335,7 +335,7 @@ fn test_shape_fill_rule_roundtrip() {
 #[test]
 fn test_paint_opacity_roundtrip() {
     let _guard = init_engine();
-    let shape = Shape::new();
+    let mut shape = Shape::new();
     shape.set_opacity(128).unwrap();
     assert_eq!(shape.opacity().unwrap(), 128);
 }
@@ -343,7 +343,7 @@ fn test_paint_opacity_roundtrip() {
 #[test]
 fn test_paint_visibility_roundtrip() {
     let _guard = init_engine();
-    let shape = Shape::new();
+    let mut shape = Shape::new();
     assert!(shape.visible());
     shape.set_visible(false).unwrap();
     assert!(!shape.visible());
@@ -354,7 +354,7 @@ fn test_paint_visibility_roundtrip() {
 #[test]
 fn test_paint_transform_roundtrip() {
     let _guard = init_engine();
-    let shape = Shape::new();
+    let mut shape = Shape::new();
     let m = Matrix {
         e11: 2.0,
         e12: 0.5,
@@ -378,7 +378,7 @@ fn test_paint_transform_roundtrip() {
 #[test]
 fn test_paint_id_roundtrip() {
     let _guard = init_engine();
-    let shape = Shape::new();
+    let mut shape = Shape::new();
     shape.set_id(42).unwrap();
     assert_eq!(shape.id(), 42);
 }
@@ -386,7 +386,7 @@ fn test_paint_id_roundtrip() {
 #[test]
 fn test_paint_type() {
     let _guard = init_engine();
-    let shape = Shape::new();
+    let mut shape = Shape::new();
     assert_eq!(shape.paint_type().unwrap(), PaintType::Shape);
 
     let scene = Scene::new();
@@ -565,7 +565,7 @@ fn test_invalid_picture_load() {
 #[test]
 fn test_shape_stroke_color_without_stroke() {
     let _guard = init_engine();
-    let shape = Shape::new();
+    let mut shape = Shape::new();
     // Getting stroke color without setting stroke should return error
     let result = shape.stroke_color();
     assert!(result.is_err());

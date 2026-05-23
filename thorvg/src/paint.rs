@@ -182,7 +182,7 @@ pub trait Paint {
     fn into_raw(self) -> ffi::Tvg_Paint;
 
     /// Sets the opacity of the paint object (0 = transparent, 255 = opaque).
-    fn set_opacity(&self, opacity: u8) -> Result<()> {
+    fn set_opacity(&mut self, opacity: u8) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_set_opacity(self.raw(), opacity) })
     }
 
@@ -194,7 +194,7 @@ pub trait Paint {
     }
 
     /// Sets the visibility of the paint object.
-    fn set_visible(&self, visible: bool) -> Result<()> {
+    fn set_visible(&mut self, visible: bool) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_set_visible(self.raw(), visible) })
     }
 
@@ -204,22 +204,22 @@ pub trait Paint {
     }
 
     /// Scales the paint object by the given factor.
-    fn scale(&self, factor: f32) -> Result<()> {
+    fn scale(&mut self, factor: f32) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_scale(self.raw(), factor) })
     }
 
     /// Rotates the paint object by the given angle in degrees.
-    fn rotate(&self, degree: f32) -> Result<()> {
+    fn rotate(&mut self, degree: f32) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_rotate(self.raw(), degree) })
     }
 
     /// Translates the paint object by the given offset.
-    fn translate(&self, x: f32, y: f32) -> Result<()> {
+    fn translate(&mut self, x: f32, y: f32) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_translate(self.raw(), x, y) })
     }
 
     /// Sets the affine transformation matrix.
-    fn set_transform(&self, m: &Matrix) -> Result<()> {
+    fn set_transform(&mut self, m: &Matrix) -> Result<()> {
         let raw_m = m.to_raw();
         Error::from_raw(unsafe { ffi::tvg_paint_set_transform(self.raw(), &raw const raw_m) })
     }
@@ -278,7 +278,7 @@ pub trait Paint {
     }
 
     /// Clips the drawing region to the specified shape's paths.
-    fn set_clip(&self, clipper: &Shape) -> Result<()> {
+    fn set_clip(&mut self, clipper: &Shape) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_set_clip(self.raw(), clipper.raw()) })
     }
 
@@ -293,7 +293,7 @@ pub trait Paint {
     }
 
     /// Sets the masking target and method.
-    fn set_mask<P: Paint>(&self, target: &P, method: MaskMethod) -> Result<()> {
+    fn set_mask<P: Paint>(&mut self, target: &P, method: MaskMethod) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_paint_set_mask_method(self.raw(), target.raw(), method.to_raw())
         })
@@ -321,12 +321,12 @@ pub trait Paint {
     }
 
     /// Sets the blending method.
-    fn set_blend(&self, method: BlendMethod) -> Result<()> {
+    fn set_blend(&mut self, method: BlendMethod) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_set_blend_method(self.raw(), method.to_raw()) })
     }
 
     /// Sets the paint ID.
-    fn set_id(&self, id: u32) -> Result<()> {
+    fn set_id(&mut self, id: u32) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_set_id(self.raw(), id) })
     }
 
