@@ -128,6 +128,8 @@ This project provides Rust bindings to [ThorVG](https://github.com/thorvg/thorvg
 
 This project is not affiliated with, endorsed by, or sponsored by the ThorVG project or the Linux Foundation.
 
+Special thanks to [Hermet Park](https://github.com/hermet) and all [ThorVG contributors](https://github.com/thorvg/thorvg/graphs/contributors) for building such an excellent, lightweight, and well-designed vector graphics engine with a clean C API that made these bindings possible.
+
 ## License
 
 MIT — same as [ThorVG](https://github.com/thorvg/thorvg/blob/main/LICENSE).
