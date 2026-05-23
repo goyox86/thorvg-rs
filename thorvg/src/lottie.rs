@@ -63,13 +63,8 @@ impl LottieAnimation {
     /// Returns the generated slot ID, or `None` on failure.
     pub fn gen_slot(&mut self, slot_json: &str) -> Option<u32> {
         let c_slot = CString::new(slot_json).ok()?;
-        let id =
-            unsafe { ffi::tvg_lottie_animation_gen_slot(self.inner.raw(), c_slot.as_ptr()) };
-        if id == 0 {
-            None
-        } else {
-            Some(id)
-        }
+        let id = unsafe { ffi::tvg_lottie_animation_gen_slot(self.inner.raw(), c_slot.as_ptr()) };
+        if id == 0 { None } else { Some(id) }
     }
 
     /// Applies a previously generated slot to the animation.
@@ -183,9 +178,7 @@ impl LottieAnimation {
     ///
     /// Lower values prioritize performance, higher values prioritize quality.
     pub fn set_quality(&mut self, value: u8) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_set_quality(self.inner.raw(), value)
-        })
+        Error::from_raw(unsafe { ffi::tvg_lottie_animation_set_quality(self.inner.raw(), value) })
     }
 }
 
@@ -200,5 +193,11 @@ impl core::ops::Deref for LottieAnimation {
 impl core::ops::DerefMut for LottieAnimation {
     fn deref_mut(&mut self) -> &mut Animation {
         &mut self.inner
+    }
+}
+
+impl core::fmt::Debug for LottieAnimation {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LottieAnimation").finish_non_exhaustive()
     }
 }

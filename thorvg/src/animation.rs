@@ -78,11 +78,16 @@ impl Animation {
     }
 }
 
-
 impl Drop for Animation {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_animation_del(self.raw);
         }
+    }
+}
+
+impl core::fmt::Debug for Animation {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Animation").finish_non_exhaustive()
     }
 }

@@ -87,11 +87,16 @@ impl Accessor {
     }
 }
 
-
 impl Drop for Accessor {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_accessor_del(self.raw);
         }
+    }
+}
+
+impl core::fmt::Debug for Accessor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Accessor").finish_non_exhaustive()
     }
 }

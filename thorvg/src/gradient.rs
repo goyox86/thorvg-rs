@@ -222,7 +222,6 @@ impl LinearGradient {
     }
 }
 
-
 impl Drop for LinearGradient {
     fn drop(&mut self) {
         unsafe {
@@ -329,7 +328,6 @@ impl RadialGradient {
         raw
     }
 }
-
 
 impl Drop for RadialGradient {
     fn drop(&mut self) {

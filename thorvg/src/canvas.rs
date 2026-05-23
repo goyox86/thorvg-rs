@@ -371,3 +371,21 @@ impl WgCanvas {
 }
 
 impl_canvas_ops!(WgCanvas);
+
+impl core::fmt::Debug for SwCanvas {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SwCanvas").finish_non_exhaustive()
+    }
+}
+
+impl core::fmt::Debug for GlCanvas {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("GlCanvas").finish_non_exhaustive()
+    }
+}
+
+impl core::fmt::Debug for WgCanvas {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("WgCanvas").finish_non_exhaustive()
+    }
+}

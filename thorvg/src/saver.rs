@@ -69,11 +69,16 @@ impl Saver {
     }
 }
 
-
 impl Drop for Saver {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_saver_del(self.raw);
         }
+    }
+}
+
+impl core::fmt::Debug for Saver {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Saver").finish_non_exhaustive()
     }
 }

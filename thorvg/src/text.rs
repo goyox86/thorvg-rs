@@ -221,7 +221,6 @@ impl Text {
     }
 }
 
-
 impl Paint for Text {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
@@ -244,5 +243,11 @@ impl Drop for Text {
                 ffi::tvg_paint_rel(self.raw);
             }
         }
+    }
+}
+
+impl core::fmt::Debug for Text {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Text").finish_non_exhaustive()
     }
 }

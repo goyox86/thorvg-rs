@@ -131,7 +131,6 @@ impl Scene {
     }
 }
 
-
 impl Paint for Scene {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
@@ -154,5 +153,11 @@ impl Drop for Scene {
                 ffi::tvg_paint_rel(self.raw);
             }
         }
+    }
+}
+
+impl core::fmt::Debug for Scene {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Scene").finish_non_exhaustive()
     }
 }

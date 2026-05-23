@@ -157,7 +157,6 @@ impl Picture {
     }
 }
 
-
 impl Paint for Picture {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
@@ -180,5 +179,11 @@ impl Drop for Picture {
                 ffi::tvg_paint_rel(self.raw);
             }
         }
+    }
+}
+
+impl core::fmt::Debug for Picture {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Picture").finish_non_exhaustive()
     }
 }
