@@ -47,7 +47,13 @@ impl FillSpread {
 fn set_color_stops_raw(raw: ffi::Tvg_Gradient, stops: &[ColorStop]) -> Result<()> {
     let raw_stops: Vec<ffi::Tvg_Color_Stop> = stops
         .iter()
-        .map(|s| ffi::Tvg_Color_Stop { offset: s.offset, r: s.r, g: s.g, b: s.b, a: s.a })
+        .map(|s| ffi::Tvg_Color_Stop {
+            offset: s.offset,
+            r: s.r,
+            g: s.g,
+            b: s.b,
+            a: s.a,
+        })
         .collect();
     Error::from_raw(unsafe {
         ffi::tvg_gradient_set_color_stops(raw, raw_stops.as_ptr(), raw_stops.len() as u32)
@@ -57,14 +63,21 @@ fn set_color_stops_raw(raw: ffi::Tvg_Gradient, stops: &[ColorStop]) -> Result<()
 fn get_color_stops_raw(raw: ffi::Tvg_Gradient) -> Result<Vec<ColorStop>> {
     let mut ptr: *const ffi::Tvg_Color_Stop = core::ptr::null();
     let mut cnt: u32 = 0;
-    Error::from_raw(unsafe {
-        ffi::tvg_gradient_get_color_stops(raw, &raw mut ptr, &raw mut cnt)
-    })?;
+    Error::from_raw(unsafe { ffi::tvg_gradient_get_color_stops(raw, &raw mut ptr, &raw mut cnt) })?;
     if ptr.is_null() || cnt == 0 {
         return Ok(Vec::new());
     }
     let slice = unsafe { core::slice::from_raw_parts(ptr, cnt as usize) };
-    Ok(slice.iter().map(|s| ColorStop { offset: s.offset, r: s.r, g: s.g, b: s.b, a: s.a }).collect())
+    Ok(slice
+        .iter()
+        .map(|s| ColorStop {
+            offset: s.offset,
+            r: s.r,
+            g: s.g,
+            b: s.b,
+            a: s.a,
+        })
+        .collect())
 }
 
 fn get_spread_raw(raw: ffi::Tvg_Gradient) -> Result<FillSpread> {
@@ -75,9 +88,15 @@ fn get_spread_raw(raw: ffi::Tvg_Gradient) -> Result<FillSpread> {
 
 fn set_transform_raw(raw: ffi::Tvg_Gradient, m: &Matrix) -> Result<()> {
     let rm = ffi::Tvg_Matrix {
-        e11: m.e11, e12: m.e12, e13: m.e13,
-        e21: m.e21, e22: m.e22, e23: m.e23,
-        e31: m.e31, e32: m.e32, e33: m.e33,
+        e11: m.e11,
+        e12: m.e12,
+        e13: m.e13,
+        e21: m.e21,
+        e22: m.e22,
+        e23: m.e23,
+        e31: m.e31,
+        e32: m.e32,
+        e33: m.e33,
     };
     Error::from_raw(unsafe { ffi::tvg_gradient_set_transform(raw, &raw const rm) })
 }
@@ -90,15 +109,27 @@ fn get_type_raw(raw: ffi::Tvg_Gradient) -> Result<PaintType> {
 
 fn get_transform_raw(raw: ffi::Tvg_Gradient) -> Result<Matrix> {
     let mut m = ffi::Tvg_Matrix {
-        e11: 0.0, e12: 0.0, e13: 0.0,
-        e21: 0.0, e22: 0.0, e23: 0.0,
-        e31: 0.0, e32: 0.0, e33: 0.0,
+        e11: 0.0,
+        e12: 0.0,
+        e13: 0.0,
+        e21: 0.0,
+        e22: 0.0,
+        e23: 0.0,
+        e31: 0.0,
+        e32: 0.0,
+        e33: 0.0,
     };
     Error::from_raw(unsafe { ffi::tvg_gradient_get_transform(raw, &raw mut m) })?;
     Ok(Matrix {
-        e11: m.e11, e12: m.e12, e13: m.e13,
-        e21: m.e21, e22: m.e22, e23: m.e23,
-        e31: m.e31, e32: m.e32, e33: m.e33,
+        e11: m.e11,
+        e12: m.e12,
+        e13: m.e13,
+        e21: m.e21,
+        e22: m.e22,
+        e23: m.e23,
+        e31: m.e31,
+        e32: m.e32,
+        e33: m.e33,
     })
 }
 
@@ -126,7 +157,13 @@ impl LinearGradient {
     pub fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
         let (mut x1, mut y1, mut x2, mut y2) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
         Error::from_raw(unsafe {
-            ffi::tvg_linear_gradient_get(self.raw, &raw mut x1, &raw mut y1, &raw mut x2, &raw mut y2)
+            ffi::tvg_linear_gradient_get(
+                self.raw,
+                &raw mut x1,
+                &raw mut y1,
+                &raw mut x2,
+                &raw mut y2,
+            )
         })?;
         Ok((x1, y1, x2, y2))
     }
@@ -169,7 +206,11 @@ impl LinearGradient {
     /// Duplicates this gradient.
     pub fn duplicate(&self) -> Option<Self> {
         let raw = unsafe { ffi::tvg_gradient_duplicate(self.raw) };
-        if raw.is_null() { None } else { Some(Self { raw }) }
+        if raw.is_null() {
+            None
+        } else {
+            Some(Self { raw })
+        }
     }
 
     /// Consumes self and returns the raw pointer (ownership transferred).
@@ -181,12 +222,16 @@ impl LinearGradient {
 }
 
 impl Default for LinearGradient {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for LinearGradient {
     fn drop(&mut self) {
-        unsafe { ffi::tvg_gradient_del(self.raw); }
+        unsafe {
+            ffi::tvg_gradient_del(self.raw);
+        }
     }
 }
 
@@ -207,7 +252,13 @@ impl RadialGradient {
 
     /// Sets the radial gradient attributes.
     pub fn set_radial(
-        &mut self, cx: f32, cy: f32, r: f32, fx: f32, fy: f32, fr: f32,
+        &mut self,
+        cx: f32,
+        cy: f32,
+        r: f32,
+        fx: f32,
+        fy: f32,
+        fr: f32,
     ) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_radial_gradient_set(self.raw, cx, cy, r, fx, fy, fr) })
     }
@@ -219,8 +270,12 @@ impl RadialGradient {
         Error::from_raw(unsafe {
             ffi::tvg_radial_gradient_get(
                 self.raw,
-                &raw mut cx, &raw mut cy, &raw mut r,
-                &raw mut fx, &raw mut fy, &raw mut fr,
+                &raw mut cx,
+                &raw mut cy,
+                &raw mut r,
+                &raw mut fx,
+                &raw mut fy,
+                &raw mut fr,
             )
         })?;
         Ok((cx, cy, r, fx, fy, fr))
@@ -264,7 +319,11 @@ impl RadialGradient {
     /// Duplicates this gradient.
     pub fn duplicate(&self) -> Option<Self> {
         let raw = unsafe { ffi::tvg_gradient_duplicate(self.raw) };
-        if raw.is_null() { None } else { Some(Self { raw }) }
+        if raw.is_null() {
+            None
+        } else {
+            Some(Self { raw })
+        }
     }
 
     /// Consumes self and returns the raw pointer (ownership transferred).
@@ -276,11 +335,15 @@ impl RadialGradient {
 }
 
 impl Default for RadialGradient {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for RadialGradient {
     fn drop(&mut self) {
-        unsafe { ffi::tvg_gradient_del(self.raw); }
+        unsafe {
+            ffi::tvg_gradient_del(self.raw);
+        }
     }
 }

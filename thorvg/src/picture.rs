@@ -59,7 +59,11 @@ impl Picture {
     /// Loads a picture from memory.
     #[allow(clippy::cast_possible_truncation)]
     pub fn load_data(
-        &mut self, data: &[u8], mimetype: &str, resource_path: Option<&str>, copy: bool,
+        &mut self,
+        data: &[u8],
+        mimetype: &str,
+        resource_path: Option<&str>,
+        copy: bool,
     ) -> Result<()> {
         let c_mime = CString::new(mimetype).map_err(|_| Error::InvalidArguments)?;
         let c_rpath = resource_path
@@ -80,8 +84,12 @@ impl Picture {
 
     /// Loads raw image data (pixel buffer).
     pub fn load_raw(
-        &mut self, data: &[u32], w: u32, h: u32,
-        cs: crate::ColorSpace, copy: bool,
+        &mut self,
+        data: &[u32],
+        w: u32,
+        h: u32,
+        cs: crate::ColorSpace,
+        copy: bool,
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_picture_load_raw(self.raw, data.as_ptr(), w, h, cs.to_raw(), copy)
@@ -138,9 +146,7 @@ impl Picture {
         resolver: ffi::Tvg_Picture_Asset_Resolver,
         data: *mut core::ffi::c_void,
     ) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_picture_set_asset_resolver(self.raw, resolver, data)
-        })
+        Error::from_raw(unsafe { ffi::tvg_picture_set_asset_resolver(self.raw, resolver, data) })
     }
 
     /// Retrieves a paint object from the picture scene by its unique ID.
@@ -151,11 +157,15 @@ impl Picture {
 }
 
 impl Default for Picture {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Paint for Picture {
-    fn raw(&self) -> ffi::Tvg_Paint { self.raw }
+    fn raw(&self) -> ffi::Tvg_Paint {
+        self.raw
+    }
 
     fn into_raw(mut self) -> ffi::Tvg_Paint {
         self.owned = false;
@@ -170,7 +180,9 @@ impl Paint for Picture {
 impl Drop for Picture {
     fn drop(&mut self) {
         if self.owned {
-            unsafe { ffi::tvg_paint_rel(self.raw); }
+            unsafe {
+                ffi::tvg_paint_rel(self.raw);
+            }
         }
     }
 }

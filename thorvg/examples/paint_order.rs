@@ -15,11 +15,14 @@ fn main() {
     let (w, h) = (700u32, 350u32);
     let mut buffer = vec![0u32; (w * h) as usize];
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
-    canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888)
+        .unwrap();
 
     // Background
     let mut bg = Shape::new();
-    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true).unwrap();
+    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
+        .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
     canvas.push(bg).unwrap();
 
@@ -54,7 +57,8 @@ fn main() {
     let trims = [0.25, 0.5, 0.75, 1.0];
     for (i, &end) in trims.iter().enumerate() {
         let mut s = Shape::new();
-        s.append_circle(100.0 + i as f32 * 160.0, 270.0, 40.0, 40.0, true).unwrap();
+        s.append_circle(100.0 + i as f32 * 160.0, 270.0, 40.0, 40.0, true)
+            .unwrap();
         s.set_stroke_width(5.0).unwrap();
         let hue = (i * 60 + 50) as u8;
         s.set_stroke_color(hue, 100, 255 - hue, 255).unwrap();

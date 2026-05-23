@@ -29,14 +29,21 @@ impl Saver {
     /// Saves a paint object to a file.
     #[cfg(feature = "std")]
     pub fn save<P: Paint, Q: AsRef<std::path::Path>>(
-        &mut self, paint: P, path: Q, quality: u32,
+        &mut self,
+        paint: P,
+        path: Q,
+        quality: u32,
     ) -> Result<()> {
         self.save_to_str(paint, &path.as_ref().to_string_lossy(), quality)
     }
 
     /// Saves an animation to a file path string.
     pub fn save_animation_to_str(
-        &mut self, animation: &Animation, path: &str, quality: u32, fps: u32,
+        &mut self,
+        animation: &Animation,
+        path: &str,
+        quality: u32,
+        fps: u32,
     ) -> Result<()> {
         let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
@@ -47,7 +54,11 @@ impl Saver {
     /// Saves an animation to a file.
     #[cfg(feature = "std")]
     pub fn save_animation<P: AsRef<std::path::Path>>(
-        &mut self, animation: &Animation, path: P, quality: u32, fps: u32,
+        &mut self,
+        animation: &Animation,
+        path: P,
+        quality: u32,
+        fps: u32,
     ) -> Result<()> {
         self.save_animation_to_str(animation, &path.as_ref().to_string_lossy(), quality, fps)
     }
@@ -59,11 +70,15 @@ impl Saver {
 }
 
 impl Default for Saver {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for Saver {
     fn drop(&mut self) {
-        unsafe { ffi::tvg_saver_del(self.raw); }
+        unsafe {
+            ffi::tvg_saver_del(self.raw);
+        }
     }
 }

@@ -155,7 +155,11 @@ impl LottieAnimation {
         let mut end: f32 = 0.0;
         Error::from_raw(unsafe {
             ffi::tvg_lottie_animation_get_marker_info(
-                self.raw, idx, &raw mut name_ptr, &raw mut begin, &raw mut end,
+                self.raw,
+                idx,
+                &raw mut name_ptr,
+                &raw mut begin,
+                &raw mut end,
             )
         })?;
         let name = if name_ptr.is_null() {
@@ -190,9 +194,7 @@ impl LottieAnimation {
 
     /// Interpolates between two frames based on a progress value (0.0–1.0).
     pub fn tween(&mut self, from: f32, to: f32, progress: f32) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_tween(self.raw, from, to, progress)
-        })
+        Error::from_raw(unsafe { ffi::tvg_lottie_animation_tween(self.raw, from, to, progress) })
     }
 
     // ── Expressions ────────────────────────────────────────────────
@@ -202,9 +204,7 @@ impl LottieAnimation {
         let c_layer = CString::new(layer).map_err(|_| Error::InvalidArguments)?;
         let c_var = CString::new(var).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_assign(
-                self.raw, c_layer.as_ptr(), ix, c_var.as_ptr(), val,
-            )
+            ffi::tvg_lottie_animation_assign(self.raw, c_layer.as_ptr(), ix, c_var.as_ptr(), val)
         })
     }
 
@@ -219,11 +219,15 @@ impl LottieAnimation {
 }
 
 impl Default for LottieAnimation {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for LottieAnimation {
     fn drop(&mut self) {
-        unsafe { ffi::tvg_animation_del(self.raw); }
+        unsafe {
+            ffi::tvg_animation_del(self.raw);
+        }
     }
 }

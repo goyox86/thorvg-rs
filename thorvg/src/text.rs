@@ -129,10 +129,18 @@ impl Text {
     /// Gets font metrics (ascent, descent, linegap, advance).
     pub fn text_metrics(&self) -> Result<TextMetrics> {
         let mut m = ffi::Tvg_Text_Metrics {
-            ascent: 0.0, descent: 0.0, linegap: 0.0, advance: 0.0,
+            ascent: 0.0,
+            descent: 0.0,
+            linegap: 0.0,
+            advance: 0.0,
         };
         Error::from_raw(unsafe { ffi::tvg_text_get_text_metrics(self.raw, &raw mut m) })?;
-        Ok(TextMetrics { ascent: m.ascent, descent: m.descent, linegap: m.linegap, advance: m.advance })
+        Ok(TextMetrics {
+            ascent: m.ascent,
+            descent: m.descent,
+            linegap: m.linegap,
+            advance: m.advance,
+        })
     }
 
     /// Gets glyph metrics for a UTF-8 character.
@@ -150,8 +158,14 @@ impl Text {
         Ok(GlyphMetrics {
             advance: m.advance,
             bearing: m.bearing,
-            min: Point { x: m.min.x, y: m.min.y },
-            max: Point { x: m.max.x, y: m.max.y },
+            min: Point {
+                x: m.min.x,
+                y: m.min.y,
+            },
+            max: Point {
+                x: m.max.x,
+                y: m.max.y,
+            },
         })
     }
 
@@ -184,7 +198,10 @@ impl Text {
     /// Loads a font from memory.
     #[allow(clippy::cast_possible_truncation)]
     pub fn load_font_data(
-        name: &str, data: &[u8], mimetype: Option<&str>, copy: bool,
+        name: &str,
+        data: &[u8],
+        mimetype: Option<&str>,
+        copy: bool,
     ) -> Result<()> {
         let c_name = CString::new(name).map_err(|_| Error::InvalidArguments)?;
         let c_mime = mimetype
@@ -204,11 +221,15 @@ impl Text {
 }
 
 impl Default for Text {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Paint for Text {
-    fn raw(&self) -> ffi::Tvg_Paint { self.raw }
+    fn raw(&self) -> ffi::Tvg_Paint {
+        self.raw
+    }
 
     fn into_raw(mut self) -> ffi::Tvg_Paint {
         self.owned = false;
@@ -223,7 +244,9 @@ impl Paint for Text {
 impl Drop for Text {
     fn drop(&mut self) {
         if self.owned {
-            unsafe { ffi::tvg_paint_rel(self.raw); }
+            unsafe {
+                ffi::tvg_paint_rel(self.raw);
+            }
         }
     }
 }

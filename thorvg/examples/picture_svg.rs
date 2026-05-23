@@ -14,11 +14,14 @@ fn main() {
     let (w, h) = (400u32, 400u32);
     let mut buffer = vec![0u32; (w * h) as usize];
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
-    canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888)
+        .unwrap();
 
     // White background
     let mut bg = Shape::new();
-    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true).unwrap();
+    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
+        .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
     canvas.push(bg).unwrap();
 
@@ -39,7 +42,8 @@ fn main() {
     );
 
     let mut pic = Picture::new();
-    pic.load_data(svg_data.as_bytes(), "svg", None, true).unwrap();
+    pic.load_data(svg_data.as_bytes(), "svg", None, true)
+        .unwrap();
     pic.set_size(w as f32, h as f32).unwrap();
     canvas.push(pic).unwrap();
 

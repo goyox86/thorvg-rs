@@ -111,8 +111,7 @@ impl SwCanvas {
     ///
     /// Ownership of `target` is transferred to the canvas.
     pub fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
-        let result =
-            unsafe { ffi::tvg_canvas_insert(self.raw, target.into_raw(), at.raw()) };
+        let result = unsafe { ffi::tvg_canvas_insert(self.raw, target.into_raw(), at.raw()) };
         Error::from_raw(result)
     }
 
@@ -216,7 +215,9 @@ macro_rules! impl_canvas_ops {
 
         impl Drop for $ty {
             fn drop(&mut self) {
-                unsafe { ffi::tvg_canvas_destroy(self.raw); }
+                unsafe {
+                    ffi::tvg_canvas_destroy(self.raw);
+                }
             }
         }
     };
@@ -263,7 +264,14 @@ impl GlCanvas {
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_glcanvas_set_target(
-                self.raw, display, surface, context, id, w, h, colorspace.to_raw(),
+                self.raw,
+                display,
+                surface,
+                context,
+                id,
+                w,
+                h,
+                colorspace.to_raw(),
             )
         })
     }
@@ -321,8 +329,14 @@ impl WgCanvas {
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_wgcanvas_set_target(
-                self.raw, device, instance, target, w, h,
-                colorspace.to_raw(), target_type as i32,
+                self.raw,
+                device,
+                instance,
+                target,
+                w,
+                h,
+                colorspace.to_raw(),
+                target_type as i32,
             )
         })
     }

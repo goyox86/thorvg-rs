@@ -22,8 +22,14 @@ fn build_vendored(thorvg_src: &Path, out_dir: &Path) {
     let install_dir = out_dir.join("thorvg-install");
 
     // Check for meson and ninja
-    check_tool("meson", "meson is required to build thorvg. Install it with: pip install meson");
-    check_tool("ninja", "ninja is required to build thorvg. Install it with your package manager.");
+    check_tool(
+        "meson",
+        "meson is required to build thorvg. Install it with: pip install meson",
+    );
+    check_tool(
+        "ninja",
+        "ninja is required to build thorvg. Install it with your package manager.",
+    );
 
     // Configure with meson (only if not already configured)
     if !build_dir.join("build.ninja").exists() {

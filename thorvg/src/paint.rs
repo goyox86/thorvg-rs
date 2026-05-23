@@ -5,32 +5,56 @@ use thorvg_sys as ffi;
 /// A 3×3 affine transformation matrix.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Matrix {
-    pub e11: f32, pub e12: f32, pub e13: f32,
-    pub e21: f32, pub e22: f32, pub e23: f32,
-    pub e31: f32, pub e32: f32, pub e33: f32,
+    pub e11: f32,
+    pub e12: f32,
+    pub e13: f32,
+    pub e21: f32,
+    pub e22: f32,
+    pub e23: f32,
+    pub e31: f32,
+    pub e32: f32,
+    pub e33: f32,
 }
 
 impl Matrix {
     /// The identity matrix.
     pub const IDENTITY: Self = Self {
-        e11: 1.0, e12: 0.0, e13: 0.0,
-        e21: 0.0, e22: 1.0, e23: 0.0,
-        e31: 0.0, e32: 0.0, e33: 1.0,
+        e11: 1.0,
+        e12: 0.0,
+        e13: 0.0,
+        e21: 0.0,
+        e22: 1.0,
+        e23: 0.0,
+        e31: 0.0,
+        e32: 0.0,
+        e33: 1.0,
     };
 
     fn to_raw(self) -> ffi::Tvg_Matrix {
         ffi::Tvg_Matrix {
-            e11: self.e11, e12: self.e12, e13: self.e13,
-            e21: self.e21, e22: self.e22, e23: self.e23,
-            e31: self.e31, e32: self.e32, e33: self.e33,
+            e11: self.e11,
+            e12: self.e12,
+            e13: self.e13,
+            e21: self.e21,
+            e22: self.e22,
+            e23: self.e23,
+            e31: self.e31,
+            e32: self.e32,
+            e33: self.e33,
         }
     }
 
     fn from_raw(m: ffi::Tvg_Matrix) -> Self {
         Self {
-            e11: m.e11, e12: m.e12, e13: m.e13,
-            e21: m.e21, e22: m.e22, e23: m.e23,
-            e31: m.e31, e32: m.e32, e33: m.e33,
+            e11: m.e11,
+            e12: m.e12,
+            e13: m.e13,
+            e21: m.e21,
+            e22: m.e22,
+            e23: m.e23,
+            e31: m.e31,
+            e32: m.e32,
+            e33: m.e33,
         }
     }
 }
@@ -203,9 +227,15 @@ pub trait Paint {
     /// Gets the affine transformation matrix.
     fn transform(&self) -> Result<Matrix> {
         let mut m = ffi::Tvg_Matrix {
-            e11: 0.0, e12: 0.0, e13: 0.0,
-            e21: 0.0, e22: 0.0, e23: 0.0,
-            e31: 0.0, e32: 0.0, e33: 0.0,
+            e11: 0.0,
+            e12: 0.0,
+            e13: 0.0,
+            e21: 0.0,
+            e22: 0.0,
+            e23: 0.0,
+            e31: 0.0,
+            e32: 0.0,
+            e33: 0.0,
         };
         Error::from_raw(unsafe { ffi::tvg_paint_get_transform(self.raw(), &raw mut m) })?;
         Ok(Matrix::from_raw(m))
@@ -228,10 +258,22 @@ pub trait Paint {
         let mut pts = [ffi::Tvg_Point { x: 0.0, y: 0.0 }; 4];
         Error::from_raw(unsafe { ffi::tvg_paint_get_obb(self.raw(), pts.as_mut_ptr()) })?;
         Ok([
-            Point { x: pts[0].x, y: pts[0].y },
-            Point { x: pts[1].x, y: pts[1].y },
-            Point { x: pts[2].x, y: pts[2].y },
-            Point { x: pts[3].x, y: pts[3].y },
+            Point {
+                x: pts[0].x,
+                y: pts[0].y,
+            },
+            Point {
+                x: pts[1].x,
+                y: pts[1].y,
+            },
+            Point {
+                x: pts[2].x,
+                y: pts[2].y,
+            },
+            Point {
+                x: pts[3].x,
+                y: pts[3].y,
+            },
         ])
     }
 
@@ -280,9 +322,7 @@ pub trait Paint {
 
     /// Sets the blending method.
     fn set_blend(&self, method: BlendMethod) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_paint_set_blend_method(self.raw(), method.to_raw())
-        })
+        Error::from_raw(unsafe { ffi::tvg_paint_set_blend_method(self.raw(), method.to_raw()) })
     }
 
     /// Sets the paint ID.
@@ -308,7 +348,10 @@ pub trait Paint {
     }
 
     /// Duplicates this paint object.
-    fn duplicate(&self) -> Option<Self> where Self: Sized {
+    fn duplicate(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
         let raw = unsafe { ffi::tvg_paint_duplicate(self.raw()) };
         if raw.is_null() {
             None
@@ -342,5 +385,7 @@ pub trait Paint {
     ///
     /// # Safety
     /// `raw` must be a valid, owned `Tvg_Paint`.
-    unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self where Self: Sized;
+    unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self
+    where
+        Self: Sized;
 }

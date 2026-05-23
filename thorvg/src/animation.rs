@@ -37,27 +37,21 @@ impl Animation {
     /// Gets the current animation frame.
     pub fn frame(&self) -> Result<f32> {
         let mut frame: f32 = 0.0;
-        Error::from_raw(unsafe {
-            ffi::tvg_animation_get_frame(self.raw, &raw mut frame)
-        })?;
+        Error::from_raw(unsafe { ffi::tvg_animation_get_frame(self.raw, &raw mut frame) })?;
         Ok(frame)
     }
 
     /// Gets the total number of frames.
     pub fn total_frame(&self) -> Result<f32> {
         let mut cnt: f32 = 0.0;
-        Error::from_raw(unsafe {
-            ffi::tvg_animation_get_total_frame(self.raw, &raw mut cnt)
-        })?;
+        Error::from_raw(unsafe { ffi::tvg_animation_get_total_frame(self.raw, &raw mut cnt) })?;
         Ok(cnt)
     }
 
     /// Gets the animation duration in seconds.
     pub fn duration(&self) -> Result<f32> {
         let mut duration: f32 = 0.0;
-        Error::from_raw(unsafe {
-            ffi::tvg_animation_get_duration(self.raw, &raw mut duration)
-        })?;
+        Error::from_raw(unsafe { ffi::tvg_animation_get_duration(self.raw, &raw mut duration) })?;
         Ok(duration)
     }
 

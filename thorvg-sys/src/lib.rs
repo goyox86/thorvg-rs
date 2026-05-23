@@ -39,7 +39,12 @@ mod tests {
             let mut micro: u32 = 0;
             let mut version: *const core::ffi::c_char = core::ptr::null();
 
-            let result = tvg_engine_version(&raw mut major, &raw mut minor, &raw mut micro, &raw mut version);
+            let result = tvg_engine_version(
+                &raw mut major,
+                &raw mut minor,
+                &raw mut micro,
+                &raw mut version,
+            );
             assert_eq!(result, Tvg_Result::TVG_RESULT_SUCCESS);
             assert!(major >= 1);
         }

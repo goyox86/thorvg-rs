@@ -34,9 +34,7 @@ impl Accessor {
         func: unsafe extern "C" fn(ffi::Tvg_Paint, *mut core::ffi::c_void) -> bool,
         data: *mut core::ffi::c_void,
     ) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_accessor_set(self.raw, paint.raw(), Some(func), data)
-        })
+        Error::from_raw(unsafe { ffi::tvg_accessor_set(self.raw, paint.raw(), Some(func), data) })
     }
 
     /// Iterates through all descendants, calling a safe Rust closure on each.
@@ -58,12 +56,7 @@ impl Accessor {
 
         let data = core::ptr::from_mut(&mut func).cast::<core::ffi::c_void>();
         Error::from_raw(unsafe {
-            ffi::tvg_accessor_set(
-                self.raw,
-                paint.raw(),
-                Some(trampoline::<F>),
-                data,
-            )
+            ffi::tvg_accessor_set(self.raw, paint.raw(), Some(trampoline::<F>), data)
         })
     }
 
@@ -95,11 +88,15 @@ impl Accessor {
 }
 
 impl Default for Accessor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Drop for Accessor {
     fn drop(&mut self) {
-        unsafe { ffi::tvg_accessor_del(self.raw); }
+        unsafe {
+            ffi::tvg_accessor_del(self.raw);
+        }
     }
 }

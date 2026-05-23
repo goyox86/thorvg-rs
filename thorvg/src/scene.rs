@@ -23,9 +23,7 @@ impl Scene {
 
     /// Inserts a paint object before another existing paint in the scene.
     pub fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_scene_insert(self.raw, target.into_raw(), at.raw())
-        })
+        Error::from_raw(unsafe { ffi::tvg_scene_insert(self.raw, target.into_raw(), at.raw()) })
     }
 
     /// Removes a paint from the scene.
@@ -45,7 +43,11 @@ impl Scene {
 
     /// Adds a Gaussian blur effect.
     pub fn add_gaussian_blur(
-        &mut self, sigma: f64, direction: i32, border: i32, quality: i32,
+        &mut self,
+        sigma: f64,
+        direction: i32,
+        border: i32,
+        quality: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_scene_add_effect_gaussian_blur(self.raw, sigma, direction, border, quality)
@@ -55,8 +57,15 @@ impl Scene {
     /// Adds a drop shadow effect.
     #[allow(clippy::too_many_arguments)]
     pub fn add_drop_shadow(
-        &mut self, r: i32, g: i32, b: i32, a: i32,
-        angle: f64, distance: f64, sigma: f64, quality: i32,
+        &mut self,
+        r: i32,
+        g: i32,
+        b: i32,
+        a: i32,
+        angle: f64,
+        distance: f64,
+        sigma: f64,
+        quality: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_scene_add_effect_drop_shadow(
@@ -67,16 +76,20 @@ impl Scene {
 
     /// Adds a fill color effect (overrides scene content color).
     pub fn add_fill_effect(&mut self, r: i32, g: i32, b: i32, a: i32) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_scene_add_effect_fill(self.raw, r, g, b, a)
-        })
+        Error::from_raw(unsafe { ffi::tvg_scene_add_effect_fill(self.raw, r, g, b, a) })
     }
 
     /// Adds a tint effect.
     #[allow(clippy::too_many_arguments)]
     pub fn add_tint_effect(
-        &mut self, black_r: i32, black_g: i32, black_b: i32,
-        white_r: i32, white_g: i32, white_b: i32, intensity: f64,
+        &mut self,
+        black_r: i32,
+        black_g: i32,
+        black_b: i32,
+        white_r: i32,
+        white_g: i32,
+        white_b: i32,
+        intensity: f64,
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_scene_add_effect_tint(
@@ -89,17 +102,29 @@ impl Scene {
     #[allow(clippy::too_many_arguments)]
     pub fn add_tritone_effect(
         &mut self,
-        shadow_r: i32, shadow_g: i32, shadow_b: i32,
-        midtone_r: i32, midtone_g: i32, midtone_b: i32,
-        highlight_r: i32, highlight_g: i32, highlight_b: i32,
+        shadow_r: i32,
+        shadow_g: i32,
+        shadow_b: i32,
+        midtone_r: i32,
+        midtone_g: i32,
+        midtone_b: i32,
+        highlight_r: i32,
+        highlight_g: i32,
+        highlight_b: i32,
         blend: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
             ffi::tvg_scene_add_effect_tritone(
                 self.raw,
-                shadow_r, shadow_g, shadow_b,
-                midtone_r, midtone_g, midtone_b,
-                highlight_r, highlight_g, highlight_b,
+                shadow_r,
+                shadow_g,
+                shadow_b,
+                midtone_r,
+                midtone_g,
+                midtone_b,
+                highlight_r,
+                highlight_g,
+                highlight_b,
                 blend,
             )
         })
@@ -107,11 +132,15 @@ impl Scene {
 }
 
 impl Default for Scene {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Paint for Scene {
-    fn raw(&self) -> ffi::Tvg_Paint { self.raw }
+    fn raw(&self) -> ffi::Tvg_Paint {
+        self.raw
+    }
 
     fn into_raw(mut self) -> ffi::Tvg_Paint {
         self.owned = false;
@@ -126,7 +155,9 @@ impl Paint for Scene {
 impl Drop for Scene {
     fn drop(&mut self) {
         if self.owned {
-            unsafe { ffi::tvg_paint_rel(self.raw); }
+            unsafe {
+                ffi::tvg_paint_rel(self.raw);
+            }
         }
     }
 }

@@ -7,20 +7,21 @@
 
 mod common;
 
-use thorvg::{
-    ColorSpace, ColorStop, EngineOption, LinearGradient, Paint, Shape, SwCanvas, Thorvg,
-};
+use thorvg::{ColorSpace, ColorStop, EngineOption, LinearGradient, Paint, Shape, SwCanvas, Thorvg};
 
 fn main() {
     let _engine = Thorvg::init(0).unwrap();
     let (w, h) = (600u32, 400u32);
     let mut buffer = vec![0u32; (w * h) as usize];
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
-    canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888)
+        .unwrap();
 
     // Background
     let mut bg = Shape::new();
-    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true).unwrap();
+    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
+        .unwrap();
     bg.set_fill_color(30, 30, 50, 255).unwrap();
     canvas.push(bg).unwrap();
 
@@ -28,12 +29,26 @@ fn main() {
     let mut grad = LinearGradient::new();
     grad.set_bounds(50.0, 50.0, 250.0, 300.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop { offset: 0.0, r: 255, g: 100, b: 0, a: 255 },
-        ColorStop { offset: 1.0, r: 0, g: 100, b: 255, a: 255 },
-    ]).unwrap();
+        ColorStop {
+            offset: 0.0,
+            r: 255,
+            g: 100,
+            b: 0,
+            a: 255,
+        },
+        ColorStop {
+            offset: 1.0,
+            r: 0,
+            g: 100,
+            b: 255,
+            a: 255,
+        },
+    ])
+    .unwrap();
 
     let mut rect = Shape::new();
-    rect.append_rect(50.0, 50.0, 200.0, 300.0, 0.0, 0.0, true).unwrap();
+    rect.append_rect(50.0, 50.0, 200.0, 300.0, 0.0, 0.0, true)
+        .unwrap();
     rect.set_linear_gradient(grad).unwrap();
 
     // Circle clip
@@ -67,7 +82,9 @@ fn main() {
 
     // Rounded rectangle clip
     let mut clip2 = Shape::new();
-    clip2.append_rect(360.0, 100.0, 160.0, 200.0, 20.0, 20.0, true).unwrap();
+    clip2
+        .append_rect(360.0, 100.0, 160.0, 200.0, 20.0, 20.0, true)
+        .unwrap();
     star.set_clip(&clip2).unwrap();
 
     canvas.push(star).unwrap();

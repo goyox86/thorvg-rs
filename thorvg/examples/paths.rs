@@ -14,11 +14,14 @@ fn main() {
     let (w, h) = (800u32, 600u32);
     let mut buffer = vec![0u32; (w * h) as usize];
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
-    canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888)
+        .unwrap();
 
     // Background
     let mut bg = Shape::new();
-    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true).unwrap();
+    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
+        .unwrap();
     bg.set_fill_color(15, 15, 25, 255).unwrap();
     canvas.push(bg).unwrap();
 
@@ -31,8 +34,11 @@ fn main() {
         let r = if i % 2 == 0 { outer } else { inner };
         let px = cx + angle.cos() * r;
         let py = cy + angle.sin() * r;
-        if i == 0 { star.move_to(px, py).unwrap(); }
-        else { star.line_to(px, py).unwrap(); }
+        if i == 0 {
+            star.move_to(px, py).unwrap();
+        } else {
+            star.line_to(px, py).unwrap();
+        }
     }
     star.close().unwrap();
     star.set_fill_color(255, 200, 0, 255).unwrap();
@@ -45,10 +51,25 @@ fn main() {
     let hx = 320.0f32;
     let hy = 160.0f32;
     heart.move_to(hx, hy).unwrap();
-    heart.cubic_to(hx - 5.0, hy - 60.0, hx - 100.0, hy - 60.0, hx - 100.0, hy - 10.0).unwrap();
-    heart.cubic_to(hx - 100.0, hy + 30.0, hx, hy + 80.0, hx, hy + 100.0).unwrap();
-    heart.cubic_to(hx, hy + 80.0, hx + 100.0, hy + 30.0, hx + 100.0, hy - 10.0).unwrap();
-    heart.cubic_to(hx + 100.0, hy - 60.0, hx + 5.0, hy - 60.0, hx, hy).unwrap();
+    heart
+        .cubic_to(
+            hx - 5.0,
+            hy - 60.0,
+            hx - 100.0,
+            hy - 60.0,
+            hx - 100.0,
+            hy - 10.0,
+        )
+        .unwrap();
+    heart
+        .cubic_to(hx - 100.0, hy + 30.0, hx, hy + 80.0, hx, hy + 100.0)
+        .unwrap();
+    heart
+        .cubic_to(hx, hy + 80.0, hx + 100.0, hy + 30.0, hx + 100.0, hy - 10.0)
+        .unwrap();
+    heart
+        .cubic_to(hx + 100.0, hy - 60.0, hx + 5.0, hy - 60.0, hx, hy)
+        .unwrap();
     heart.close().unwrap();
     heart.set_fill_color(220, 30, 60, 255).unwrap();
     canvas.push(heart).unwrap();
@@ -81,10 +102,14 @@ fn main() {
         let x0 = 50.0 + i as f32 * seg_w;
         let dir = if i % 2 == 0 { -60.0 } else { 60.0 };
         wave.cubic_to(
-            x0 + seg_w * 0.33, 420.0 + dir,
-            x0 + seg_w * 0.66, 420.0 + dir,
-            x0 + seg_w, 420.0,
-        ).unwrap();
+            x0 + seg_w * 0.33,
+            420.0 + dir,
+            x0 + seg_w * 0.66,
+            420.0 + dir,
+            x0 + seg_w,
+            420.0,
+        )
+        .unwrap();
     }
     wave.set_stroke_width(4.0).unwrap();
     wave.set_stroke_color(255, 150, 50, 255).unwrap();
@@ -99,8 +124,11 @@ fn main() {
         let angle = core::f32::consts::PI * i as f32 / 3.0 - core::f32::consts::FRAC_PI_2;
         let px = hcx + angle.cos() * hr;
         let py = hcy + angle.sin() * hr;
-        if i == 0 { hex.move_to(px, py).unwrap(); }
-        else { hex.line_to(px, py).unwrap(); }
+        if i == 0 {
+            hex.move_to(px, py).unwrap();
+        } else {
+            hex.line_to(px, py).unwrap();
+        }
     }
     hex.close().unwrap();
     hex.set_fill_color(60, 180, 120, 200).unwrap();
@@ -123,8 +151,10 @@ fn main() {
     let ix = 620.0f32;
     let iy = 530.0f32;
     inf.move_to(ix, iy).unwrap();
-    inf.cubic_to(ix + 70.0, iy - 70.0, ix + 130.0, iy + 70.0, ix + 70.0, iy).unwrap();
-    inf.cubic_to(ix + 10.0, iy - 70.0, ix - 60.0, iy + 70.0, ix, iy).unwrap();
+    inf.cubic_to(ix + 70.0, iy - 70.0, ix + 130.0, iy + 70.0, ix + 70.0, iy)
+        .unwrap();
+    inf.cubic_to(ix + 10.0, iy - 70.0, ix - 60.0, iy + 70.0, ix, iy)
+        .unwrap();
     inf.set_stroke_width(4.0).unwrap();
     inf.set_stroke_color(200, 200, 255, 255).unwrap();
     inf.set_stroke_cap(StrokeCap::Round).unwrap();

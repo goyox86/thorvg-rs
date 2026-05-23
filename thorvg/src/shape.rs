@@ -121,7 +121,13 @@ impl Shape {
 
     /// Draws a cubic Bézier curve.
     pub fn cubic_to(
-        &mut self, cx1: f32, cy1: f32, cx2: f32, cy2: f32, x: f32, y: f32,
+        &mut self,
+        cx1: f32,
+        cy1: f32,
+        cx2: f32,
+        cy2: f32,
+        x: f32,
+        y: f32,
     ) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_shape_cubic_to(self.raw, cx1, cy1, cx2, cy2, x, y) })
     }
@@ -134,8 +140,10 @@ impl Shape {
     /// Appends a raw sub-path from commands and points.
     #[allow(clippy::cast_possible_truncation)]
     pub fn append_path(&mut self, cmds: &[u8], pts: &[Point]) -> Result<()> {
-        let raw_pts: alloc::vec::Vec<ffi::Tvg_Point> =
-            pts.iter().map(|p| ffi::Tvg_Point { x: p.x, y: p.y }).collect();
+        let raw_pts: alloc::vec::Vec<ffi::Tvg_Point> = pts
+            .iter()
+            .map(|p| ffi::Tvg_Point { x: p.x, y: p.y })
+            .collect();
         Error::from_raw(unsafe {
             ffi::tvg_shape_append_path(
                 self.raw,
@@ -169,15 +177,20 @@ impl Shape {
     /// Appends a rectangle to the path.
     #[allow(clippy::too_many_arguments)]
     pub fn append_rect(
-        &mut self, x: f32, y: f32, w: f32, h: f32, rx: f32, ry: f32, cw: bool,
+        &mut self,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        rx: f32,
+        ry: f32,
+        cw: bool,
     ) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_shape_append_rect(self.raw, x, y, w, h, rx, ry, cw) })
     }
 
     /// Appends an ellipse (or circle) to the path.
-    pub fn append_circle(
-        &mut self, cx: f32, cy: f32, rx: f32, ry: f32, cw: bool,
-    ) -> Result<()> {
+    pub fn append_circle(&mut self, cx: f32, cy: f32, rx: f32, ry: f32, cw: bool) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_shape_append_circle(self.raw, cx, cy, rx, ry, cw) })
     }
 
@@ -226,7 +239,11 @@ impl Shape {
     pub fn gradient_raw(&self) -> Option<ffi::Tvg_Gradient> {
         let mut grad: ffi::Tvg_Gradient = core::ptr::null_mut();
         let r = unsafe { ffi::tvg_shape_get_gradient(self.raw, &raw mut grad) };
-        if Error::from_raw(r).is_err() || grad.is_null() { None } else { Some(grad) }
+        if Error::from_raw(r).is_err() || grad.is_null() {
+            None
+        } else {
+            Some(grad)
+        }
     }
 
     /// Sets the rendering order of stroke and fill.
@@ -257,7 +274,9 @@ impl Shape {
     pub fn stroke_color(&self) -> Result<(u8, u8, u8, u8)> {
         let (mut r, mut g, mut b, mut a) = (0u8, 0u8, 0u8, 0u8);
         Error::from_raw(unsafe {
-            ffi::tvg_shape_get_stroke_color(self.raw, &raw mut r, &raw mut g, &raw mut b, &raw mut a)
+            ffi::tvg_shape_get_stroke_color(
+                self.raw, &raw mut r, &raw mut g, &raw mut b, &raw mut a,
+            )
         })?;
         Ok((r, g, b, a))
     }
@@ -328,7 +347,11 @@ impl Shape {
     pub fn stroke_gradient_raw(&self) -> Option<ffi::Tvg_Gradient> {
         let mut grad: ffi::Tvg_Gradient = core::ptr::null_mut();
         let r = unsafe { ffi::tvg_shape_get_stroke_gradient(self.raw, &raw mut grad) };
-        if Error::from_raw(r).is_err() || grad.is_null() { None } else { Some(grad) }
+        if Error::from_raw(r).is_err() || grad.is_null() {
+            None
+        } else {
+            Some(grad)
+        }
     }
 
     /// Sets the stroke gradient fill.
@@ -338,18 +361,20 @@ impl Shape {
 
     /// Sets the trim path (visible segment along the path).
     pub fn set_trimpath(&mut self, begin: f32, end: f32, simultaneous: bool) -> Result<()> {
-        Error::from_raw(unsafe {
-            ffi::tvg_shape_set_trimpath(self.raw, begin, end, simultaneous)
-        })
+        Error::from_raw(unsafe { ffi::tvg_shape_set_trimpath(self.raw, begin, end, simultaneous) })
     }
 }
 
 impl Default for Shape {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Paint for Shape {
-    fn raw(&self) -> ffi::Tvg_Paint { self.raw }
+    fn raw(&self) -> ffi::Tvg_Paint {
+        self.raw
+    }
 
     fn into_raw(mut self) -> ffi::Tvg_Paint {
         self.owned = false;
@@ -364,7 +389,9 @@ impl Paint for Shape {
 impl Drop for Shape {
     fn drop(&mut self) {
         if self.owned {
-            unsafe { ffi::tvg_paint_rel(self.raw); }
+            unsafe {
+                ffi::tvg_paint_rel(self.raw);
+            }
         }
     }
 }

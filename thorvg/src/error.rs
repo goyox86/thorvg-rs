@@ -27,9 +27,7 @@ impl Error {
         match result {
             ffi::Tvg_Result::TVG_RESULT_SUCCESS => Ok(()),
             ffi::Tvg_Result::TVG_RESULT_INVALID_ARGUMENT => Err(Error::InvalidArguments),
-            ffi::Tvg_Result::TVG_RESULT_INSUFFICIENT_CONDITION => {
-                Err(Error::InsufficientCondition)
-            }
+            ffi::Tvg_Result::TVG_RESULT_INSUFFICIENT_CONDITION => Err(Error::InsufficientCondition),
             ffi::Tvg_Result::TVG_RESULT_FAILED_ALLOCATION => Err(Error::FailedAllocation),
             ffi::Tvg_Result::TVG_RESULT_MEMORY_CORRUPTION => Err(Error::MemoryCorruption),
             ffi::Tvg_Result::TVG_RESULT_NOT_SUPPORTED => Err(Error::NotSupported),

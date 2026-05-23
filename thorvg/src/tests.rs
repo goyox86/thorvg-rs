@@ -3,9 +3,9 @@
 extern crate alloc;
 extern crate std;
 
+use crate::*;
 use alloc::vec;
 use std::sync::OnceLock;
-use crate::*;
 
 /// Shared engine guard — initialized once, kept alive for all tests.
 fn init_engine() -> &'static Thorvg {
@@ -41,17 +41,24 @@ fn test_canvas_draw_shape() {
     let (width, height) = (100u32, 100u32);
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888)
+        .unwrap();
 
     let mut shape = Shape::new();
-    shape.append_rect(10.0, 10.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
+    shape
+        .append_rect(10.0, 10.0, 50.0, 50.0, 0.0, 0.0, true)
+        .unwrap();
     shape.set_fill_color(255, 0, 0, 255).unwrap();
 
     canvas.push(shape).unwrap(); // ownership transferred
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
 
-    assert!(buffer.iter().any(|&px| px != 0), "Expected non-empty render output");
+    assert!(
+        buffer.iter().any(|&px| px != 0),
+        "Expected non-empty render output"
+    );
 }
 
 #[test]
@@ -59,7 +66,9 @@ fn test_canvas_clear_all() {
     let _guard = init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
-    canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888)
+        .unwrap();
 
     // Push multiple shapes
     for _ in 0..5 {
@@ -88,10 +97,14 @@ fn test_shape_ownership_transfer_to_canvas() {
     let _guard = init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
-    canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888)
+        .unwrap();
 
     let mut shape = Shape::new();
-    shape.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
+    shape
+        .append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true)
+        .unwrap();
     shape.set_fill_color(255, 0, 0, 255).unwrap();
 
     // Transfer ownership — shape should NOT be freed by Rust
@@ -105,7 +118,8 @@ fn test_shape_ownership_transfer_to_scene() {
     let mut scene = Scene::new();
 
     let mut s1 = Shape::new();
-    s1.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
+    s1.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true)
+        .unwrap();
     s1.set_fill_color(255, 0, 0, 255).unwrap();
 
     let mut s2 = Shape::new();
@@ -123,7 +137,9 @@ fn test_shape_not_transferred_is_freed() {
     let _guard = init_engine();
     // Shape created but never pushed to canvas/scene — Rust must free it
     let mut shape = Shape::new();
-    shape.append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true).unwrap();
+    shape
+        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+        .unwrap();
     shape.set_fill_color(255, 255, 0, 255).unwrap();
     shape.set_stroke_width(3.0).unwrap();
     shape.set_stroke_color(0, 0, 0, 255).unwrap();
@@ -139,12 +155,27 @@ fn test_gradient_ownership_transfer_to_shape() {
     let mut grad = LinearGradient::new();
     grad.set_bounds(0.0, 0.0, 100.0, 100.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop { offset: 0.0, r: 255, g: 0, b: 0, a: 255 },
-        ColorStop { offset: 1.0, r: 0, g: 0, b: 255, a: 255 },
-    ]).unwrap();
+        ColorStop {
+            offset: 0.0,
+            r: 255,
+            g: 0,
+            b: 0,
+            a: 255,
+        },
+        ColorStop {
+            offset: 1.0,
+            r: 0,
+            g: 0,
+            b: 255,
+            a: 255,
+        },
+    ])
+    .unwrap();
 
     let mut shape = Shape::new();
-    shape.append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true).unwrap();
+    shape
+        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+        .unwrap();
     // Gradient ownership transferred to shape
     shape.set_linear_gradient(grad).unwrap();
     // Shape dropped here — must free gradient too
@@ -157,9 +188,22 @@ fn test_gradient_not_transferred_is_freed() {
     let mut grad = RadialGradient::new();
     grad.set_radial(50.0, 50.0, 30.0, 50.0, 50.0, 0.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop { offset: 0.0, r: 255, g: 255, b: 255, a: 255 },
-        ColorStop { offset: 1.0, r: 0, g: 0, b: 0, a: 255 },
-    ]).unwrap();
+        ColorStop {
+            offset: 0.0,
+            r: 255,
+            g: 255,
+            b: 255,
+            a: 255,
+        },
+        ColorStop {
+            offset: 1.0,
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+        },
+    ])
+    .unwrap();
     // Dropped here — must be freed by gradient_del
 }
 
@@ -170,10 +214,29 @@ fn test_gradient_duplicate() {
     let mut grad = LinearGradient::new();
     grad.set_bounds(0.0, 0.0, 200.0, 200.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop { offset: 0.0, r: 255, g: 0, b: 0, a: 255 },
-        ColorStop { offset: 0.5, r: 0, g: 255, b: 0, a: 255 },
-        ColorStop { offset: 1.0, r: 0, g: 0, b: 255, a: 255 },
-    ]).unwrap();
+        ColorStop {
+            offset: 0.0,
+            r: 255,
+            g: 0,
+            b: 0,
+            a: 255,
+        },
+        ColorStop {
+            offset: 0.5,
+            r: 0,
+            g: 255,
+            b: 0,
+            a: 255,
+        },
+        ColorStop {
+            offset: 1.0,
+            r: 0,
+            g: 0,
+            b: 255,
+            a: 255,
+        },
+    ])
+    .unwrap();
 
     let dup = grad.duplicate();
     assert!(dup.is_some());
@@ -196,13 +259,16 @@ fn test_scene_nested_drop() {
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
-    canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888)
+        .unwrap();
 
     // Scene containing shapes, pushed to canvas
     let mut scene = Scene::new();
     for i in 0..10 {
         let mut s = Shape::new();
-        s.append_circle(i as f32 * 20.0, 50.0, 10.0, 10.0, true).unwrap();
+        s.append_circle(i as f32 * 20.0, 50.0, 10.0, 10.0, true)
+            .unwrap();
         s.set_fill_color(255, 0, 0, 255).unwrap();
         scene.push(s).unwrap();
     }
@@ -298,9 +364,15 @@ fn test_paint_transform_roundtrip() {
     let _guard = init_engine();
     let shape = Shape::new();
     let m = Matrix {
-        e11: 2.0, e12: 0.5, e13: 10.0,
-        e21: 0.0, e22: 3.0, e23: 20.0,
-        e31: 0.0, e32: 0.0, e33: 1.0,
+        e11: 2.0,
+        e12: 0.5,
+        e13: 10.0,
+        e21: 0.0,
+        e22: 3.0,
+        e23: 20.0,
+        e31: 0.0,
+        e32: 0.0,
+        e33: 1.0,
     };
     shape.set_transform(&m).unwrap();
     let got = shape.transform().unwrap();
@@ -353,7 +425,8 @@ fn test_linear_gradient_roundtrip() {
 fn test_radial_gradient_roundtrip() {
     let _guard = init_engine();
     let mut grad = RadialGradient::new();
-    grad.set_radial(100.0, 120.0, 50.0, 10.0, 20.0, 5.0).unwrap();
+    grad.set_radial(100.0, 120.0, 50.0, 10.0, 20.0, 5.0)
+        .unwrap();
     let (cx, cy, r, fx, fy, fr) = grad.radial().unwrap();
     assert!((cx - 100.0).abs() < f32::EPSILON);
     assert!((cy - 120.0).abs() < f32::EPSILON);
@@ -379,9 +452,27 @@ fn test_gradient_color_stops_roundtrip() {
     let _guard = init_engine();
     let mut grad = LinearGradient::new();
     let stops = [
-        ColorStop { offset: 0.0, r: 10, g: 20, b: 30, a: 40 },
-        ColorStop { offset: 0.5, r: 100, g: 110, b: 120, a: 130 },
-        ColorStop { offset: 1.0, r: 200, g: 210, b: 220, a: 230 },
+        ColorStop {
+            offset: 0.0,
+            r: 10,
+            g: 20,
+            b: 30,
+            a: 40,
+        },
+        ColorStop {
+            offset: 0.5,
+            r: 100,
+            g: 110,
+            b: 120,
+            a: 130,
+        },
+        ColorStop {
+            offset: 1.0,
+            r: 200,
+            g: 210,
+            b: 220,
+            a: 230,
+        },
     ];
     grad.set_color_stops(&stops).unwrap();
     let got = grad.color_stops().unwrap();
@@ -496,10 +587,14 @@ fn test_clip_lifecycle() {
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
-    canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888)
+        .unwrap();
 
     let mut shape = Shape::new();
-    shape.append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true).unwrap();
+    shape
+        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+        .unwrap();
     shape.set_fill_color(255, 0, 0, 255).unwrap();
 
     let mut clipper = Shape::new();
@@ -520,12 +615,15 @@ fn test_full_pipeline_scene_with_effects() {
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
-    canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888).unwrap();
+    canvas
+        .set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888)
+        .unwrap();
 
     let mut scene = Scene::new();
 
     let mut s1 = Shape::new();
-    s1.append_rect(10.0, 10.0, 80.0, 80.0, 5.0, 5.0, true).unwrap();
+    s1.append_rect(10.0, 10.0, 80.0, 80.0, 5.0, 5.0, true)
+        .unwrap();
     s1.set_fill_color(255, 0, 0, 255).unwrap();
     scene.push(s1).unwrap();
 

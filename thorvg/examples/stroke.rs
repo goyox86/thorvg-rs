@@ -9,9 +9,7 @@
 
 mod common;
 
-use thorvg::{
-    ColorSpace, EngineOption, Shape, StrokeCap, StrokeJoin, SwCanvas, Thorvg,
-};
+use thorvg::{ColorSpace, EngineOption, Shape, StrokeCap, StrokeJoin, SwCanvas, Thorvg};
 
 fn main() {
     let _engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -72,7 +70,9 @@ fn main() {
         .unwrap();
     dashed.set_stroke_width(4.0).unwrap();
     dashed.set_stroke_color(255, 255, 80, 255).unwrap();
-    dashed.set_stroke_dash(&[15.0, 10.0, 5.0, 10.0], 0.0).unwrap();
+    dashed
+        .set_stroke_dash(&[15.0, 10.0, 5.0, 10.0], 0.0)
+        .unwrap();
     canvas.push(dashed).unwrap();
 
     // ── Stroked circle with fill ───────────────────────────────────

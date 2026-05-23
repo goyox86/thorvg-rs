@@ -54,31 +54,31 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-mod error;
-mod canvas;
-mod paint;
-mod shape;
-mod gradient;
-mod picture;
-mod scene;
-mod text;
-mod animation;
-mod lottie;
-mod saver;
 mod accessor;
+mod animation;
+mod canvas;
+mod error;
+mod gradient;
+mod lottie;
+mod paint;
+mod picture;
+mod saver;
+mod scene;
+mod shape;
+mod text;
 
-pub use error::{Error, Result};
-pub use canvas::{SwCanvas, GlCanvas, WgCanvas, WgTargetType, EngineOption, ColorSpace};
-pub use paint::{Paint, BlendMethod, MaskMethod, PaintType, Matrix, Point};
-pub use shape::{Shape, FillRule, StrokeCap, StrokeJoin};
-pub use gradient::{LinearGradient, RadialGradient, ColorStop, FillSpread};
-pub use picture::{Picture, FilterMethod};
-pub use scene::Scene;
-pub use text::{Text, TextWrap, TextMetrics, GlyphMetrics};
-pub use animation::Animation;
-pub use lottie::{LottieAnimation, Marker};
-pub use saver::Saver;
 pub use accessor::Accessor;
+pub use animation::Animation;
+pub use canvas::{ColorSpace, EngineOption, GlCanvas, SwCanvas, WgCanvas, WgTargetType};
+pub use error::{Error, Result};
+pub use gradient::{ColorStop, FillSpread, LinearGradient, RadialGradient};
+pub use lottie::{LottieAnimation, Marker};
+pub use paint::{BlendMethod, MaskMethod, Matrix, Paint, PaintType, Point};
+pub use picture::{FilterMethod, Picture};
+pub use saver::Saver;
+pub use scene::Scene;
+pub use shape::{FillRule, Shape, StrokeCap, StrokeJoin};
+pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 
 use thorvg_sys as ffi;
 

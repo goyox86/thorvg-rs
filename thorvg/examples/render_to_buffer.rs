@@ -9,9 +9,7 @@
 
 mod common;
 
-use thorvg::{
-    ColorSpace, ColorStop, EngineOption, LinearGradient, Paint, Shape, SwCanvas, Thorvg,
-};
+use thorvg::{ColorSpace, ColorStop, EngineOption, LinearGradient, Paint, Shape, SwCanvas, Thorvg};
 
 fn main() {
     let _engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -36,9 +34,27 @@ fn main() {
     let mut grad = LinearGradient::new();
     grad.set_bounds(50.0, 50.0, 350.0, 250.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop { offset: 0.0, r: 64, g: 0, b: 128, a: 255 },
-        ColorStop { offset: 0.5, r: 0, g: 128, b: 255, a: 255 },
-        ColorStop { offset: 1.0, r: 0, g: 255, b: 128, a: 255 },
+        ColorStop {
+            offset: 0.0,
+            r: 64,
+            g: 0,
+            b: 128,
+            a: 255,
+        },
+        ColorStop {
+            offset: 0.5,
+            r: 0,
+            g: 128,
+            b: 255,
+            a: 255,
+        },
+        ColorStop {
+            offset: 1.0,
+            r: 0,
+            g: 255,
+            b: 128,
+            a: 255,
+        },
     ])
     .unwrap();
 
