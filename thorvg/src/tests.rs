@@ -10,7 +10,7 @@ use std::sync::Once;
 /// Shared engine initialization — called once, engine stays alive for all tests.
 /// We use `std::sync::Once` instead of `OnceLock<Thorvg>` because `Thorvg` is
 /// intentionally `!Send + !Sync`. The engine is leaked (never terminated) which
-/// is fine for tests — ThorVG uses internal reference counting.
+/// is fine for tests — `ThorVG` uses internal reference counting.
 fn init_engine() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
@@ -392,7 +392,7 @@ fn test_paint_id_roundtrip() {
 #[test]
 fn test_paint_type() {
     init_engine();
-    let mut shape = Shape::new();
+    let shape = Shape::new();
     assert_eq!(shape.paint_type().unwrap(), PaintType::Shape);
 
     let scene = Scene::new();
@@ -571,7 +571,7 @@ fn test_invalid_picture_load() {
 #[test]
 fn test_shape_stroke_color_without_stroke() {
     init_engine();
-    let mut shape = Shape::new();
+    let shape = Shape::new();
     // Getting stroke color without setting stroke should return error
     let result = shape.stroke_color();
     assert!(result.is_err());

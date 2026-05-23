@@ -51,6 +51,7 @@
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::match_wildcard_for_single_variants)]
+#![allow(clippy::new_without_default)]
 
 extern crate alloc;
 
