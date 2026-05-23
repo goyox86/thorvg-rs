@@ -5,19 +5,25 @@ extern crate std;
 
 use crate::*;
 use alloc::vec;
-use std::sync::OnceLock;
+use std::sync::Once;
 
-/// Shared engine guard — initialized once, kept alive for all tests.
-fn init_engine() -> &'static Thorvg {
-    static ENGINE: OnceLock<Thorvg> = OnceLock::new();
-    ENGINE.get_or_init(|| Thorvg::init(0).expect("Failed to init ThorVG"))
+/// Shared engine initialization — called once, engine stays alive for all tests.
+/// We use `std::sync::Once` instead of `OnceLock<Thorvg>` because `Thorvg` is
+/// intentionally `!Send + !Sync`. The engine is leaked (never terminated) which
+/// is fine for tests — ThorVG uses internal reference counting.
+fn init_engine() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let guard = Thorvg::init(0).expect("Failed to init ThorVG");
+        core::mem::forget(guard);
+    });
 }
 
 // ── Engine & Version ───────────────────────────────────────────────
 
 #[test]
 fn test_init_and_version() {
-    let _guard = init_engine();
+    init_engine();
     let (major, _minor, _micro, version_str) = Thorvg::version().expect("Failed to get version");
     assert!(major >= 1);
     assert!(!version_str.is_empty());
@@ -27,7 +33,7 @@ fn test_init_and_version() {
 
 #[test]
 fn test_canvas_create_destroy() {
-    let _guard = init_engine();
+    init_engine();
     // Canvas should be created and dropped without issues
     let canvas = SwCanvas::new(EngineOption::Default);
     assert!(canvas.is_ok());
@@ -36,7 +42,7 @@ fn test_canvas_create_destroy() {
 
 #[test]
 fn test_canvas_draw_shape() {
-    let _guard = init_engine();
+    init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let (width, height) = (100u32, 100u32);
     let mut buffer = vec![0u32; (width * height) as usize];
@@ -61,7 +67,7 @@ fn test_canvas_draw_shape() {
 
 #[test]
 fn test_canvas_clear_all() {
-    let _guard = init_engine();
+    init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
@@ -90,7 +96,7 @@ fn test_canvas_clear_all() {
 
 #[test]
 fn test_shape_ownership_transfer_to_canvas() {
-    let _guard = init_engine();
+    init_engine();
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
@@ -108,7 +114,7 @@ fn test_shape_ownership_transfer_to_canvas() {
 
 #[test]
 fn test_shape_ownership_transfer_to_scene() {
-    let _guard = init_engine();
+    init_engine();
     let mut scene = Scene::new();
 
     let mut s1 = Shape::new();
@@ -128,7 +134,7 @@ fn test_shape_ownership_transfer_to_scene() {
 
 #[test]
 fn test_shape_not_transferred_is_freed() {
-    let _guard = init_engine();
+    init_engine();
     // Shape created but never pushed to canvas/scene — Rust must free it
     let mut shape = Shape::new();
     shape
@@ -144,7 +150,7 @@ fn test_shape_not_transferred_is_freed() {
 
 #[test]
 fn test_gradient_ownership_transfer_to_shape() {
-    let _guard = init_engine();
+    init_engine();
 
     let mut grad = LinearGradient::new();
     grad.set_bounds(0.0, 0.0, 100.0, 100.0).unwrap();
@@ -177,7 +183,7 @@ fn test_gradient_ownership_transfer_to_shape() {
 
 #[test]
 fn test_gradient_not_transferred_is_freed() {
-    let _guard = init_engine();
+    init_engine();
     // Gradient created but never given to a shape
     let mut grad = RadialGradient::new();
     grad.set_radial(50.0, 50.0, 30.0, 50.0, 50.0, 0.0).unwrap();
@@ -203,7 +209,7 @@ fn test_gradient_not_transferred_is_freed() {
 
 #[test]
 fn test_gradient_duplicate() {
-    let _guard = init_engine();
+    init_engine();
 
     let mut grad = LinearGradient::new();
     grad.set_bounds(0.0, 0.0, 200.0, 200.0).unwrap();
@@ -249,7 +255,7 @@ fn test_gradient_duplicate() {
 
 #[test]
 fn test_scene_nested_drop() {
-    let _guard = init_engine();
+    init_engine();
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
@@ -273,7 +279,7 @@ fn test_scene_nested_drop() {
 
 #[test]
 fn test_scene_clear_and_reuse() {
-    let _guard = init_engine();
+    init_engine();
 
     let mut scene = Scene::new();
 
@@ -297,7 +303,7 @@ fn test_scene_clear_and_reuse() {
 
 #[test]
 fn test_shape_fill_color_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     shape.set_fill_color(100, 150, 200, 255).unwrap();
     let (r, g, b, a) = shape.fill_color().unwrap();
@@ -306,7 +312,7 @@ fn test_shape_fill_color_roundtrip() {
 
 #[test]
 fn test_shape_stroke_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     shape.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
     shape.set_stroke_width(3.0).unwrap();
@@ -325,7 +331,7 @@ fn test_shape_stroke_roundtrip() {
 
 #[test]
 fn test_shape_fill_rule_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     assert_eq!(shape.fill_rule().unwrap(), FillRule::NonZero);
     shape.set_fill_rule(FillRule::EvenOdd).unwrap();
@@ -334,7 +340,7 @@ fn test_shape_fill_rule_roundtrip() {
 
 #[test]
 fn test_paint_opacity_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     shape.set_opacity(128).unwrap();
     assert_eq!(shape.opacity().unwrap(), 128);
@@ -342,7 +348,7 @@ fn test_paint_opacity_roundtrip() {
 
 #[test]
 fn test_paint_visibility_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     assert!(shape.visible());
     shape.set_visible(false).unwrap();
@@ -353,7 +359,7 @@ fn test_paint_visibility_roundtrip() {
 
 #[test]
 fn test_paint_transform_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     let m = Matrix {
         e11: 2.0,
@@ -377,7 +383,7 @@ fn test_paint_transform_roundtrip() {
 
 #[test]
 fn test_paint_id_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     shape.set_id(42).unwrap();
     assert_eq!(shape.id(), 42);
@@ -385,7 +391,7 @@ fn test_paint_id_roundtrip() {
 
 #[test]
 fn test_paint_type() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     assert_eq!(shape.paint_type().unwrap(), PaintType::Shape);
 
@@ -403,7 +409,7 @@ fn test_paint_type() {
 
 #[test]
 fn test_linear_gradient_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut grad = LinearGradient::new();
     grad.set_bounds(10.0, 20.0, 300.0, 400.0).unwrap();
     let (x1, y1, x2, y2) = grad.bounds().unwrap();
@@ -415,7 +421,7 @@ fn test_linear_gradient_roundtrip() {
 
 #[test]
 fn test_radial_gradient_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut grad = RadialGradient::new();
     grad.set_radial(100.0, 120.0, 50.0, 10.0, 20.0, 5.0)
         .unwrap();
@@ -430,7 +436,7 @@ fn test_radial_gradient_roundtrip() {
 
 #[test]
 fn test_gradient_spread_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut grad = LinearGradient::new();
     assert_eq!(grad.spread().unwrap(), FillSpread::Pad);
     grad.set_spread(FillSpread::Reflect).unwrap();
@@ -441,7 +447,7 @@ fn test_gradient_spread_roundtrip() {
 
 #[test]
 fn test_gradient_color_stops_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut grad = LinearGradient::new();
     let stops = [
         ColorStop {
@@ -481,7 +487,7 @@ fn test_gradient_color_stops_roundtrip() {
 
 #[test]
 fn test_stroke_dash_roundtrip() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     shape.set_stroke_width(2.0).unwrap();
     shape.set_stroke_dash(&[10.0, 5.0, 3.0], 2.5).unwrap();
@@ -498,14 +504,14 @@ fn test_stroke_dash_roundtrip() {
 
 #[test]
 fn test_picture_create_destroy() {
-    let _guard = init_engine();
+    init_engine();
     let _pic = Picture::new();
     // Dropped without loading — should not crash
 }
 
 #[test]
 fn test_picture_load_svg_from_memory() {
-    let _guard = init_engine();
+    init_engine();
     let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><rect width=\"100\" height=\"100\" fill=\"red\"/></svg>";
     let mut pic = Picture::new();
     pic.load_data(svg, "svg", None, true).unwrap();
@@ -518,7 +524,7 @@ fn test_picture_load_svg_from_memory() {
 
 #[test]
 fn test_animation_create_destroy() {
-    let _guard = init_engine();
+    init_engine();
     let _anim = Animation::new();
     // Dropped without loading — should not crash
 }
@@ -527,7 +533,7 @@ fn test_animation_create_destroy() {
 
 #[test]
 fn test_saver_create_destroy() {
-    let _guard = init_engine();
+    init_engine();
     let _saver = Saver::new();
     // Dropped without saving — should not crash
 }
@@ -536,13 +542,13 @@ fn test_saver_create_destroy() {
 
 #[test]
 fn test_accessor_create_destroy() {
-    let _guard = init_engine();
+    init_engine();
     let _acc = Accessor::new();
 }
 
 #[test]
 fn test_accessor_generate_id() {
-    let _guard = init_engine();
+    init_engine();
     let id = Accessor::generate_id("test_layer");
     assert!(id.is_some());
     let id2 = Accessor::generate_id("test_layer");
@@ -555,7 +561,7 @@ fn test_accessor_generate_id() {
 
 #[test]
 fn test_invalid_picture_load() {
-    let _guard = init_engine();
+    init_engine();
     let mut pic = Picture::new();
     let result = pic.load_from_str("/nonexistent/path.svg");
     assert!(result.is_err());
@@ -564,7 +570,7 @@ fn test_invalid_picture_load() {
 
 #[test]
 fn test_shape_stroke_color_without_stroke() {
-    let _guard = init_engine();
+    init_engine();
     let mut shape = Shape::new();
     // Getting stroke color without setting stroke should return error
     let result = shape.stroke_color();
@@ -575,7 +581,7 @@ fn test_shape_stroke_color_without_stroke() {
 
 #[test]
 fn test_clip_lifecycle() {
-    let _guard = init_engine();
+    init_engine();
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
@@ -601,7 +607,7 @@ fn test_clip_lifecycle() {
 
 #[test]
 fn test_full_pipeline_scene_with_effects() {
-    let _guard = init_engine();
+    init_engine();
 
     let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];

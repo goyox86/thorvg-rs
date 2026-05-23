@@ -91,8 +91,9 @@ mod tests;
 /// RAII guard for the `ThorVG` engine lifetime.
 ///
 /// The engine is terminated when this guard is dropped.
+/// Not `Send` or `Sync` — initialize and terminate the engine on the same thread.
 pub struct Thorvg {
-    _private: (),
+    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
 
 impl Thorvg {
@@ -104,7 +105,9 @@ impl Thorvg {
     pub fn init(threads: u32) -> Result<Self> {
         let result = unsafe { ffi::tvg_engine_init(threads) };
         Error::from_raw(result)?;
-        Ok(Self { _private: () })
+        Ok(Self {
+            _not_send_sync: core::marker::PhantomData,
+        })
     }
 
     /// Get the `ThorVG` engine version.
