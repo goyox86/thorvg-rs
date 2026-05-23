@@ -9,6 +9,7 @@ use std::path::Path;
 /// - bits  8–15: G
 /// - bits 16–23: B
 /// - bits 24–31: A
+#[allow(clippy::many_single_char_names)]
 pub fn save_png(path: &str, buffer: &[u32], width: u32, height: u32) {
     let file = File::create(Path::new(path)).expect("Failed to create output file");
     let w = BufWriter::new(file);

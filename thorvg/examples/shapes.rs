@@ -5,6 +5,8 @@
 //! Run with: `cargo run --example shapes`
 //! Output:   `shapes.png`
 
+#![allow(clippy::cast_precision_loss)]
+
 mod common;
 
 use thorvg::{ColorSpace, EngineOption, Shape, SwCanvas, Thorvg};

@@ -4,7 +4,7 @@
 //! Run with: `cargo run --example paint_order`
 //! Output:   `paint_order.png`
 
-#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
 
 mod common;
 

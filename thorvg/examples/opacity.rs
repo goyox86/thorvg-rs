@@ -3,7 +3,7 @@
 //! Run with: `cargo run --example opacity`
 //! Output:   `opacity.png`
 
-#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 
 mod common;
 
