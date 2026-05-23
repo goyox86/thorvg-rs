@@ -122,6 +122,10 @@ just coverage    # show C API coverage stats
 just --list      # show all recipes
 ```
 
+## Acknowledgments
+
+This project provides Rust bindings to [ThorVG](https://github.com/thorvg/thorvg), created and maintained by the [ThorVG project](https://www.thorvg.org/) contributors. ThorVG is a [Linux Foundation](https://www.linuxfoundation.org/) project. All vector graphics rendering is performed by the ThorVG engine — this crate is a thin binding layer.
+
 ## License
 
 MIT — same as [ThorVG](https://github.com/thorvg/thorvg/blob/main/LICENSE).
