@@ -5,7 +5,7 @@
 //! Run with: `cargo run --example gradient`
 //! Output:   `gradient.png`
 
-#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_precision_loss, clippy::too_many_lines)]
 
 mod common;
 
