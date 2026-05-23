@@ -54,8 +54,11 @@ impl EngineOption {
 /// A software-rendered canvas.
 ///
 /// This canvas uses the CPU engine for rendering.
+///
+/// Not `Send` or `Sync` — a single canvas must be used from one thread.
 pub struct SwCanvas {
     raw: ffi::Tvg_Canvas,
+    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
 
 impl SwCanvas {
@@ -65,7 +68,10 @@ impl SwCanvas {
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self { raw })
+        Ok(Self {
+            raw,
+            _not_send_sync: core::marker::PhantomData,
+        })
     }
 
     /// Sets the rendering target buffer.
@@ -233,8 +239,11 @@ macro_rules! impl_canvas_ops {
 // ── GlCanvas ───────────────────────────────────────────────────────
 
 /// An OpenGL/ES-rendered canvas.
+///
+/// Not `Send` or `Sync` — a single canvas must be used from one thread.
 pub struct GlCanvas {
     raw: ffi::Tvg_Canvas,
+    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
 
 impl GlCanvas {
@@ -244,7 +253,10 @@ impl GlCanvas {
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self { raw })
+        Ok(Self {
+            raw,
+            _not_send_sync: core::marker::PhantomData,
+        })
     }
 
     /// Sets the OpenGL drawing target.
@@ -298,8 +310,11 @@ pub enum WgTargetType {
 }
 
 /// A WebGPU-rendered canvas.
+///
+/// Not `Send` or `Sync` — a single canvas must be used from one thread.
 pub struct WgCanvas {
     raw: ffi::Tvg_Canvas,
+    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
 
 impl WgCanvas {
@@ -309,7 +324,10 @@ impl WgCanvas {
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self { raw })
+        Ok(Self {
+            raw,
+            _not_send_sync: core::marker::PhantomData,
+        })
     }
 
     /// Sets the WebGPU drawing target.
