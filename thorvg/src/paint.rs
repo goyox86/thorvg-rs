@@ -3,6 +3,9 @@ use crate::shape::Shape;
 use thorvg_sys as ffi;
 
 /// A 3×3 affine transformation matrix.
+///
+/// Note: `PartialEq` uses exact floating-point comparison.
+/// Use approximate comparison for transformed values.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Matrix {
     pub e11: f32,
