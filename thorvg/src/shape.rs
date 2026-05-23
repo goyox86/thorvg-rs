@@ -5,6 +5,7 @@ use thorvg_sys as ffi;
 
 /// Fill rule for determining the interior of a shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FillRule {
     /// Non-zero winding rule.
     NonZero,
@@ -30,6 +31,7 @@ impl FillRule {
 
 /// Stroke line cap style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum StrokeCap {
     Butt,
     Round,
@@ -56,6 +58,7 @@ impl StrokeCap {
 
 /// Stroke line join style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum StrokeJoin {
     Miter,
     Round,

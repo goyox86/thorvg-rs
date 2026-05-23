@@ -4,6 +4,7 @@ use thorvg_sys as ffi;
 
 /// Color space for the rendering buffer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ColorSpace {
     /// Alpha, Blue, Green, Red (premultiplied alpha).
     ABGR8888,
@@ -28,6 +29,7 @@ impl ColorSpace {
 
 /// Engine rendering options.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum EngineOption {
     /// No options.
     None,
@@ -302,6 +304,7 @@ impl_canvas_ops!(GlCanvas);
 
 /// WebGPU target type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum WgTargetType {
     /// Use a `WGPUSurface` as the presentable target.
     Surface = 0,

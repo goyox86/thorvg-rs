@@ -6,6 +6,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 /// Errors returned by `ThorVG` operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// Invalid arguments were provided.
     InvalidArguments,

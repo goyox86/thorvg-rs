@@ -69,6 +69,7 @@ pub struct Point {
 /// Blending method for compositing paint objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum BlendMethod {
     Normal = 0,
     Multiply,
@@ -116,6 +117,7 @@ impl BlendMethod {
 /// Masking method for combining two paint objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum MaskMethod {
     None = 0,
     Alpha,
@@ -150,6 +152,7 @@ impl MaskMethod {
 
 /// The concrete type of a paint object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PaintType {
     Undefined,
     Shape,

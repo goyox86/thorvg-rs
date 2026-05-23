@@ -6,6 +6,7 @@ use thorvg_sys as ffi;
 
 /// Image filtering method used during scaling or transformation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FilterMethod {
     /// Smooth interpolation using surrounding pixels.
     Bilinear,

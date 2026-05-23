@@ -7,6 +7,7 @@ use thorvg_sys as ffi;
 
 /// Text wrapping mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum TextWrap {
     None,
     Character,

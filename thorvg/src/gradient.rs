@@ -17,6 +17,7 @@ pub struct ColorStop {
 
 /// How to fill the area outside the gradient bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FillSpread {
     Pad,
     Reflect,
