@@ -1,6 +1,5 @@
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -8,7 +7,7 @@ fn main() {
     let thorvg_src = manifest_dir.join("thorvg");
 
     if cfg!(feature = "vendored") {
-        build_vendored(&thorvg_src, &out_dir);
+        build_vendored_cc(&thorvg_src, &out_dir);
     } else {
         link_system();
     }
@@ -16,108 +15,228 @@ fn main() {
     generate_bindings(&thorvg_src, &out_dir);
 }
 
-/// Build thorvg from the vendored source using meson + ninja.
-fn build_vendored(thorvg_src: &Path, out_dir: &Path) {
-    let build_dir = out_dir.join("thorvg-build");
-    let install_dir = out_dir.join("thorvg-install");
+// ---------------------------------------------------------------------------
+// cc-based vendored build
+// ---------------------------------------------------------------------------
 
-    // Check for meson and ninja
-    check_tool(
-        "meson",
-        "meson is required to build thorvg. Install it with: pip install meson",
-    );
-    check_tool(
-        "ninja",
-        "ninja is required to build thorvg. Install it with your package manager.",
-    );
+/// Build ThorVG from vendored source using the `cc` crate.
+///
+/// The `cc` crate automatically picks up the correct cross-compiler from
+/// Cargo's target environment (e.g. `xtensa-esp32s3-elf-g++` for ESP32-S3,
+/// `arm-none-eabi-g++` for Cortex-M, host `g++`/`clang++` for desktop).
+///
+/// Which loaders and capabilities are compiled is controlled entirely by
+/// cargo features — no target-based heuristics.
+fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
+    let src = thorvg_src.join("src");
+    let target = env::var("TARGET").unwrap_or_default();
 
-    // Create stub directories for meson subdirs that we excluded from
-    // the crates.io package (test/, tools/). Meson's subdir() fails
-    // if the directory doesn't exist, even with -Dtests=false.
-    for stub in &["test", "tools"] {
-        let stub_dir = thorvg_src.join(stub);
-        if !stub_dir.exists() {
-            std::fs::create_dir_all(&stub_dir).ok();
-            std::fs::write(stub_dir.join("meson.build"), "").ok();
+    // Write config.h based on enabled features.
+    write_config_h(out_dir);
+
+    // ── Collect source files ─────────────────────────────────────────────
+
+    let mut sources: Vec<PathBuf> = Vec::new();
+
+    // Core (always compiled): renderer, SW engine, common, C API, raw loader.
+    add_dir_cpp(&mut sources, &src.join("renderer"));
+    add_dir_cpp(&mut sources, &src.join("renderer/cpu_engine"));
+    add_dir_cpp(&mut sources, &src.join("common"));
+    add_dir_cpp(&mut sources, &src.join("bindings/capi"));
+    add_dir_cpp(&mut sources, &src.join("loaders/raw"));
+
+    // Feature-gated loaders.
+    if cfg!(feature = "lottie") {
+        add_dir_cpp(&mut sources, &src.join("loaders/lottie"));
+
+        if cfg!(feature = "expressions") {
+            add_dir_cpp_recursive(&mut sources, &src.join("loaders/lottie/jerryscript"));
+        } else {
+            // Without expressions, exclude the expressions source file
+            // (it references JerryScript headers).
+            sources.retain(|p| !p.to_string_lossy().contains("tvgLottieExpressions"));
         }
     }
 
-    // Configure with meson (only if not already configured)
-    if !build_dir.join("build.ninja").exists() {
-        let status = Command::new("meson")
-            .arg("setup")
-            .arg(&build_dir)
-            .arg(thorvg_src)
-            .arg(format!("--prefix={}", install_dir.display()))
-            .arg("--default-library=static")
-            .arg("--buildtype=release")
-            .arg("-Dbindings=capi")
-            .arg("-Dloaders=all")
-            .arg("-Dthreads=true")
-            .arg("-Dstatic=true")
-            // Disable tools and tests for faster builds
-            .arg("-Dtools=")
-            .arg("-Dtests=false")
-            .arg("-Dlog=false")
-            .status()
-            .expect("Failed to run meson setup");
-
-        assert!(status.success(), "meson setup failed");
+    if cfg!(feature = "svg") {
+        add_dir_cpp(&mut sources, &src.join("loaders/svg"));
     }
 
-    // Build with ninja
-    let status = Command::new("ninja")
-        .arg("-C")
-        .arg(&build_dir)
-        .status()
-        .expect("Failed to run ninja");
+    if cfg!(feature = "png") {
+        add_dir_cpp(&mut sources, &src.join("loaders/png"));
+    }
 
-    assert!(status.success(), "ninja build failed");
+    if cfg!(feature = "fonts") {
+        add_dir_cpp(&mut sources, &src.join("loaders/sfnt"));
+    }
 
-    // Install to get clean lib/include layout
-    let status = Command::new("meson")
-        .arg("install")
-        .arg("-C")
-        .arg(&build_dir)
-        .status()
-        .expect("Failed to run meson install");
+    // Always exclude GPU engine files.
+    sources.retain(|p| {
+        let s = p.to_string_lossy();
+        !s.contains("gpu_engine") && !s.contains("tvgGl") && !s.contains("tvgWg")
+    });
 
-    assert!(status.success(), "meson install failed");
+    // ── Include paths ────────────────────────────────────────────────────
 
-    // Find the static library
-    // meson installs to lib/, lib64/, or lib/x86_64-linux-gnu/ depending on distro
-    let lib_dir = find_lib_dir(&install_dir);
+    let mut include_dirs: Vec<PathBuf> = vec![
+        out_dir.to_path_buf(), // config.h
+        thorvg_src.join("inc"), // thorvg.h public C++ header
+        src.join("renderer"),
+        src.join("renderer/cpu_engine"),
+        src.join("common"),
+        src.join("bindings/capi"),
+        src.join("loaders/raw"),
+    ];
 
-    println!("cargo:rustc-link-search=native={}", lib_dir.display());
-    println!("cargo:rustc-link-lib=static=thorvg-1");
+    if cfg!(feature = "lottie") {
+        include_dirs.push(src.join("loaders/lottie"));
+        include_dirs.push(src.join("loaders/lottie/rapidjson"));
 
-    // ThorVG depends on these system libraries
-    let target = env::var("TARGET").unwrap();
-    if target.contains("apple") || target.contains("freebsd") {
+        if cfg!(feature = "expressions") {
+            for sub in &[
+                "jerry-core",
+                "jerry-core/include",
+                "jerry-core/ecma/base",
+                "jerry-core/ecma/builtin-objects",
+                "jerry-core/ecma/builtin-objects/typedarray",
+                "jerry-core/ecma/operations",
+                "jerry-core/jcontext",
+                "jerry-core/jmem",
+                "jerry-core/jrt",
+                "jerry-core/lit",
+                "jerry-core/parser/js",
+                "jerry-core/parser/regexp",
+                "jerry-core/vm",
+                "jerry-port/common",
+            ] {
+                include_dirs.push(src.join("loaders/lottie/jerryscript").join(sub));
+            }
+        }
+    }
+
+    if cfg!(feature = "svg") {
+        include_dirs.push(src.join("loaders/svg"));
+    }
+
+    if cfg!(feature = "png") {
+        include_dirs.push(src.join("loaders/png"));
+    }
+
+    if cfg!(feature = "fonts") {
+        include_dirs.push(src.join("loaders/sfnt"));
+    }
+
+    // ── Build ────────────────────────────────────────────────────────────
+
+    let mut build = cc::Build::new();
+    build.cpp(true).std("c++14").warnings(false);
+
+    // -- Target-specific plumbing (not policy) ----------------------------
+
+    // Expose POSIX functions (strdup, strncasecmp, etc.) on newlib
+    // toolchains where they are gated behind feature-test macros.
+    build.define("_DEFAULT_SOURCE", None);
+
+    // JerryScript's JERRY_VLA fallback uses alloca() without including
+    // <alloca.h>.  Override the macro to use C99 VLAs which GCC and
+    // Clang support natively.
+    if cfg!(feature = "expressions") {
+        build.define("JERRY_VLA(type,name,size)", "type name[size]");
+    }
+
+    // ESP-IDF provides its own C++ runtime (libcxx component) — prevent
+    // the cc crate from auto-linking libstdc++ which would cause
+    // multiple-definition errors.
+    if target.contains("espidf") {
+        build.cpp_set_stdlib(None);
+    }
+
+    // Xtensa target selection — the generic `xtensa-esp-elf-g++` defaults
+    // to big-endian.  The target-specific wrappers select the correct
+    // multilib (little-endian) automatically.
+    if target.contains("esp32s3") {
+        build.compiler("xtensa-esp32s3-elf-g++");
+    } else if target.contains("esp32s2") {
+        build.compiler("xtensa-esp32s2-elf-g++");
+    } else if target.contains("esp32") && target.contains("xtensa") {
+        build.compiler("xtensa-esp32-elf-g++");
+    }
+
+    // Optimise for size on small targets.
+    if target.contains("xtensa")
+        || target.contains("riscv32")
+        || target.contains("thumbv")
+        || target.contains("arm")
+    {
+        build.opt_level_str("s");
+    }
+
+    // -- Compile -----------------------------------------------------------
+
+    for dir in &include_dirs {
+        build.include(dir);
+    }
+    for src_file in &sources {
+        build.file(src_file);
+    }
+
+    build.compile("thorvg");
+
+    println!("cargo:rustc-link-lib=static=thorvg");
+
+    // Link C++ runtime where needed.
+    if target.contains("espidf") {
+        // ESP-IDF links its own C++ support; nothing to add.
+    } else if target.contains("apple") || target.contains("freebsd") {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target.contains("linux") || target.contains("gnu") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     }
-
-    // Link pthread for threading support
-    println!("cargo:rustc-link-lib=dylib=pthread");
-
-    // Link OpenMP (thorvg uses it for parallel rasterization)
-    link_optional_dep("openmp");
-    // Fallback: link gomp directly if pkg-config doesn't find openmp
-    if pkg_config::probe_library("openmp").is_err() {
-        println!("cargo:rustc-link-lib=dylib=gomp");
-    }
-
-    // Link optional loader dependencies (if available)
-    link_optional_dep("libpng");
-    link_optional_dep("libturbojpeg");
-    link_optional_dep("libwebp");
+    // Other bare-metal targets link C++ via their sysroot automatically.
 
     println!("cargo:rerun-if-changed=thorvg/src");
-    println!("cargo:rerun-if-changed=thorvg/inc");
-    println!("cargo:rerun-if-changed=thorvg/meson.build");
 }
+
+/// Write `config.h` based on enabled cargo features.
+fn write_config_h(out_dir: &Path) {
+    let mut config = String::from(
+        "/* Generated by thorvg-sys build.rs — do not edit. */\n\
+         #pragma once\n\n\
+         #define THORVG_CAPI_BINDING_SUPPORT 1\n\
+         #define THORVG_CPU_ENGINE_SUPPORT 1\n\
+         #define THORVG_VERSION_STRING \"1.0.5\"\n",
+    );
+
+    if cfg!(feature = "lottie") {
+        config.push_str("#define THORVG_LOTTIE_LOADER_SUPPORT 1\n");
+    }
+    if cfg!(feature = "expressions") {
+        config.push_str("#define THORVG_LOTTIE_EXPRESSIONS_SUPPORT 1\n");
+    }
+    if cfg!(feature = "svg") {
+        config.push_str("#define THORVG_SVG_LOADER_SUPPORT 1\n");
+    }
+    if cfg!(feature = "png") {
+        config.push_str("#define THORVG_PNG_LOADER_SUPPORT 1\n");
+    }
+    if cfg!(feature = "fonts") {
+        config.push_str("#define THORVG_SFNT_LOADER_SUPPORT 1\n");
+        config.push_str("#define THORVG_OTF_LOADER_SUPPORT 1\n");
+        config.push_str("#define THORVG_TTF_LOADER_SUPPORT 1\n");
+    }
+    if cfg!(feature = "threads") {
+        config.push_str("#define THORVG_THREAD_SUPPORT 1\n");
+    }
+    if cfg!(feature = "file-io") {
+        config.push_str("#define THORVG_FILE_IO_SUPPORT 1\n");
+    }
+
+    std::fs::write(out_dir.join("config.h"), config).expect("failed to write config.h");
+}
+
+// ---------------------------------------------------------------------------
+// System (non-vendored) build
+// ---------------------------------------------------------------------------
 
 /// Link against a system-installed thorvg via pkg-config.
 fn link_system() {
@@ -129,6 +248,10 @@ fn link_system() {
              Either install thorvg or enable the `vendored` feature.",
         );
 }
+
+// ---------------------------------------------------------------------------
+// Bindgen
+// ---------------------------------------------------------------------------
 
 /// Generate Rust bindings from the C API header.
 fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
@@ -143,10 +266,10 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
     let bindings = bindgen::Builder::default()
         .header(capi_header.to_string_lossy())
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .clang_arg(format!("-I{}", out_dir.display()))
         .allowlist_function("tvg_.*")
         .allowlist_type("Tvg_.*")
         .allowlist_var("TVG_.*")
-        // Generate Rust enums from C enums
         .rustified_enum("Tvg_Result")
         .rustified_enum("Tvg_Colorspace")
         .rustified_enum("Tvg_Engine_Option")
@@ -159,7 +282,6 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .rustified_enum("Tvg_Fill_Rule")
         .rustified_enum("Tvg_Text_Wrap")
         .rustified_enum("Tvg_Filter_Method")
-        // no_std support: use core types instead of std
         .use_core()
         .layout_tests(true)
         .generate()
@@ -170,43 +292,49 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .expect("Couldn't write bindings!");
 }
 
-/// Check that a build tool is available on PATH.
-fn check_tool(name: &str, help: &str) {
-    let result = Command::new("which").arg(name).output();
-    match result {
-        Ok(output) if output.status.success() => {}
-        _ => panic!("{name} not found. {help}"),
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Collect all `.cpp` files in a directory (non-recursive).
+fn add_dir_cpp(out: &mut Vec<PathBuf>, dir: &Path) {
+    if !dir.exists() {
+        return;
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "cpp") {
+                out.push(path);
+            }
+        }
     }
 }
 
-/// Find the library directory under the install prefix.
-fn find_lib_dir(install_dir: &Path) -> PathBuf {
-    let candidates = [
-        install_dir.join("lib"),
-        install_dir.join("lib64"),
-        install_dir.join("lib").join("x86_64-linux-gnu"),
-    ];
-
-    for dir in &candidates {
-        if dir.join("libthorvg-1.a").exists() {
-            return dir.clone();
+/// Collect all `.cpp` files in a directory tree (recursive).
+fn add_dir_cpp_recursive(out: &mut Vec<PathBuf>, dir: &Path) {
+    if !dir.exists() {
+        return;
+    }
+    for entry in walkdir(dir) {
+        if entry.extension().is_some_and(|e| e == "cpp") {
+            out.push(entry);
         }
     }
-
-    // Fall back to lib/
-    candidates[0].clone()
 }
 
-/// Try to link an optional system dependency via pkg-config.
-fn link_optional_dep(name: &str) {
-    // We only print the link flags; if the dep is missing the loader just won't work
-    // at runtime (thorvg handles this gracefully).
-    if let Ok(lib) = pkg_config::probe_library(name) {
-        for path in &lib.link_paths {
-            println!("cargo:rustc-link-search=native={}", path.display());
-        }
-        for lib_name in &lib.libs {
-            println!("cargo:rustc-link-lib=dylib={lib_name}");
+/// Simple recursive directory walk (avoids pulling in the `walkdir` crate).
+fn walkdir(dir: &Path) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                result.extend(walkdir(&path));
+            } else {
+                result.push(path);
+            }
         }
     }
+    result
 }

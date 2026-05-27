@@ -1,6 +1,6 @@
 [package]
 name = "thorvg-sys"
-version = "1.0.1"
+version = "1.0.5"
 edition = "2024"
 license = "MIT"
 description = "Raw FFI bindings to the ThorVG vector graphics library"
@@ -17,9 +17,7 @@ include = [
     "/src/",
     # Vendored ThorVG: source, headers, build files, and licenses
     "thorvg/LICENSE",
-    "thorvg/meson.build",
-    "thorvg/meson_options.txt",
-    "thorvg/**/meson.build",
+    "thorvg/inc/**",
     "thorvg/**/*.cpp",
     "thorvg/**/*.h",
     "thorvg/**/*.c",
@@ -27,9 +25,23 @@ include = [
 ]
 
 [features]
-default = ["vendored"]
+default = ["vendored", "lottie", "svg", "png", "fonts", "expressions", "threads", "file-io"]
 vendored = []
+
+# ── Loader features ──────────────────────────────────────────────
+# Each loader adds the corresponding ThorVG source files and config
+# define.  Disable defaults and pick what you need for embedded.
+lottie      = []   # Lottie animation loader
+svg         = []   # SVG loader
+png         = []   # Built-in PNG loader (lodepng, no system dep)
+fonts       = []   # SFNT / OTF / TTF font loaders
+
+# ── Optional capabilities ────────────────────────────────────────
+expressions = []   # Lottie expressions via JerryScript (~200 KB RAM)
+threads     = []   # Multi-threaded TaskScheduler (std::thread)
+file-io     = []   # Filesystem I/O APIs (Picture::load, etc.)
 
 [build-dependencies]
 bindgen = "0.71"
+cc = "1"
 pkg-config = "0.3"
