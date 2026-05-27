@@ -3,9 +3,25 @@ use crate::picture::Picture;
 use thorvg_sys as ffi;
 
 /// An animation controller for animated content (e.g., Lottie).
+///
+/// # Thread Safety
+///
+/// `Animation` is [`Send`] but not [`Sync`]: you may move it to another
+/// thread, but you must not share references across threads.
 pub struct Animation {
     raw: ffi::Tvg_Animation,
 }
+
+// SAFETY: `Animation` exclusively owns a heap-allocated ThorVG animation
+// handle (`Tvg_Animation`).  The C++ implementation guards shared global
+// state (loader registry, memory pool) with internal mutexes.  Per-object
+// state is only accessed through `&mut self`.  Transferring sole ownership
+// to another thread is safe.
+//
+// `Animation` is intentionally `!Sync`: the raw pointer field prevents the
+// auto-`Sync` impl, which is correct — concurrent `&`-access to the same
+// C handle would be a data race.
+unsafe impl Send for Animation {}
 
 impl Animation {
     /// Returns the raw `Tvg_Animation` handle.

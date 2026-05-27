@@ -8,6 +8,10 @@ pub struct Scene {
     owned: bool,
 }
 
+// SAFETY: Same rationale as other ThorVG handle types — exclusive
+// ownership of a C heap object; global state is mutex-protected.
+unsafe impl Send for Scene {}
+
 impl Scene {
     /// Creates a new Scene object.
     pub fn new() -> Self {

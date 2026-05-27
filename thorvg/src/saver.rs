@@ -10,6 +10,10 @@ pub struct Saver {
     raw: ffi::Tvg_Saver,
 }
 
+// SAFETY: Same rationale as other ThorVG handle types — exclusive
+// ownership of a C heap object; global state is mutex-protected.
+unsafe impl Send for Saver {}
+
 impl Saver {
     /// Creates a new Saver object.
     pub fn new() -> Self {

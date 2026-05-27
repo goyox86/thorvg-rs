@@ -52,6 +52,10 @@ pub struct Text {
     owned: bool,
 }
 
+// SAFETY: Same rationale as other ThorVG handle types — exclusive
+// ownership of a C heap object; global state is mutex-protected.
+unsafe impl Send for Text {}
+
 impl Text {
     /// Creates a new Text object.
     pub fn new() -> Self {

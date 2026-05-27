@@ -57,11 +57,27 @@ impl EngineOption {
 ///
 /// This canvas uses the CPU engine for rendering.
 ///
-/// Not `Send` or `Sync` — a single canvas must be used from one thread.
+/// # Thread Safety
+///
+/// `SwCanvas` is [`Send`] but not [`Sync`]: you may move it to another
+/// thread, but you must not share references across threads.  All
+/// mutation goes through `&mut self`, so the borrow checker enforces
+/// exclusive access at compile time.
 pub struct SwCanvas {
     raw: ffi::Tvg_Canvas,
-    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
+
+// SAFETY: `SwCanvas` exclusively owns a heap-allocated ThorVG canvas
+// (`Tvg_Canvas`).  The C++ implementation guards shared global state
+// (renderer ref-count, memory pool, loader registry) with internal
+// mutexes (`_rendererMtx`, `ScopedLock` / `StrictKey`), and per-canvas
+// state is only accessed through `&mut self`.  Transferring sole
+// ownership to another thread is therefore safe.
+//
+// `SwCanvas` is intentionally `!Sync`: the raw pointer field prevents
+// the auto-`Sync` impl, which is correct — concurrent `&`-access to
+// the same C handle would be a data race.
+unsafe impl Send for SwCanvas {}
 
 impl SwCanvas {
     /// Creates a new software canvas with the given engine options.
@@ -70,10 +86,7 @@ impl SwCanvas {
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self {
-            raw,
-            _not_send_sync: core::marker::PhantomData,
-        })
+        Ok(Self { raw })
     }
 
     /// Sets the rendering target buffer.
@@ -242,11 +255,17 @@ macro_rules! impl_canvas_ops {
 
 /// An OpenGL/ES-rendered canvas.
 ///
-/// Not `Send` or `Sync` — a single canvas must be used from one thread.
+/// # Thread Safety
+///
+/// `GlCanvas` is [`Send`] but not [`Sync`]: you may move it to another
+/// thread, but you must not share references across threads.
 pub struct GlCanvas {
     raw: ffi::Tvg_Canvas,
-    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
+
+// SAFETY: same rationale as `SwCanvas` — exclusive ownership of a
+// heap-allocated C handle; global state is mutex-protected.
+unsafe impl Send for GlCanvas {}
 
 impl GlCanvas {
     /// Creates a new OpenGL canvas with the given engine options.
@@ -255,10 +274,7 @@ impl GlCanvas {
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self {
-            raw,
-            _not_send_sync: core::marker::PhantomData,
-        })
+        Ok(Self { raw })
     }
 
     /// Sets the OpenGL drawing target.
@@ -314,11 +330,17 @@ pub enum WgTargetType {
 
 /// A WebGPU-rendered canvas.
 ///
-/// Not `Send` or `Sync` — a single canvas must be used from one thread.
+/// # Thread Safety
+///
+/// `WgCanvas` is [`Send`] but not [`Sync`]: you may move it to another
+/// thread, but you must not share references across threads.
 pub struct WgCanvas {
     raw: ffi::Tvg_Canvas,
-    _not_send_sync: core::marker::PhantomData<*const ()>,
 }
+
+// SAFETY: same rationale as `SwCanvas` — exclusive ownership of a
+// heap-allocated C handle; global state is mutex-protected.
+unsafe impl Send for WgCanvas {}
 
 impl WgCanvas {
     /// Creates a new WebGPU canvas with the given engine options.
@@ -327,10 +349,7 @@ impl WgCanvas {
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self {
-            raw,
-            _not_send_sync: core::marker::PhantomData,
-        })
+        Ok(Self { raw })
     }
 
     /// Sets the WebGPU drawing target.

@@ -24,10 +24,19 @@ impl FilterMethod {
 }
 
 /// A picture object for loading and displaying images (SVG, PNG, JPG, Lottie, etc.).
+///
+/// # Thread Safety
+///
+/// `Picture` is [`Send`] but not [`Sync`].
 pub struct Picture {
     raw: ffi::Tvg_Paint,
     owned: bool,
 }
+
+// SAFETY: `Picture` exclusively owns (or borrows) a heap-allocated ThorVG
+// paint handle.  Shared global state is mutex-protected in C++.  Sole
+// ownership transfer to another thread is safe.
+unsafe impl Send for Picture {}
 
 impl Picture {
     /// Creates a new Picture object.

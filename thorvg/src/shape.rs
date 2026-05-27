@@ -89,6 +89,10 @@ pub struct Shape {
     owned: bool,
 }
 
+// SAFETY: Same rationale as other ThorVG handle types — exclusive
+// ownership of a C heap object; global state is mutex-protected.
+unsafe impl Send for Shape {}
+
 impl Shape {
     /// Creates a new Shape object.
     pub fn new() -> Self {
