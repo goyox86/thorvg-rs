@@ -38,8 +38,6 @@ pub enum EngineOption {
     Default,
     /// Enable smart (partial) rendering.
     SmartRender,
-    /// Disable anti-aliasing.
-    Aliased,
 }
 
 impl EngineOption {
@@ -48,7 +46,6 @@ impl EngineOption {
             EngineOption::None => ffi::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE,
             EngineOption::Default => ffi::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT,
             EngineOption::SmartRender => ffi::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER,
-            EngineOption::Aliased => ffi::Tvg_Engine_Option::TVG_ENGINE_OPTION_ALIASED,
         }
     }
 }
