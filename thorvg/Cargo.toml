@@ -1,6 +1,6 @@
 [package]
 name = "thorvg"
-version = "0.1.1"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "Safe Rust bindings to the ThorVG vector graphics library"
@@ -12,11 +12,22 @@ categories = ["graphics", "rendering", "no-std"]
 keywords = ["thorvg", "vector-graphics", "svg", "lottie", "canvas"]
 
 [features]
-default = ["std"]
-std = []
+default = ["vendored", "std", "lottie", "svg", "png", "fonts", "expressions", "threads", "file-io"]
+vendored = ["thorvg-sys/vendored"]
+std = ["thorvg-sys/file-io"]
+
+# Pass-through features to thorvg-sys — controls which ThorVG loaders
+# and capabilities are compiled into the static library.
+lottie      = ["thorvg-sys/lottie"]
+svg         = ["thorvg-sys/svg"]
+png         = ["thorvg-sys/png"]
+fonts       = ["thorvg-sys/fonts"]
+expressions = ["thorvg-sys/expressions"]
+threads     = ["thorvg-sys/threads"]
+file-io     = ["thorvg-sys/file-io"]
 
 [dependencies]
-thorvg-sys = { path = "../thorvg-sys", version = "1.0.1" }
+thorvg-sys = { path = "../thorvg-sys", version = "1.0.5", default-features = false }
 
 [dev-dependencies]
 png = "0.17"

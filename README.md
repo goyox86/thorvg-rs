@@ -34,15 +34,58 @@ canvas.sync().unwrap();
 
 ## Features
 
-- **`std`** (default) — Adds file I/O APIs that accept `std::path::Path`
-- **`vendored`** (default, `thorvg-sys`) — Builds ThorVG from source via the vendored git submodule
+### `thorvg` (safe wrapper)
 
-Disable default features for `no_std` + `alloc` environments:
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `std` | ✅ | File I/O APIs (`Picture::load`, `Text::load_font`, etc.) |
+| `vendored` | ✅ | Build ThorVG from source via the `cc` crate |
+| `lottie` | ✅ | Lottie animation loader |
+| `svg` | ✅ | SVG loader |
+| `png` | ✅ | Built-in PNG loader (lodepng, no system dep) |
+| `fonts` | ✅ | SFNT / OTF / TTF font loaders |
+| `expressions` | ✅ | Lottie expressions via JerryScript (~200 KB RAM) |
+| `threads` | ✅ | Multi-threaded TaskScheduler (`std::thread`) |
+| `file-io` | ✅ | Filesystem I/O support in ThorVG |
+
+All features are pass-throughs to `thorvg-sys`.
+
+### Desktop (default — everything enabled)
 
 ```toml
 [dependencies]
-thorvg = { version = "0.1", default-features = false }
+thorvg = "0.1"
 ```
+
+### Embedded / `no_std` (pick only what you need)
+
+```toml
+[dependencies]
+thorvg = { version = "0.1", default-features = false, features = ["vendored", "lottie", "svg"] }
+```
+
+This gives you Lottie + SVG playback with no threads, no JerryScript,
+no PNG/font loaders — suitable for microcontrollers with limited RAM.
+
+## Cross-Compilation
+
+ThorVG is compiled from C++ source using the [`cc`](https://crates.io/crates/cc) crate, which
+automatically picks up the correct cross-compiler from Cargo's target
+environment. No meson or ninja required.
+
+Tested targets:
+
+| Target | Compiler | Notes |
+|--------|----------|-------|
+| `x86_64-unknown-linux-gnu` | `g++` / `clang++` | Desktop default |
+| `xtensa-esp32s3-espidf` | `xtensa-esp32s3-elf-g++` | ESP32-S3 (Waveshare Knob Touch S3) |
+| `xtensa-esp32-espidf` | `xtensa-esp32-elf-g++` | ESP32 |
+| `riscv32imc-esp-espidf` | `riscv32-esp-elf-g++` | ESP32-C6 |
+| `thumbv8m.main-none-eabihf` | `arm-none-eabi-g++` | RP2350 / Cortex-M33 |
+
+For Xtensa targets, the build script automatically selects the correct
+target-specific compiler wrapper (e.g. `xtensa-esp32s3-elf-g++`) to
+ensure the right endianness and ABI.
 
 ## API Coverage
 
@@ -62,7 +105,10 @@ thorvg = { version = "0.1", default-features = false }
 
 ## `no_std` Support
 
-Both crates are `no_std` compatible. The safe wrapper requires `alloc`. File I/O APIs (`Picture::load`, `Text::load_font`, `Saver::save`) are gated behind the `std` feature. All rendering, shapes, gradients, scenes, and canvas operations work in `no_std`.
+Both crates are `no_std` compatible. The safe wrapper requires `alloc`.
+File I/O APIs (`Picture::load`, `Text::load_font`, `Saver::save`) are
+gated behind the `std` feature. All rendering, shapes, gradients,
+scenes, and canvas operations work in `no_std`.
 
 ## Examples
 
@@ -87,29 +133,17 @@ All examples output PNG files in the current directory.
 
 ## Building
 
-ThorVG is vendored as a git submodule and built automatically. You need `meson` and `ninja` installed:
+ThorVG is vendored as a git submodule and compiled automatically via
+the [`cc`](https://crates.io/crates/cc) crate. You need a C++ compiler
+(any `g++` or `clang++` will do):
 
 ```bash
-# Debian/Ubuntu
-sudo apt install meson ninja-build
-
-# Fedora
-sudo dnf install meson ninja-build
-
-# macOS
-brew install meson ninja
-
-# pip
-pip install meson ninja
-```
-
-Then:
-
-```bash
-git clone --recurse-submodules https://github.com/user/thorvg-rs
+git clone --recurse-submodules https://github.com/goyox86/thorvg-rs
 cd thorvg-rs
 cargo build
 ```
+
+No meson, ninja, or pkg-config required for vendored builds.
 
 ## Development
 
