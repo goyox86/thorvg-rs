@@ -180,6 +180,16 @@ impl SwCanvas {
         let result = unsafe { ffi::tvg_canvas_set_viewport(self.raw, x, y, w, h) };
         Error::from_raw(result)
     }
+
+    /// Update, draw (clearing the buffer), and sync in one call.
+    ///
+    /// Equivalent to calling [`update`](Self::update), [`draw(true)`](Self::draw),
+    /// and [`sync`](Self::sync) in sequence.
+    pub fn render(&mut self) -> Result<()> {
+        self.update()?;
+        self.draw(true)?;
+        self.sync()
+    }
 }
 
 impl Drop for SwCanvas {
@@ -238,6 +248,16 @@ macro_rules! impl_canvas_ops {
             /// Sets the drawing viewport (clipping region).
             pub fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()> {
                 Error::from_raw(unsafe { ffi::tvg_canvas_set_viewport(self.raw, x, y, w, h) })
+            }
+
+            /// Update, draw (clearing the buffer), and sync in one call.
+            ///
+            /// Equivalent to calling [`update`](Self::update), [`draw(true)`](Self::draw),
+            /// and [`sync`](Self::sync) in sequence.
+            pub fn render(&mut self) -> Result<()> {
+                self.update()?;
+                self.draw(true)?;
+                self.sync()
             }
         }
 

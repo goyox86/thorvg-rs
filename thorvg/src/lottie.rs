@@ -56,6 +56,36 @@ impl LottieAnimation {
         }
     }
 
+    // ── Convenience loaders ──────────────────────────────────────────
+
+    /// Load a Lottie animation from a JSON byte slice.
+    ///
+    /// Convenience wrapper around [`Picture::load_data`] that uses the
+    /// `"lottie"` mimetype and copies the data. For advanced use cases
+    /// (e.g. external asset `resource_path`), access the picture
+    /// directly via [`Animation::picture`].
+    pub fn load_data(&mut self, data: &[u8]) -> Result<()> {
+        let mut pic = self.picture();
+        pic.load_data(data, "lottie", None, true)
+    }
+
+    /// Load a Lottie animation from a file path string.
+    ///
+    /// Convenience wrapper around [`Picture::load_from_str`].
+    #[cfg(feature = "std")]
+    pub fn load_file(&mut self, path: &str) -> Result<()> {
+        let mut pic = self.picture();
+        pic.load_from_str(path)
+    }
+
+    /// Set the render size of the animation picture.
+    ///
+    /// Convenience wrapper around [`Picture::set_size`].
+    pub fn set_size(&mut self, w: f32, h: f32) -> Result<()> {
+        let mut pic = self.picture();
+        pic.set_size(w, h)
+    }
+
     // ── Slots ──────────────────────────────────────────────────────
 
     /// Generates a new slot from the given Lottie slot data (JSON format).
