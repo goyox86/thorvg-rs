@@ -2,3 +2,4 @@
 Cargo.lock
 *.png
 *.ppm
+.pi-lens/
