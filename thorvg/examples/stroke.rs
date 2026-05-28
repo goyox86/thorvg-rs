@@ -9,27 +9,27 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Shape, StrokeCap, StrokeJoin, SwCanvas, Thorvg};
+use thorvg::{ColorSpace, EngineOption, StrokeCap, StrokeJoin, Thorvg};
 
 fn main() {
-    let _engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
+    let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
 
     let width = 800u32;
     let height = 400u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = SwCanvas::new(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Dark background ────────────────────────────────────────────
-    let mut bg = Shape::new();
+    let mut bg = engine.shape();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 30, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Butt cap, Miter join ───────────────────────────────────────
-    let mut shape1 = Shape::new();
+    let mut shape1 = engine.shape();
     shape1.move_to(50.0, 50.0).unwrap();
     shape1.line_to(200.0, 50.0).unwrap();
     shape1.line_to(200.0, 150.0).unwrap();
@@ -40,7 +40,7 @@ fn main() {
     canvas.push(shape1).unwrap();
 
     // ── Round cap, Round join ──────────────────────────────────────
-    let mut shape2 = Shape::new();
+    let mut shape2 = engine.shape();
     shape2.move_to(300.0, 50.0).unwrap();
     shape2.line_to(450.0, 50.0).unwrap();
     shape2.line_to(450.0, 150.0).unwrap();
@@ -51,7 +51,7 @@ fn main() {
     canvas.push(shape2).unwrap();
 
     // ── Square cap, Bevel join ─────────────────────────────────────
-    let mut shape3 = Shape::new();
+    let mut shape3 = engine.shape();
     shape3.move_to(550.0, 50.0).unwrap();
     shape3.line_to(700.0, 50.0).unwrap();
     shape3.line_to(700.0, 150.0).unwrap();
@@ -62,7 +62,7 @@ fn main() {
     canvas.push(shape3).unwrap();
 
     // ── Dashed stroke ──────────────────────────────────────────────
-    let mut dashed = Shape::new();
+    let mut dashed = engine.shape();
     dashed
         .append_rect(50.0, 250.0, 300.0, 100.0, 0.0, 0.0, true)
         .unwrap();
@@ -74,7 +74,7 @@ fn main() {
     canvas.push(dashed).unwrap();
 
     // ── Stroked circle with fill ───────────────────────────────────
-    let mut stroked_circle = Shape::new();
+    let mut stroked_circle = engine.shape();
     stroked_circle
         .append_circle(600.0, 300.0, 60.0, 60.0, true)
         .unwrap();

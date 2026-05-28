@@ -4,12 +4,16 @@ use thorvg_sys as ffi;
 
 /// An animation controller for animated content (e.g., Lottie).
 ///
+/// The lifetime `'eng` ties this animation to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create animations via [`Thorvg::animation()`](crate::Thorvg::animation).
+///
 /// # Thread Safety
 ///
 /// `Animation` is [`Send`] but not [`Sync`]: you may move it to another
 /// thread, but you must not share references across threads.
-pub struct Animation {
+pub struct Animation<'eng> {
     raw: ffi::Tvg_Animation,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: `Animation` exclusively owns a heap-allocated ThorVG animation
@@ -21,9 +25,9 @@ pub struct Animation {
 // `Animation` is intentionally `!Sync`: the raw pointer field prevents the
 // auto-`Sync` impl, which is correct — concurrent `&`-access to the same
 // C handle would be a data race.
-unsafe impl Send for Animation {}
+unsafe impl Send for Animation<'_> {}
 
-impl Animation {
+impl Animation<'_> {
     /// Returns the raw `Tvg_Animation` handle.
     pub(crate) fn raw(&self) -> ffi::Tvg_Animation {
         self.raw
@@ -34,20 +38,26 @@ impl Animation {
     /// # Safety
     /// `raw` must be a valid, owned `Tvg_Animation`.
     pub(crate) unsafe fn from_raw(raw: ffi::Tvg_Animation) -> Self {
-        Self { raw }
+        Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Creates a new Animation object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_animation_new() };
         assert!(!raw.is_null(), "failed to create Animation");
-        Self { raw }
+        Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Returns the associated Picture object.
     ///
     /// The returned Picture is **not owned** — it is managed by the Animation.
-    pub fn picture(&self) -> Picture {
+    pub fn picture(&self) -> Picture<'_> {
         let raw = unsafe { ffi::tvg_animation_get_picture(self.raw) };
         assert!(!raw.is_null(), "animation has no picture");
         unsafe { Picture::from_raw(raw, false) }
@@ -94,7 +104,7 @@ impl Animation {
     }
 }
 
-impl Drop for Animation {
+impl Drop for Animation<'_> {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_animation_del(self.raw);
@@ -102,7 +112,7 @@ impl Drop for Animation {
     }
 }
 
-impl core::fmt::Debug for Animation {
+impl core::fmt::Debug for Animation<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Animation").finish_non_exhaustive()
     }

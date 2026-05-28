@@ -7,24 +7,24 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Shape, StrokeCap, StrokeJoin, SwCanvas, Thorvg};
+use thorvg::{ColorSpace, EngineOption, StrokeCap, StrokeJoin, Thorvg};
 
 fn main() {
-    let _engine = Thorvg::init(0).unwrap();
+    let engine = Thorvg::init(0).unwrap();
     let (w, h) = (800u32, 600u32);
     let mut buffer = vec![0u32; (w * h) as usize];
-    let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Background
-    let mut bg = Shape::new();
+    let mut bg = engine.shape();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(15, 15, 25, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── 5-pointed star ─────────────────────────────────────────────
-    let mut star = Shape::new();
+    let mut star = engine.shape();
     let (cx, cy) = (120.0f32, 140.0f32);
     let (outer, inner) = (80.0f32, 35.0f32);
     for i in 0..10 {
@@ -45,7 +45,7 @@ fn main() {
     canvas.push(star).unwrap();
 
     // ── Heart shape (cubic Béziers) ────────────────────────────────
-    let mut heart = Shape::new();
+    let mut heart = engine.shape();
     let hx = 320.0f32;
     let hy = 160.0f32;
     heart.move_to(hx, hy).unwrap();
@@ -73,7 +73,7 @@ fn main() {
     canvas.push(heart).unwrap();
 
     // ── Spiral (stroked path) ──────────────────────────────────────
-    let mut spiral = Shape::new();
+    let mut spiral = engine.shape();
     let (sx, sy) = (580.0f32, 140.0f32);
     spiral.move_to(sx, sy).unwrap();
     let turns = 4.0f32;
@@ -92,7 +92,7 @@ fn main() {
     canvas.push(spiral).unwrap();
 
     // ── Wavy line ──────────────────────────────────────────────────
-    let mut wave = Shape::new();
+    let mut wave = engine.shape();
     wave.move_to(50.0, 420.0).unwrap();
     let segments = 12;
     let seg_w = 60.0f32;
@@ -116,7 +116,7 @@ fn main() {
     canvas.push(wave).unwrap();
 
     // ── Polygon (hexagon) ──────────────────────────────────────────
-    let mut hex = Shape::new();
+    let mut hex = engine.shape();
     let (hcx, hcy, hr) = (150.0f32, 520.0f32, 50.0f32);
     for i in 0..6 {
         let angle = core::f32::consts::PI * i as f32 / 3.0 - core::f32::consts::FRAC_PI_2;
@@ -135,7 +135,7 @@ fn main() {
     canvas.push(hex).unwrap();
 
     // ── Arrow shape ────────────────────────────────────────────────
-    let mut arrow = Shape::new();
+    let mut arrow = engine.shape();
     arrow.move_to(350.0, 500.0).unwrap();
     arrow.line_to(500.0, 530.0).unwrap();
     arrow.line_to(350.0, 560.0).unwrap();
@@ -145,7 +145,7 @@ fn main() {
     canvas.push(arrow).unwrap();
 
     // ── Infinity symbol (figure-8 with Béziers) ────────────────────
-    let mut inf = Shape::new();
+    let mut inf = engine.shape();
     let ix = 620.0f32;
     let iy = 530.0f32;
     inf.move_to(ix, iy).unwrap();

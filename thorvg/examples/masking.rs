@@ -8,20 +8,20 @@
 mod common;
 
 use thorvg::{
-    ColorSpace, ColorStop, EngineOption, LinearGradient, MaskMethod, Paint, Shape, SwCanvas, Thorvg,
+    ColorSpace, ColorStop, EngineOption, MaskMethod, Paint, Thorvg,
 };
 
 fn main() {
-    let _engine = Thorvg::init(0).unwrap();
+    let engine = Thorvg::init(0).unwrap();
     let (w, h) = (700u32, 350u32);
     let mut buffer = vec![0u32; (w * h) as usize];
-    let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Checkerboard background
     for row in 0..(h / 15) {
         for col in 0..(w / 15) {
-            let mut sq = Shape::new();
+            let mut sq = engine.shape();
             sq.append_rect(
                 col as f32 * 15.0,
                 row as f32 * 15.0,
@@ -39,14 +39,14 @@ fn main() {
     }
 
     // ── Alpha mask: gradient circle masks a rectangle ───────────────
-    let mut rect1 = Shape::new();
+    let mut rect1 = engine.shape();
     rect1
         .append_rect(30.0, 50.0, 200.0, 200.0, 0.0, 0.0, true)
         .unwrap();
     rect1.set_fill_color(50, 50, 220, 255).unwrap();
 
     // Mask target: circle with gradient alpha
-    let mut grad = LinearGradient::new();
+    let mut grad = engine.linear_gradient();
     grad.set_bounds(30.0, 50.0, 230.0, 250.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -66,7 +66,7 @@ fn main() {
     ])
     .unwrap();
 
-    let mut mask1 = Shape::new();
+    let mut mask1 = engine.shape();
     mask1.append_circle(130.0, 150.0, 90.0, 90.0, true).unwrap();
     mask1.set_linear_gradient(grad).unwrap();
 
@@ -74,13 +74,13 @@ fn main() {
     canvas.push(rect1).unwrap();
 
     // ── InvAlpha mask ──────────────────────────────────────────────
-    let mut rect2 = Shape::new();
+    let mut rect2 = engine.shape();
     rect2
         .append_rect(260.0, 50.0, 200.0, 200.0, 0.0, 0.0, true)
         .unwrap();
     rect2.set_fill_color(220, 50, 50, 255).unwrap();
 
-    let mut mask2 = Shape::new();
+    let mut mask2 = engine.shape();
     mask2.append_circle(360.0, 150.0, 60.0, 60.0, true).unwrap();
     mask2.set_fill_color(255, 255, 255, 255).unwrap();
 
@@ -88,13 +88,13 @@ fn main() {
     canvas.push(rect2).unwrap();
 
     // ── Luma mask ──────────────────────────────────────────────────
-    let mut rect3 = Shape::new();
+    let mut rect3 = engine.shape();
     rect3
         .append_rect(490.0, 50.0, 180.0, 200.0, 15.0, 15.0, true)
         .unwrap();
     rect3.set_fill_color(50, 200, 50, 255).unwrap();
 
-    let mut grad3 = LinearGradient::new();
+    let mut grad3 = engine.linear_gradient();
     grad3.set_bounds(490.0, 50.0, 670.0, 250.0).unwrap();
     grad3
         .set_color_stops(&[
@@ -115,7 +115,7 @@ fn main() {
         ])
         .unwrap();
 
-    let mut mask3 = Shape::new();
+    let mut mask3 = engine.shape();
     mask3
         .append_rect(490.0, 50.0, 180.0, 200.0, 0.0, 0.0, true)
         .unwrap();

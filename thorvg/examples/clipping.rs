@@ -7,24 +7,24 @@
 
 mod common;
 
-use thorvg::{ColorSpace, ColorStop, EngineOption, LinearGradient, Paint, Shape, SwCanvas, Thorvg};
+use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Thorvg};
 
 fn main() {
-    let _engine = Thorvg::init(0).unwrap();
+    let engine = Thorvg::init(0).unwrap();
     let (w, h) = (600u32, 400u32);
     let mut buffer = vec![0u32; (w * h) as usize];
-    let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Background
-    let mut bg = Shape::new();
+    let mut bg = engine.shape();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 50, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Left: gradient rectangle clipped by a circle ───────────────
-    let mut grad = LinearGradient::new();
+    let mut grad = engine.linear_gradient();
     grad.set_bounds(50.0, 50.0, 250.0, 300.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -44,20 +44,20 @@ fn main() {
     ])
     .unwrap();
 
-    let mut rect = Shape::new();
+    let mut rect = engine.shape();
     rect.append_rect(50.0, 50.0, 200.0, 300.0, 0.0, 0.0, true)
         .unwrap();
     rect.set_linear_gradient(grad).unwrap();
 
     // Circle clip
-    let mut clip1 = Shape::new();
+    let mut clip1 = engine.shape();
     clip1.append_circle(150.0, 200.0, 90.0, 90.0, true).unwrap();
     rect.set_clip(&clip1).unwrap();
 
     canvas.push(rect).unwrap();
 
     // ── Right: star shape clipped by a rounded rectangle ───────────
-    let mut star = Shape::new();
+    let mut star = engine.shape();
     let cx = 440.0f32;
     let cy = 200.0f32;
     let spikes = 6;
@@ -79,7 +79,7 @@ fn main() {
     star.set_fill_color(255, 220, 0, 255).unwrap();
 
     // Rounded rectangle clip
-    let mut clip2 = Shape::new();
+    let mut clip2 = engine.shape();
     clip2
         .append_rect(360.0, 100.0, 160.0, 200.0, 20.0, 20.0, true)
         .unwrap();

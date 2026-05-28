@@ -41,7 +41,7 @@ pub enum EngineOption {
 }
 
 impl EngineOption {
-    fn to_raw(self) -> ffi::Tvg_Engine_Option {
+    pub(crate) fn to_raw(self) -> ffi::Tvg_Engine_Option {
         match self {
             EngineOption::None => ffi::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE,
             EngineOption::Default => ffi::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT,
@@ -54,14 +54,18 @@ impl EngineOption {
 ///
 /// This canvas uses the CPU engine for rendering.
 ///
+/// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create canvases via [`Thorvg::sw_canvas()`](crate::Thorvg::sw_canvas).
+///
 /// # Thread Safety
 ///
 /// `SwCanvas` is [`Send`] but not [`Sync`]: you may move it to another
 /// thread, but you must not share references across threads.  All
 /// mutation goes through `&mut self`, so the borrow checker enforces
 /// exclusive access at compile time.
-pub struct SwCanvas {
+pub struct SwCanvas<'eng> {
     raw: ffi::Tvg_Canvas,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: `SwCanvas` exclusively owns a heap-allocated ThorVG canvas
@@ -74,16 +78,19 @@ pub struct SwCanvas {
 // `SwCanvas` is intentionally `!Sync`: the raw pointer field prevents
 // the auto-`Sync` impl, which is correct — concurrent `&`-access to
 // the same C handle would be a data race.
-unsafe impl Send for SwCanvas {}
+unsafe impl Send for SwCanvas<'_> {}
 
-impl SwCanvas {
+impl SwCanvas<'_> {
     /// Creates a new software canvas with the given engine options.
-    pub fn new(option: EngineOption) -> Result<Self> {
+    pub(crate) fn new(option: EngineOption) -> Result<Self> {
         let raw = unsafe { ffi::tvg_swcanvas_create(option.to_raw()) };
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self { raw })
+        Ok(Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        })
     }
 
     /// Sets the rendering target buffer.
@@ -189,7 +196,7 @@ impl SwCanvas {
     }
 }
 
-impl Drop for SwCanvas {
+impl Drop for SwCanvas<'_> {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_canvas_destroy(self.raw);
@@ -201,7 +208,7 @@ impl Drop for SwCanvas {
 
 macro_rules! impl_canvas_ops {
     ($ty:ident) => {
-        impl $ty {
+        impl $ty<'_> {
             /// Adds a paint object to the canvas for rendering.
             ///
             /// Ownership of the paint is transferred to the canvas.
@@ -258,7 +265,7 @@ macro_rules! impl_canvas_ops {
             }
         }
 
-        impl Drop for $ty {
+        impl Drop for $ty<'_> {
             fn drop(&mut self) {
                 unsafe {
                     ffi::tvg_canvas_destroy(self.raw);
@@ -272,26 +279,33 @@ macro_rules! impl_canvas_ops {
 
 /// An OpenGL/ES-rendered canvas.
 ///
+/// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create canvases via [`Thorvg::gl_canvas()`](crate::Thorvg::gl_canvas).
+///
 /// # Thread Safety
 ///
 /// `GlCanvas` is [`Send`] but not [`Sync`]: you may move it to another
 /// thread, but you must not share references across threads.
-pub struct GlCanvas {
+pub struct GlCanvas<'eng> {
     raw: ffi::Tvg_Canvas,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: same rationale as `SwCanvas` — exclusive ownership of a
 // heap-allocated C handle; global state is mutex-protected.
-unsafe impl Send for GlCanvas {}
+unsafe impl Send for GlCanvas<'_> {}
 
-impl GlCanvas {
+impl GlCanvas<'_> {
     /// Creates a new OpenGL canvas with the given engine options.
-    pub fn new(option: EngineOption) -> Result<Self> {
+    pub(crate) fn new(option: EngineOption) -> Result<Self> {
         let raw = unsafe { ffi::tvg_glcanvas_create(option.to_raw()) };
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self { raw })
+        Ok(Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        })
     }
 
     /// Sets the OpenGL drawing target.
@@ -347,26 +361,33 @@ pub enum WgTargetType {
 
 /// A WebGPU-rendered canvas.
 ///
+/// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create canvases via [`Thorvg::wg_canvas()`](crate::Thorvg::wg_canvas).
+///
 /// # Thread Safety
 ///
 /// `WgCanvas` is [`Send`] but not [`Sync`]: you may move it to another
 /// thread, but you must not share references across threads.
-pub struct WgCanvas {
+pub struct WgCanvas<'eng> {
     raw: ffi::Tvg_Canvas,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: same rationale as `SwCanvas` — exclusive ownership of a
 // heap-allocated C handle; global state is mutex-protected.
-unsafe impl Send for WgCanvas {}
+unsafe impl Send for WgCanvas<'_> {}
 
-impl WgCanvas {
+impl WgCanvas<'_> {
     /// Creates a new WebGPU canvas with the given engine options.
-    pub fn new(option: EngineOption) -> Result<Self> {
+    pub(crate) fn new(option: EngineOption) -> Result<Self> {
         let raw = unsafe { ffi::tvg_wgcanvas_create(option.to_raw()) };
         if raw.is_null() {
             return Err(Error::Unknown);
         }
-        Ok(Self { raw })
+        Ok(Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        })
     }
 
     /// Sets the WebGPU drawing target.
@@ -408,19 +429,19 @@ impl WgCanvas {
 
 impl_canvas_ops!(WgCanvas);
 
-impl core::fmt::Debug for SwCanvas {
+impl core::fmt::Debug for SwCanvas<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SwCanvas").finish_non_exhaustive()
     }
 }
 
-impl core::fmt::Debug for GlCanvas {
+impl core::fmt::Debug for GlCanvas<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("GlCanvas").finish_non_exhaustive()
     }
 }
 
-impl core::fmt::Debug for WgCanvas {
+impl core::fmt::Debug for WgCanvas<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("WgCanvas").finish_non_exhaustive()
     }

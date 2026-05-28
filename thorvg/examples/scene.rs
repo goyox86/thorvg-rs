@@ -9,30 +9,30 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Paint, Scene, Shape, SwCanvas, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Paint, Thorvg};
 
 fn main() {
-    let _engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
+    let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
 
     let width = 600u32;
     let height = 400u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = SwCanvas::new(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Background ─────────────────────────────────────────────────
-    let mut bg = Shape::new();
+    let mut bg = engine.shape();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Scene with grouped shapes ──────────────────────────────────
-    let mut scene = Scene::new();
+    let mut scene = engine.scene();
 
     // Green circle
-    let mut circle = Shape::new();
+    let mut circle = engine.shape();
     circle
         .append_circle(150.0, 150.0, 80.0, 80.0, true)
         .unwrap();
@@ -40,14 +40,14 @@ fn main() {
     scene.push(circle).unwrap();
 
     // Semi-transparent blue rectangle overlapping the circle
-    let mut rect = Shape::new();
+    let mut rect = engine.shape();
     rect.append_rect(100.0, 100.0, 150.0, 100.0, 10.0, 10.0, true)
         .unwrap();
     rect.set_fill_color(0, 0, 200, 180).unwrap();
     scene.push(rect).unwrap();
 
     // Yellow star-like shape using paths
-    let mut star = Shape::new();
+    let mut star = engine.shape();
     star.move_to(350.0, 80.0).unwrap();
     star.line_to(370.0, 140.0).unwrap();
     star.line_to(430.0, 140.0).unwrap();

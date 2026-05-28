@@ -8,16 +8,23 @@ use thorvg_sys as ffi;
 /// Scene tree traversal helper.
 ///
 /// Iterates through all descendants of a paint (scene) and invokes a callback on each.
-pub struct Accessor {
+///
+/// The lifetime `'eng` ties this accessor to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create accessors via [`Thorvg::accessor()`](crate::Thorvg::accessor).
+pub struct Accessor<'eng> {
     raw: ffi::Tvg_Accessor,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
-impl Accessor {
+impl Accessor<'_> {
     /// Creates a new Accessor object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_accessor_new() };
         assert!(!raw.is_null(), "failed to create Accessor");
-        Self { raw }
+        Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Iterates through all descendants of `paint`, calling `func` on each.
@@ -87,7 +94,7 @@ impl Accessor {
     }
 }
 
-impl Drop for Accessor {
+impl Drop for Accessor<'_> {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_accessor_del(self.raw);
@@ -95,7 +102,7 @@ impl Drop for Accessor {
     }
 }
 
-impl core::fmt::Debug for Accessor {
+impl core::fmt::Debug for Accessor<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Accessor").finish_non_exhaustive()
     }

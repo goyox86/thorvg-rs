@@ -25,25 +25,33 @@ impl FilterMethod {
 
 /// A picture object for loading and displaying images (SVG, PNG, JPG, Lottie, etc.).
 ///
+/// The lifetime `'eng` ties this picture to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create pictures via [`Thorvg::picture()`](crate::Thorvg::picture).
+///
 /// # Thread Safety
 ///
 /// `Picture` is [`Send`] but not [`Sync`].
-pub struct Picture {
+pub struct Picture<'eng> {
     raw: ffi::Tvg_Paint,
     owned: bool,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: `Picture` exclusively owns (or borrows) a heap-allocated ThorVG
 // paint handle.  Shared global state is mutex-protected in C++.  Sole
 // ownership transfer to another thread is safe.
-unsafe impl Send for Picture {}
+unsafe impl Send for Picture<'_> {}
 
-impl Picture {
+impl Picture<'_> {
     /// Creates a new Picture object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_picture_new() };
         assert!(!raw.is_null(), "failed to create Picture");
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Wraps an existing raw paint pointer.
@@ -51,7 +59,11 @@ impl Picture {
     /// # Safety
     /// The pointer must be a valid `Tvg_Paint` of type Picture.
     pub(crate) unsafe fn from_raw(raw: ffi::Tvg_Paint, owned: bool) -> Self {
-        Self { raw, owned }
+        Self {
+            raw,
+            owned,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Loads a picture from a file path string.
@@ -162,11 +174,15 @@ impl Picture {
     /// Retrieves a paint object from the picture scene by its unique ID.
     pub fn get_paint(&self, id: u32) -> Option<ffi::Tvg_Paint> {
         let raw = unsafe { ffi::tvg_picture_get_paint(self.raw, id) };
-        if raw.is_null() { None } else { Some(raw) }
+        if raw.is_null() {
+            None
+        } else {
+            Some(raw)
+        }
     }
 }
 
-impl Paint for Picture {
+impl Paint for Picture<'_> {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
     }
@@ -177,11 +193,15 @@ impl Paint for Picture {
     }
 
     unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self {
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 }
 
-impl Drop for Picture {
+impl Drop for Picture<'_> {
     fn drop(&mut self) {
         if self.owned {
             unsafe {
@@ -191,7 +211,7 @@ impl Drop for Picture {
     }
 }
 
-impl core::fmt::Debug for Picture {
+impl core::fmt::Debug for Picture<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Picture").finish_non_exhaustive()
     }

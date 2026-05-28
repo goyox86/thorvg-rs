@@ -10,29 +10,29 @@
 mod common;
 
 use thorvg::{
-    ColorSpace, ColorStop, EngineOption, FillSpread, LinearGradient, Paint, RadialGradient, Shape,
-    SwCanvas, Thorvg,
+    ColorSpace, ColorStop, EngineOption, FillSpread, Paint,
+    Thorvg,
 };
 
 fn main() {
-    let _engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
+    let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
 
     let width = 800u32;
     let height = 400u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = SwCanvas::new(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Dark background ────────────────────────────────────────────
-    let mut bg = Shape::new();
+    let mut bg = engine.shape();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(20, 20, 20, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Linear gradient: red → blue ────────────────────────────────
-    let mut linear_grad = LinearGradient::new();
+    let mut linear_grad = engine.linear_gradient();
     linear_grad.set_bounds(50.0, 50.0, 350.0, 200.0).unwrap();
     linear_grad
         .set_color_stops(&[
@@ -53,7 +53,7 @@ fn main() {
         ])
         .unwrap();
 
-    let mut rect1 = Shape::new();
+    let mut rect1 = engine.shape();
     rect1
         .append_rect(50.0, 50.0, 300.0, 150.0, 0.0, 0.0, true)
         .unwrap();
@@ -61,7 +61,7 @@ fn main() {
     canvas.push(rect1).unwrap();
 
     // ── Linear gradient with 4 color stops (rainbow) ───────────────
-    let mut rainbow_grad = LinearGradient::new();
+    let mut rainbow_grad = engine.linear_gradient();
     rainbow_grad.set_bounds(50.0, 250.0, 350.0, 250.0).unwrap();
     rainbow_grad
         .set_color_stops(&[
@@ -97,7 +97,7 @@ fn main() {
         .unwrap();
     rainbow_grad.set_spread(FillSpread::Pad).unwrap();
 
-    let mut rect2 = Shape::new();
+    let mut rect2 = engine.shape();
     rect2
         .append_rect(50.0, 250.0, 300.0, 100.0, 0.0, 0.0, true)
         .unwrap();
@@ -105,7 +105,7 @@ fn main() {
     canvas.push(rect2).unwrap();
 
     // ── Radial gradient on a circle ────────────────────────────────
-    let mut radial_grad = RadialGradient::new();
+    let mut radial_grad = engine.radial_gradient();
     radial_grad
         .set_radial(550.0, 130.0, 100.0, 550.0, 130.0, 0.0)
         .unwrap();
@@ -135,7 +135,7 @@ fn main() {
         ])
         .unwrap();
 
-    let mut circle = Shape::new();
+    let mut circle = engine.shape();
     circle
         .append_circle(550.0, 130.0, 100.0, 100.0, true)
         .unwrap();
@@ -143,7 +143,7 @@ fn main() {
     canvas.push(circle).unwrap();
 
     // ── Radial gradient with focal offset ──────────────────────────
-    let mut focal_grad = RadialGradient::new();
+    let mut focal_grad = engine.radial_gradient();
     focal_grad
         .set_radial(600.0, 310.0, 80.0, 560.0, 280.0, 10.0)
         .unwrap();
@@ -166,7 +166,7 @@ fn main() {
         ])
         .unwrap();
 
-    let mut rect3 = Shape::new();
+    let mut rect3 = engine.shape();
     rect3
         .append_rect(500.0, 250.0, 200.0, 120.0, 15.0, 15.0, true)
         .unwrap();

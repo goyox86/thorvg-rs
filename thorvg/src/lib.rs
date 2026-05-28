@@ -17,13 +17,13 @@
 //! # Quick Start
 //!
 //! ```no_run
-//! use thorvg::{Thorvg, SwCanvas, Shape, ColorSpace};
+//! use thorvg::{Thorvg, ColorSpace};
 //!
-//! // Initialize the engine
-//! let _guard = Thorvg::init(0).expect("Failed to initialize ThorVG");
+//! // Initialize the engine — all objects borrow from this guard
+//! let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
 //!
 //! // Create a canvas with a buffer
-//! let mut canvas = SwCanvas::new(Default::default()).expect("Failed to create canvas");
+//! let mut canvas = engine.sw_canvas(Default::default()).expect("Failed to create canvas");
 //! let mut buffer = vec![0u32; 800 * 600];
 //! // Safety: buffer outlives the canvas.
 //! unsafe {
@@ -33,8 +33,8 @@
 //! }
 //!
 //! // Draw a red rectangle
-//! let mut shape = Shape::new();
-//! shape.append_rect(0.0, 0.0, 200.0, 200.0, 0.0, 0.0, true);
+//! let mut shape = engine.shape();
+//! shape.append_rect(0.0, 0.0, 200.0, 200.0, 0.0, 0.0, true).unwrap();
 //! shape.set_fill_color(255, 0, 0, 255).unwrap();
 //! canvas.push(shape).unwrap();
 //!
@@ -51,7 +51,6 @@
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::match_wildcard_for_single_variants)]
-#![allow(clippy::new_without_default)]
 
 extern crate alloc;
 
@@ -93,6 +92,22 @@ mod tests;
 ///
 /// The engine is terminated when this guard is dropped.
 /// Not `Send` or `Sync` — initialize and terminate the engine on the same thread.
+///
+/// All `ThorVG` objects ([`Shape`], [`SwCanvas`], [`Scene`], etc.) borrow from this
+/// guard via a lifetime parameter, ensuring the engine cannot be terminated while
+/// any object is alive.
+///
+/// # Example
+///
+/// ```no_run
+/// use thorvg::{Thorvg, ColorSpace};
+///
+/// let engine = Thorvg::init(0).unwrap();
+/// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
+/// let mut shape = engine.shape();
+/// shape.set_fill_color(255, 0, 0, 255).unwrap();
+/// canvas.push(shape).unwrap();
+/// ```
 pub struct Thorvg {
     _not_send_sync: core::marker::PhantomData<*const ()>,
 }
@@ -103,6 +118,7 @@ impl Thorvg {
     /// `threads` specifies the number of worker threads. Use `0` for single-threaded mode.
     ///
     /// Returns a guard that will terminate the engine when dropped.
+    /// Create all `ThorVG` objects via methods on this guard.
     pub fn init(threads: u32) -> Result<Self> {
         let result = unsafe { ffi::tvg_engine_init(threads) };
         Error::from_raw(result)?;
@@ -137,6 +153,81 @@ impl Thorvg {
         };
 
         Ok((major, minor, micro, version_str))
+    }
+
+    // ── Paint factories ────────────────────────────────────────────
+
+    /// Creates a new [`Shape`] tied to this engine.
+    pub fn shape(&self) -> Shape<'_> {
+        Shape::new()
+    }
+
+    /// Creates a new [`Scene`] tied to this engine.
+    pub fn scene(&self) -> Scene<'_> {
+        Scene::new()
+    }
+
+    /// Creates a new [`Picture`] tied to this engine.
+    pub fn picture(&self) -> Picture<'_> {
+        Picture::new()
+    }
+
+    /// Creates a new [`Text`] object tied to this engine.
+    pub fn text(&self) -> Text<'_> {
+        Text::new()
+    }
+
+    // ── Gradient factories ─────────────────────────────────────────
+
+    /// Creates a new [`LinearGradient`] tied to this engine.
+    pub fn linear_gradient(&self) -> LinearGradient<'_> {
+        LinearGradient::new()
+    }
+
+    /// Creates a new [`RadialGradient`] tied to this engine.
+    pub fn radial_gradient(&self) -> RadialGradient<'_> {
+        RadialGradient::new()
+    }
+
+    // ── Canvas factories ───────────────────────────────────────────
+
+    /// Creates a new software-rendered [`SwCanvas`] tied to this engine.
+    pub fn sw_canvas(&self, option: EngineOption) -> Result<SwCanvas<'_>> {
+        SwCanvas::new(option)
+    }
+
+    /// Creates a new OpenGL-rendered [`GlCanvas`] tied to this engine.
+    pub fn gl_canvas(&self, option: EngineOption) -> Result<GlCanvas<'_>> {
+        GlCanvas::new(option)
+    }
+
+    /// Creates a new WebGPU-rendered [`WgCanvas`] tied to this engine.
+    pub fn wg_canvas(&self, option: EngineOption) -> Result<WgCanvas<'_>> {
+        WgCanvas::new(option)
+    }
+
+    // ── Animation factories ────────────────────────────────────────
+
+    /// Creates a new [`Animation`] controller tied to this engine.
+    pub fn animation(&self) -> Animation<'_> {
+        Animation::new()
+    }
+
+    /// Creates a new [`LottieAnimation`] controller tied to this engine.
+    pub fn lottie_animation(&self) -> LottieAnimation<'_> {
+        LottieAnimation::new()
+    }
+
+    // ── Utility factories ──────────────────────────────────────────
+
+    /// Creates a new [`Saver`] tied to this engine.
+    pub fn saver(&self) -> Saver<'_> {
+        Saver::new()
+    }
+
+    /// Creates a new [`Accessor`] tied to this engine.
+    pub fn accessor(&self) -> Accessor<'_> {
+        Accessor::new()
     }
 }
 

@@ -284,12 +284,12 @@ pub trait Paint {
     }
 
     /// Clips the drawing region to the specified shape's paths.
-    fn set_clip(&mut self, clipper: &Shape) -> Result<()> {
+    fn set_clip(&mut self, clipper: &Shape<'_>) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_paint_set_clip(self.raw(), clipper.raw()) })
     }
 
     /// Gets the clip shape, if any.
-    fn clip(&self) -> Option<Shape> {
+    fn clip(&self) -> Option<Shape<'_>> {
         let raw = unsafe { ffi::tvg_paint_get_clip(self.raw()) };
         if raw.is_null() {
             None

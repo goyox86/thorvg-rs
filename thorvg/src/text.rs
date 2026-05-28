@@ -47,21 +47,29 @@ pub struct GlyphMetrics {
 }
 
 /// A text object for rendering unicode text.
-pub struct Text {
+///
+/// The lifetime `'eng` ties this text object to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create text objects via [`Thorvg::text()`](crate::Thorvg::text).
+pub struct Text<'eng> {
     raw: ffi::Tvg_Paint,
     owned: bool,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: Same rationale as other ThorVG handle types — exclusive
 // ownership of a C heap object; global state is mutex-protected.
-unsafe impl Send for Text {}
+unsafe impl Send for Text<'_> {}
 
-impl Text {
+impl Text<'_> {
     /// Creates a new Text object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_text_new() };
         assert!(!raw.is_null(), "failed to create Text");
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Sets the font family name.
@@ -122,12 +130,12 @@ impl Text {
     }
 
     /// Sets a linear gradient fill for the text.
-    pub fn set_linear_gradient(&mut self, grad: LinearGradient) -> Result<()> {
+    pub fn set_linear_gradient(&mut self, grad: LinearGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_text_set_gradient(self.raw, grad.into_raw()) })
     }
 
     /// Sets a radial gradient fill for the text.
-    pub fn set_radial_gradient(&mut self, grad: RadialGradient) -> Result<()> {
+    pub fn set_radial_gradient(&mut self, grad: RadialGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_text_set_gradient(self.raw, grad.into_raw()) })
     }
 
@@ -225,7 +233,7 @@ impl Text {
     }
 }
 
-impl Paint for Text {
+impl Paint for Text<'_> {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
     }
@@ -236,11 +244,15 @@ impl Paint for Text {
     }
 
     unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self {
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 }
 
-impl Drop for Text {
+impl Drop for Text<'_> {
     fn drop(&mut self) {
         if self.owned {
             unsafe {
@@ -250,7 +262,7 @@ impl Drop for Text {
     }
 }
 
-impl core::fmt::Debug for Text {
+impl core::fmt::Debug for Text<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Text").finish_non_exhaustive()
     }

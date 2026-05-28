@@ -84,21 +84,30 @@ impl StrokeJoin {
 }
 
 /// A two-dimensional shape with path, fill, and stroke properties.
-pub struct Shape {
+///
+/// The lifetime `'eng` ties this shape to a [`Thorvg`](crate::Thorvg) engine
+/// instance, ensuring the engine cannot be terminated while the shape exists.
+/// Create shapes via [`Thorvg::shape()`](crate::Thorvg::shape).
+pub struct Shape<'eng> {
     raw: ffi::Tvg_Paint,
     owned: bool,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: Same rationale as other ThorVG handle types — exclusive
 // ownership of a C heap object; global state is mutex-protected.
-unsafe impl Send for Shape {}
+unsafe impl Send for Shape<'_> {}
 
-impl Shape {
+impl Shape<'_> {
     /// Creates a new Shape object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_shape_new() };
         assert!(!raw.is_null(), "failed to create Shape");
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Wraps an existing raw paint pointer.
@@ -106,7 +115,11 @@ impl Shape {
     /// # Safety
     /// The pointer must be a valid `Tvg_Paint` of type Shape.
     pub(crate) unsafe fn from_raw(raw: ffi::Tvg_Paint, owned: bool) -> Self {
-        Self { raw, owned }
+        Self {
+            raw,
+            owned,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     // ── Path commands ──────────────────────────────────────────────
@@ -230,12 +243,12 @@ impl Shape {
     }
 
     /// Sets a linear gradient fill.
-    pub fn set_linear_gradient(&mut self, grad: LinearGradient) -> Result<()> {
+    pub fn set_linear_gradient(&mut self, grad: LinearGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_shape_set_gradient(self.raw, grad.into_raw()) })
     }
 
     /// Sets a radial gradient fill.
-    pub fn set_radial_gradient(&mut self, grad: RadialGradient) -> Result<()> {
+    pub fn set_radial_gradient(&mut self, grad: RadialGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_shape_set_gradient(self.raw, grad.into_raw()) })
     }
 
@@ -362,7 +375,7 @@ impl Shape {
     }
 
     /// Sets the stroke gradient fill.
-    pub fn set_stroke_gradient(&mut self, grad: LinearGradient) -> Result<()> {
+    pub fn set_stroke_gradient(&mut self, grad: LinearGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { ffi::tvg_shape_set_stroke_gradient(self.raw, grad.into_raw()) })
     }
 
@@ -372,7 +385,7 @@ impl Shape {
     }
 }
 
-impl Paint for Shape {
+impl Paint for Shape<'_> {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
     }
@@ -383,11 +396,15 @@ impl Paint for Shape {
     }
 
     unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self {
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 }
 
-impl Drop for Shape {
+impl Drop for Shape<'_> {
     fn drop(&mut self) {
         if self.owned {
             unsafe {
@@ -397,7 +414,7 @@ impl Drop for Shape {
     }
 }
 
-impl core::fmt::Debug for Shape {
+impl core::fmt::Debug for Shape<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Shape").finish_non_exhaustive()
     }

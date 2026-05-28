@@ -9,27 +9,27 @@
 
 mod common;
 
-use thorvg::{ColorSpace, ColorStop, EngineOption, LinearGradient, Paint, Shape, SwCanvas, Thorvg};
+use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Thorvg};
 
 fn main() {
-    let _engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
+    let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
 
     let width = 400u32;
     let height = 300u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = SwCanvas::new(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Background: white rectangle ────────────────────────────────
-    let mut bg = Shape::new();
+    let mut bg = engine.shape();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Gradient-filled rounded rect ───────────────────────────────
-    let mut grad = LinearGradient::new();
+    let mut grad = engine.linear_gradient();
     grad.set_bounds(50.0, 50.0, 350.0, 250.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -56,14 +56,14 @@ fn main() {
     ])
     .unwrap();
 
-    let mut rect = Shape::new();
+    let mut rect = engine.shape();
     rect.append_rect(50.0, 50.0, 300.0, 200.0, 25.0, 25.0, true)
         .unwrap();
     rect.set_linear_gradient(grad).unwrap();
     canvas.push(rect).unwrap();
 
     // ── Semi-transparent white circle on top ───────────────────────
-    let mut circle = Shape::new();
+    let mut circle = engine.shape();
     circle
         .append_circle(200.0, 150.0, 50.0, 50.0, true)
         .unwrap();

@@ -27,10 +27,10 @@ pub struct Marker {
 /// # Example
 ///
 /// ```no_run
-/// use thorvg::{Thorvg, SwCanvas, ColorSpace, EngineOption, LottieAnimation};
+/// use thorvg::{Thorvg, ColorSpace};
 ///
-/// let _engine = Thorvg::init(0).unwrap();
-/// let mut canvas = SwCanvas::new(EngineOption::Default).unwrap();
+/// let engine = Thorvg::init(0).unwrap();
+/// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
 /// let mut buffer = vec![0u32; 800 * 600];
 /// unsafe {
 ///     canvas
@@ -38,17 +38,21 @@ pub struct Marker {
 ///         .unwrap()
 /// };
 ///
-/// let mut lottie = LottieAnimation::new();
+/// let mut lottie = engine.lottie_animation();
 /// let mut pic = lottie.picture();
 /// pic.load_from_str("animation.json").ok();
 /// ```
-pub struct LottieAnimation {
-    inner: Animation,
+///
+/// The lifetime `'eng` ties this animation to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create Lottie animations via
+/// [`Thorvg::lottie_animation()`](crate::Thorvg::lottie_animation).
+pub struct LottieAnimation<'eng> {
+    inner: Animation<'eng>,
 }
 
-impl LottieAnimation {
+impl LottieAnimation<'_> {
     /// Creates a new Lottie animation object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_lottie_animation_new() };
         assert!(!raw.is_null(), "failed to create LottieAnimation");
         Self {
@@ -60,7 +64,7 @@ impl LottieAnimation {
 
     /// Load a Lottie animation from a JSON byte slice.
     ///
-    /// Convenience wrapper around [`Picture::load_data`] that uses the
+    /// Convenience wrapper around [`Picture::load_data`](crate::Picture::load_data) that uses the
     /// `"lottie"` mimetype and copies the data. For advanced use cases
     /// (e.g. external asset `resource_path`), access the picture
     /// directly via [`Animation::picture`].
@@ -71,7 +75,7 @@ impl LottieAnimation {
 
     /// Load a Lottie animation from a file path string.
     ///
-    /// Convenience wrapper around [`Picture::load_from_str`].
+    /// Convenience wrapper around [`Picture::load_from_str`](crate::Picture::load_from_str).
     #[cfg(feature = "std")]
     pub fn load_file(&mut self, path: &str) -> Result<()> {
         let mut pic = self.picture();
@@ -80,7 +84,7 @@ impl LottieAnimation {
 
     /// Set the render size of the animation picture.
     ///
-    /// Convenience wrapper around [`Picture::set_size`].
+    /// Convenience wrapper around [`Picture::set_size`](crate::Picture::set_size).
     pub fn set_size(&mut self, w: f32, h: f32) -> Result<()> {
         let mut pic = self.picture();
         pic.set_size(w, h)
@@ -94,7 +98,11 @@ impl LottieAnimation {
     pub fn gen_slot(&mut self, slot_json: &str) -> Option<u32> {
         let c_slot = CString::new(slot_json).ok()?;
         let id = unsafe { ffi::tvg_lottie_animation_gen_slot(self.inner.raw(), c_slot.as_ptr()) };
-        if id == 0 { None } else { Some(id) }
+        if id == 0 {
+            None
+        } else {
+            Some(id)
+        }
     }
 
     /// Applies a previously generated slot to the animation.
@@ -212,21 +220,21 @@ impl LottieAnimation {
     }
 }
 
-impl core::ops::Deref for LottieAnimation {
-    type Target = Animation;
+impl<'eng> core::ops::Deref for LottieAnimation<'eng> {
+    type Target = Animation<'eng>;
 
-    fn deref(&self) -> &Animation {
+    fn deref(&self) -> &Animation<'eng> {
         &self.inner
     }
 }
 
-impl core::ops::DerefMut for LottieAnimation {
-    fn deref_mut(&mut self) -> &mut Animation {
+impl<'eng> core::ops::DerefMut for LottieAnimation<'eng> {
+    fn deref_mut(&mut self) -> &mut Animation<'eng> {
         &mut self.inner
     }
 }
 
-impl core::fmt::Debug for LottieAnimation {
+impl core::fmt::Debug for LottieAnimation<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("LottieAnimation").finish_non_exhaustive()
     }

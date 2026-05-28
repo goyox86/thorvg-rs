@@ -137,16 +137,23 @@ fn get_transform_raw(raw: ffi::Tvg_Gradient) -> Result<Matrix> {
 // ── LinearGradient ─────────────────────────────────────────────────
 
 /// A linear gradient fill.
-pub struct LinearGradient {
+///
+/// The lifetime `'eng` ties this gradient to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create gradients via [`Thorvg::linear_gradient()`](crate::Thorvg::linear_gradient).
+pub struct LinearGradient<'eng> {
     raw: ffi::Tvg_Gradient,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
-impl LinearGradient {
+impl LinearGradient<'_> {
     /// Creates a new linear gradient.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_linear_gradient_new() };
         assert!(!raw.is_null(), "failed to create LinearGradient");
-        Self { raw }
+        Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Sets the gradient bounds.
@@ -210,7 +217,10 @@ impl LinearGradient {
         if raw.is_null() {
             None
         } else {
-            Some(Self { raw })
+            Some(Self {
+                raw,
+                _engine: core::marker::PhantomData,
+            })
         }
     }
 
@@ -222,7 +232,7 @@ impl LinearGradient {
     }
 }
 
-impl Drop for LinearGradient {
+impl Drop for LinearGradient<'_> {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_gradient_del(self.raw);
@@ -233,16 +243,20 @@ impl Drop for LinearGradient {
 // ── RadialGradient ─────────────────────────────────────────────────
 
 /// A radial gradient fill.
-pub struct RadialGradient {
+pub struct RadialGradient<'eng> {
     raw: ffi::Tvg_Gradient,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
-impl RadialGradient {
+impl RadialGradient<'_> {
     /// Creates a new radial gradient.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_radial_gradient_new() };
         assert!(!raw.is_null(), "failed to create RadialGradient");
-        Self { raw }
+        Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Sets the radial gradient attributes.
@@ -317,7 +331,10 @@ impl RadialGradient {
         if raw.is_null() {
             None
         } else {
-            Some(Self { raw })
+            Some(Self {
+                raw,
+                _engine: core::marker::PhantomData,
+            })
         }
     }
 
@@ -329,7 +346,7 @@ impl RadialGradient {
     }
 }
 
-impl Drop for RadialGradient {
+impl Drop for RadialGradient<'_> {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_gradient_del(self.raw);

@@ -6,20 +6,27 @@ use crate::paint::Paint;
 use thorvg_sys as ffi;
 
 /// Exports paint objects or animations to files.
-pub struct Saver {
+///
+/// The lifetime `'eng` ties this saver to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create savers via [`Thorvg::saver()`](crate::Thorvg::saver).
+pub struct Saver<'eng> {
     raw: ffi::Tvg_Saver,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: Same rationale as other ThorVG handle types — exclusive
 // ownership of a C heap object; global state is mutex-protected.
-unsafe impl Send for Saver {}
+unsafe impl Send for Saver<'_> {}
 
-impl Saver {
+impl Saver<'_> {
     /// Creates a new Saver object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_saver_new() };
         assert!(!raw.is_null(), "failed to create Saver");
-        Self { raw }
+        Self {
+            raw,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Saves a paint object to a file path string.
@@ -44,7 +51,7 @@ impl Saver {
     /// Saves an animation to a file path string.
     pub fn save_animation_to_str(
         &mut self,
-        animation: &Animation,
+        animation: &Animation<'_>,
         path: &str,
         quality: u32,
         fps: u32,
@@ -59,7 +66,7 @@ impl Saver {
     #[cfg(feature = "std")]
     pub fn save_animation<P: AsRef<std::path::Path>>(
         &mut self,
-        animation: &Animation,
+        animation: &Animation<'_>,
         path: P,
         quality: u32,
         fps: u32,
@@ -73,7 +80,7 @@ impl Saver {
     }
 }
 
-impl Drop for Saver {
+impl Drop for Saver<'_> {
     fn drop(&mut self) {
         unsafe {
             ffi::tvg_saver_del(self.raw);
@@ -81,7 +88,7 @@ impl Drop for Saver {
     }
 }
 
-impl core::fmt::Debug for Saver {
+impl core::fmt::Debug for Saver<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Saver").finish_non_exhaustive()
     }

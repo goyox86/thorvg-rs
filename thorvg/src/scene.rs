@@ -3,21 +3,29 @@ use crate::paint::Paint;
 use thorvg_sys as ffi;
 
 /// A scene that groups multiple paint objects.
-pub struct Scene {
+///
+/// The lifetime `'eng` ties this scene to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create scenes via [`Thorvg::scene()`](crate::Thorvg::scene).
+pub struct Scene<'eng> {
     raw: ffi::Tvg_Paint,
     owned: bool,
+    _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 // SAFETY: Same rationale as other ThorVG handle types — exclusive
 // ownership of a C heap object; global state is mutex-protected.
-unsafe impl Send for Scene {}
+unsafe impl Send for Scene<'_> {}
 
-impl Scene {
+impl Scene<'_> {
     /// Creates a new Scene object.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let raw = unsafe { ffi::tvg_scene_new() };
         assert!(!raw.is_null(), "failed to create Scene");
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 
     /// Adds a paint object to the scene (appended at the end).
@@ -135,7 +143,7 @@ impl Scene {
     }
 }
 
-impl Paint for Scene {
+impl Paint for Scene<'_> {
     fn raw(&self) -> ffi::Tvg_Paint {
         self.raw
     }
@@ -146,11 +154,15 @@ impl Paint for Scene {
     }
 
     unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self {
-        Self { raw, owned: true }
+        Self {
+            raw,
+            owned: true,
+            _engine: core::marker::PhantomData,
+        }
     }
 }
 
-impl Drop for Scene {
+impl Drop for Scene<'_> {
     fn drop(&mut self) {
         if self.owned {
             unsafe {
@@ -160,7 +172,7 @@ impl Drop for Scene {
     }
 }
 
-impl core::fmt::Debug for Scene {
+impl core::fmt::Debug for Scene<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Scene").finish_non_exhaustive()
     }
