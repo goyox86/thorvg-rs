@@ -3,14 +3,14 @@ use alloc::ffi::CString;
 use crate::animation::Animation;
 use crate::error::{Error, Result};
 use crate::paint::Paint;
-use thorvg_sys as ffi;
+use thorvg_sys as sys;
 
 /// Exports paint objects or animations to files.
 ///
 /// The lifetime `'eng` ties this saver to a [`Thorvg`](crate::Thorvg) engine
 /// instance. Create savers via [`Thorvg::saver()`](crate::Thorvg::saver).
 pub struct Saver<'eng> {
-    raw: ffi::Tvg_Saver,
+    raw: sys::Tvg_Saver,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
@@ -21,7 +21,7 @@ unsafe impl Send for Saver<'_> {}
 impl Saver<'_> {
     /// Creates a new Saver object.
     pub(crate) fn new() -> Self {
-        let raw = unsafe { ffi::tvg_saver_new() };
+        let raw = unsafe { sys::tvg_saver_new() };
         assert!(!raw.is_null(), "failed to create Saver");
         Self {
             raw,
@@ -33,7 +33,7 @@ impl Saver<'_> {
     pub fn save_to_str<P: Paint>(&mut self, paint: P, path: &str, quality: u32) -> Result<()> {
         let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
-            ffi::tvg_saver_save_paint(self.raw, paint.into_raw(), c_path.as_ptr(), quality)
+            sys::tvg_saver_save_paint(self.raw, paint.into_raw(), c_path.as_ptr(), quality)
         })
     }
 
@@ -58,7 +58,7 @@ impl Saver<'_> {
     ) -> Result<()> {
         let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
-            ffi::tvg_saver_save_animation(self.raw, animation.raw(), c_path.as_ptr(), quality, fps)
+            sys::tvg_saver_save_animation(self.raw, animation.raw(), c_path.as_ptr(), quality, fps)
         })
     }
 
@@ -76,14 +76,14 @@ impl Saver<'_> {
 
     /// Waits for the saving task to finish.
     pub fn sync(&mut self) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_saver_sync(self.raw) })
+        Error::from_raw(unsafe { sys::tvg_saver_sync(self.raw) })
     }
 }
 
 impl Drop for Saver<'_> {
     fn drop(&mut self) {
         unsafe {
-            ffi::tvg_saver_del(self.raw);
+            sys::tvg_saver_del(self.raw);
         }
     }
 }

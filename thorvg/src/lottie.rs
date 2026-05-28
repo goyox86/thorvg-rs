@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use crate::animation::Animation;
 use crate::error::{Error, Result};
-use thorvg_sys as ffi;
+use thorvg_sys as sys;
 
 /// Marker information for a Lottie animation segment.
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ pub struct LottieAnimation<'eng> {
 impl LottieAnimation<'_> {
     /// Creates a new Lottie animation object.
     pub(crate) fn new() -> Self {
-        let raw = unsafe { ffi::tvg_lottie_animation_new() };
+        let raw = unsafe { sys::tvg_lottie_animation_new() };
         assert!(!raw.is_null(), "failed to create LottieAnimation");
         Self {
             inner: unsafe { Animation::from_raw(raw) },
@@ -97,7 +97,7 @@ impl LottieAnimation<'_> {
     /// Returns the generated slot ID, or `None` on failure.
     pub fn gen_slot(&mut self, slot_json: &str) -> Option<u32> {
         let c_slot = CString::new(slot_json).ok()?;
-        let id = unsafe { ffi::tvg_lottie_animation_gen_slot(self.inner.raw(), c_slot.as_ptr()) };
+        let id = unsafe { sys::tvg_lottie_animation_gen_slot(self.inner.raw(), c_slot.as_ptr()) };
         if id == 0 {
             None
         } else {
@@ -109,12 +109,12 @@ impl LottieAnimation<'_> {
     ///
     /// Pass `0` to reset all slots.
     pub fn apply_slot(&mut self, id: u32) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_lottie_animation_apply_slot(self.inner.raw(), id) })
+        Error::from_raw(unsafe { sys::tvg_lottie_animation_apply_slot(self.inner.raw(), id) })
     }
 
     /// Deletes a previously generated slot.
     pub fn del_slot(&mut self, id: u32) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_lottie_animation_del_slot(self.inner.raw(), id) })
+        Error::from_raw(unsafe { sys::tvg_lottie_animation_del_slot(self.inner.raw(), id) })
     }
 
     // ── Markers ────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ impl LottieAnimation<'_> {
     pub fn markers_count(&self) -> Result<u32> {
         let mut cnt: u32 = 0;
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_get_markers_cnt(self.inner.raw(), &raw mut cnt)
+            sys::tvg_lottie_animation_get_markers_cnt(self.inner.raw(), &raw mut cnt)
         })?;
         Ok(cnt)
     }
@@ -132,7 +132,7 @@ impl LottieAnimation<'_> {
     pub fn marker_name(&self, idx: u32) -> Result<String> {
         let mut name_ptr: *const core::ffi::c_char = core::ptr::null();
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_get_marker(self.inner.raw(), idx, &raw mut name_ptr)
+            sys::tvg_lottie_animation_get_marker(self.inner.raw(), idx, &raw mut name_ptr)
         })?;
         if name_ptr.is_null() {
             return Ok(String::new());
@@ -148,7 +148,7 @@ impl LottieAnimation<'_> {
         let mut begin: f32 = 0.0;
         let mut end: f32 = 0.0;
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_get_marker_info(
+            sys::tvg_lottie_animation_get_marker_info(
                 self.inner.raw(),
                 idx,
                 &raw mut name_ptr,
@@ -180,7 +180,7 @@ impl LottieAnimation<'_> {
     pub fn set_marker(&mut self, marker: &str) -> Result<()> {
         let c_marker = CString::new(marker).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_set_marker(self.inner.raw(), c_marker.as_ptr())
+            sys::tvg_lottie_animation_set_marker(self.inner.raw(), c_marker.as_ptr())
         })
     }
 
@@ -189,7 +189,7 @@ impl LottieAnimation<'_> {
     /// Interpolates between two frames based on a progress value (0.0–1.0).
     pub fn tween(&mut self, from: f32, to: f32, progress: f32) -> Result<()> {
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_tween(self.inner.raw(), from, to, progress)
+            sys::tvg_lottie_animation_tween(self.inner.raw(), from, to, progress)
         })
     }
 
@@ -200,7 +200,7 @@ impl LottieAnimation<'_> {
         let c_layer = CString::new(layer).map_err(|_| Error::InvalidArguments)?;
         let c_var = CString::new(var).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
-            ffi::tvg_lottie_animation_assign(
+            sys::tvg_lottie_animation_assign(
                 self.inner.raw(),
                 c_layer.as_ptr(),
                 ix,
@@ -216,7 +216,7 @@ impl LottieAnimation<'_> {
     ///
     /// Lower values prioritize performance, higher values prioritize quality.
     pub fn set_quality(&mut self, value: u8) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_lottie_animation_set_quality(self.inner.raw(), value) })
+        Error::from_raw(unsafe { sys::tvg_lottie_animation_set_quality(self.inner.raw(), value) })
     }
 }
 

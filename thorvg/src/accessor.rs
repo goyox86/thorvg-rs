@@ -3,7 +3,7 @@ use alloc::string::String;
 
 use crate::error::{Error, Result};
 use crate::paint::Paint;
-use thorvg_sys as ffi;
+use thorvg_sys as sys;
 
 /// Scene tree traversal helper.
 ///
@@ -12,14 +12,14 @@ use thorvg_sys as ffi;
 /// The lifetime `'eng` ties this accessor to a [`Thorvg`](crate::Thorvg) engine
 /// instance. Create accessors via [`Thorvg::accessor()`](crate::Thorvg::accessor).
 pub struct Accessor<'eng> {
-    raw: ffi::Tvg_Accessor,
+    raw: sys::Tvg_Accessor,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
 impl Accessor<'_> {
     /// Creates a new Accessor object.
     pub(crate) fn new() -> Self {
-        let raw = unsafe { ffi::tvg_accessor_new() };
+        let raw = unsafe { sys::tvg_accessor_new() };
         assert!(!raw.is_null(), "failed to create Accessor");
         Self {
             raw,
@@ -38,23 +38,23 @@ impl Accessor<'_> {
     pub unsafe fn set<P: Paint>(
         &mut self,
         paint: &P,
-        func: unsafe extern "C" fn(ffi::Tvg_Paint, *mut core::ffi::c_void) -> bool,
+        func: unsafe extern "C" fn(sys::Tvg_Paint, *mut core::ffi::c_void) -> bool,
         data: *mut core::ffi::c_void,
     ) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_accessor_set(self.raw, paint.raw(), Some(func), data) })
+        Error::from_raw(unsafe { sys::tvg_accessor_set(self.raw, paint.raw(), Some(func), data) })
     }
 
     /// Iterates through all descendants, calling a safe Rust closure on each.
     ///
     /// The closure receives the raw `Tvg_Paint` handle and returns `true` to
     /// continue or `false` to stop.
-    pub fn for_each<P: Paint, F: FnMut(ffi::Tvg_Paint) -> bool>(
+    pub fn for_each<P: Paint, F: FnMut(sys::Tvg_Paint) -> bool>(
         &mut self,
         paint: &P,
         mut func: F,
     ) -> Result<()> {
-        unsafe extern "C" fn trampoline<F: FnMut(ffi::Tvg_Paint) -> bool>(
-            paint: ffi::Tvg_Paint,
+        unsafe extern "C" fn trampoline<F: FnMut(sys::Tvg_Paint) -> bool>(
+            paint: sys::Tvg_Paint,
             data: *mut core::ffi::c_void,
         ) -> bool {
             let f = unsafe { &mut *data.cast::<F>() };
@@ -63,7 +63,7 @@ impl Accessor<'_> {
 
         let data = core::ptr::from_mut(&mut func).cast::<core::ffi::c_void>();
         Error::from_raw(unsafe {
-            ffi::tvg_accessor_set(self.raw, paint.raw(), Some(trampoline::<F>), data)
+            sys::tvg_accessor_set(self.raw, paint.raw(), Some(trampoline::<F>), data)
         })
     }
 
@@ -72,7 +72,7 @@ impl Accessor<'_> {
     /// Use this to assign or look up paint IDs.
     pub fn generate_id(name: &str) -> Option<u32> {
         let c_name = CString::new(name).ok()?;
-        Some(unsafe { ffi::tvg_accessor_generate_id(c_name.as_ptr()) })
+        Some(unsafe { sys::tvg_accessor_generate_id(c_name.as_ptr()) })
     }
 
     /// Retrieves the original name string for a given unique ID.
@@ -81,7 +81,7 @@ impl Accessor<'_> {
     /// this accessor is currently iterating via [`Accessor::set`] or
     /// [`Accessor::for_each`].
     pub fn get_name(&self, id: u32) -> Option<String> {
-        let ptr = unsafe { ffi::tvg_accessor_get_name(self.raw, id) };
+        let ptr = unsafe { sys::tvg_accessor_get_name(self.raw, id) };
         if ptr.is_null() {
             None
         } else {
@@ -97,7 +97,7 @@ impl Accessor<'_> {
 impl Drop for Accessor<'_> {
     fn drop(&mut self) {
         unsafe {
-            ffi::tvg_accessor_del(self.raw);
+            sys::tvg_accessor_del(self.raw);
         }
     }
 }

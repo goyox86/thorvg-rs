@@ -1,5 +1,5 @@
 use core::fmt;
-use thorvg_sys as ffi;
+use thorvg_sys as sys;
 
 /// Result type for `ThorVG` operations.
 pub type Result<T> = core::result::Result<T, Error>;
@@ -24,15 +24,15 @@ pub enum Error {
 
 impl Error {
     /// Convert a raw `Tvg_Result` into a `Result<()>`.
-    pub(crate) fn from_raw(result: ffi::Tvg_Result) -> Result<()> {
+    pub(crate) fn from_raw(result: sys::Tvg_Result) -> Result<()> {
         match result {
-            ffi::Tvg_Result::TVG_RESULT_SUCCESS => Ok(()),
-            ffi::Tvg_Result::TVG_RESULT_INVALID_ARGUMENT => Err(Error::InvalidArguments),
-            ffi::Tvg_Result::TVG_RESULT_INSUFFICIENT_CONDITION => Err(Error::InsufficientCondition),
-            ffi::Tvg_Result::TVG_RESULT_FAILED_ALLOCATION => Err(Error::FailedAllocation),
-            ffi::Tvg_Result::TVG_RESULT_MEMORY_CORRUPTION => Err(Error::MemoryCorruption),
-            ffi::Tvg_Result::TVG_RESULT_NOT_SUPPORTED => Err(Error::NotSupported),
-            ffi::Tvg_Result::TVG_RESULT_UNKNOWN => Err(Error::Unknown),
+            sys::Tvg_Result::TVG_RESULT_SUCCESS => Ok(()),
+            sys::Tvg_Result::TVG_RESULT_INVALID_ARGUMENT => Err(Error::InvalidArguments),
+            sys::Tvg_Result::TVG_RESULT_INSUFFICIENT_CONDITION => Err(Error::InsufficientCondition),
+            sys::Tvg_Result::TVG_RESULT_FAILED_ALLOCATION => Err(Error::FailedAllocation),
+            sys::Tvg_Result::TVG_RESULT_MEMORY_CORRUPTION => Err(Error::MemoryCorruption),
+            sys::Tvg_Result::TVG_RESULT_NOT_SUPPORTED => Err(Error::NotSupported),
+            sys::Tvg_Result::TVG_RESULT_UNKNOWN => Err(Error::Unknown),
         }
     }
 }

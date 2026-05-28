@@ -1,13 +1,13 @@
 use crate::error::{Error, Result};
 use crate::paint::Paint;
-use thorvg_sys as ffi;
+use thorvg_sys as sys;
 
 /// A scene that groups multiple paint objects.
 ///
 /// The lifetime `'eng` ties this scene to a [`Thorvg`](crate::Thorvg) engine
 /// instance. Create scenes via [`Thorvg::scene()`](crate::Thorvg::scene).
 pub struct Scene<'eng> {
-    raw: ffi::Tvg_Paint,
+    raw: sys::Tvg_Paint,
     owned: bool,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
@@ -19,7 +19,7 @@ unsafe impl Send for Scene<'_> {}
 impl Scene<'_> {
     /// Creates a new Scene object.
     pub(crate) fn new() -> Self {
-        let raw = unsafe { ffi::tvg_scene_new() };
+        let raw = unsafe { sys::tvg_scene_new() };
         assert!(!raw.is_null(), "failed to create Scene");
         Self {
             raw,
@@ -30,27 +30,27 @@ impl Scene<'_> {
 
     /// Adds a paint object to the scene (appended at the end).
     pub fn push<P: Paint>(&mut self, paint: P) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_scene_add(self.raw, paint.into_raw()) })
+        Error::from_raw(unsafe { sys::tvg_scene_add(self.raw, paint.into_raw()) })
     }
 
     /// Inserts a paint object before another existing paint in the scene.
     pub fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_scene_insert(self.raw, target.into_raw(), at.raw()) })
+        Error::from_raw(unsafe { sys::tvg_scene_insert(self.raw, target.into_raw(), at.raw()) })
     }
 
     /// Removes a paint from the scene.
     pub fn remove<P: Paint>(&mut self, paint: &P) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_scene_remove(self.raw, paint.raw()) })
+        Error::from_raw(unsafe { sys::tvg_scene_remove(self.raw, paint.raw()) })
     }
 
     /// Removes all paints from the scene.
     pub fn clear(&mut self) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_scene_remove(self.raw, core::ptr::null_mut()) })
+        Error::from_raw(unsafe { sys::tvg_scene_remove(self.raw, core::ptr::null_mut()) })
     }
 
     /// Clears all scene effects.
     pub fn clear_effects(&mut self) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_scene_clear_effects(self.raw) })
+        Error::from_raw(unsafe { sys::tvg_scene_clear_effects(self.raw) })
     }
 
     /// Adds a Gaussian blur effect.
@@ -62,7 +62,7 @@ impl Scene<'_> {
         quality: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
-            ffi::tvg_scene_add_effect_gaussian_blur(self.raw, sigma, direction, border, quality)
+            sys::tvg_scene_add_effect_gaussian_blur(self.raw, sigma, direction, border, quality)
         })
     }
 
@@ -80,7 +80,7 @@ impl Scene<'_> {
         quality: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
-            ffi::tvg_scene_add_effect_drop_shadow(
+            sys::tvg_scene_add_effect_drop_shadow(
                 self.raw, r, g, b, a, angle, distance, sigma, quality,
             )
         })
@@ -88,7 +88,7 @@ impl Scene<'_> {
 
     /// Adds a fill color effect (overrides scene content color).
     pub fn add_fill_effect(&mut self, r: i32, g: i32, b: i32, a: i32) -> Result<()> {
-        Error::from_raw(unsafe { ffi::tvg_scene_add_effect_fill(self.raw, r, g, b, a) })
+        Error::from_raw(unsafe { sys::tvg_scene_add_effect_fill(self.raw, r, g, b, a) })
     }
 
     /// Adds a tint effect.
@@ -104,7 +104,7 @@ impl Scene<'_> {
         intensity: f64,
     ) -> Result<()> {
         Error::from_raw(unsafe {
-            ffi::tvg_scene_add_effect_tint(
+            sys::tvg_scene_add_effect_tint(
                 self.raw, black_r, black_g, black_b, white_r, white_g, white_b, intensity,
             )
         })
@@ -126,7 +126,7 @@ impl Scene<'_> {
         blend: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
-            ffi::tvg_scene_add_effect_tritone(
+            sys::tvg_scene_add_effect_tritone(
                 self.raw,
                 shadow_r,
                 shadow_g,
@@ -144,16 +144,16 @@ impl Scene<'_> {
 }
 
 impl Paint for Scene<'_> {
-    fn raw(&self) -> ffi::Tvg_Paint {
+    fn raw(&self) -> sys::Tvg_Paint {
         self.raw
     }
 
-    fn into_raw(mut self) -> ffi::Tvg_Paint {
+    fn into_raw(mut self) -> sys::Tvg_Paint {
         self.owned = false;
         self.raw
     }
 
-    unsafe fn from_raw_paint(raw: ffi::Tvg_Paint) -> Self {
+    unsafe fn from_raw_paint(raw: sys::Tvg_Paint) -> Self {
         Self {
             raw,
             owned: true,
@@ -166,7 +166,7 @@ impl Drop for Scene<'_> {
     fn drop(&mut self) {
         if self.owned {
             unsafe {
-                ffi::tvg_paint_rel(self.raw);
+                sys::tvg_paint_rel(self.raw);
             }
         }
     }

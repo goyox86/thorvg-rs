@@ -83,7 +83,7 @@ pub use scene::Scene;
 pub use shape::{FillRule, Shape, StrokeCap, StrokeJoin};
 pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 
-use thorvg_sys as ffi;
+use thorvg_sys as sys;
 
 #[cfg(test)]
 mod tests;
@@ -120,7 +120,7 @@ impl Thorvg {
     /// Returns a guard that will terminate the engine when dropped.
     /// Create all `ThorVG` objects via methods on this guard.
     pub fn init(threads: u32) -> Result<Self> {
-        let result = unsafe { ffi::tvg_engine_init(threads) };
+        let result = unsafe { sys::tvg_engine_init(threads) };
         Error::from_raw(result)?;
         Ok(Self {
             _not_send_sync: core::marker::PhantomData,
@@ -135,7 +135,7 @@ impl Thorvg {
         let mut version: *const core::ffi::c_char = core::ptr::null();
 
         let result = unsafe {
-            ffi::tvg_engine_version(
+            sys::tvg_engine_version(
                 &raw mut major,
                 &raw mut minor,
                 &raw mut micro,
@@ -234,7 +234,7 @@ impl Thorvg {
 impl Drop for Thorvg {
     fn drop(&mut self) {
         unsafe {
-            ffi::tvg_engine_term();
+            sys::tvg_engine_term();
         }
     }
 }
