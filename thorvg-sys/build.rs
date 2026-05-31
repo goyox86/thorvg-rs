@@ -40,10 +40,34 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
     // Canonical Cargo signals — see also the policy block below.  Read
     // here so the source-collection step can gate the bare-metal libc
     // shim TU on `target_os == "none"`.
+    //
+    // Three orthogonal predicates drive every target-derived decision:
+    //
+    //   * `is_bare_metal`  — `target_os == "none"`.  The system
+    //                        provides nothing: no libc, no C++
+    //                        runtime, no stdint.h.  Triggers the
+    //                        full shim treatment.
+    //   * `is_hosted`      — target_env is gnu/musl/msvc, or
+    //                        target_vendor is apple.  The system
+    //                        provides a working libc + libstdc++ and
+    //                        cc-rs's defaults are correct.
+    //   * everything else  — a self-contained runtime sits between
+    //                        those two extremes: ESP-IDF, NuttX,
+    //                        WASI, etc.  The runtime is provided
+    //                        externally (SDK component, syscall ABI,
+    //                        …); we just need to *not* emit
+    //                        directives that conflict with what the
+    //                        SDK will do at link time.
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let target_vendor = env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default();
+
     let is_bare_metal = target_os == "none";
     let is_msvc = target_env == "msvc";
+    let is_hosted = matches!(target_env.as_str(), "gnu" | "musl" | "msvc")
+        || target_vendor == "apple";
+    // (`is_cross` is computed locally inside `generate_bindings`, which
+    // is the only consumer.)
 
     // ── Collect source files ─────────────────────────────────────────────
 
@@ -175,44 +199,66 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
     }
 
     // Mirror the GCC/Clang flag set that upstream meson applies
-    // unconditionally (`src/meson.build`).  These shrink code size and
-    // — critically for bare-metal targets — remove the EH/unwind
-    // metadata that would otherwise reference libstdc++ symbols absent
-    // from an embedded sysroot.
+    // unconditionally (`src/meson.build`).  Split into two tiers:
+    //
+    //   * The "size / correctness" subset is safe for every non-MSVC
+    //     target — these are pure code-shape choices that match what
+    //     thorvg upstream wants regardless of the link environment.
+    //   * The unwind-stripping flags are bare-metal-only.  On SDK-style
+    //     embedded targets (ESP-IDF, NuttX, …) the SDK's linker script
+    //     asserts on the EH-frame section layout (e.g. ESP-IDF's
+    //     `sections.ld` requires zero gap between `.flash.rodata` and
+    //     `.eh_frame_hdr`).  Compiling our TUs with mismatched unwind
+    //     policy vs. the SDK's own C++ TUs can leave the linker unable
+    //     to satisfy those asserts.  On true `target_os == "none"` we
+    //     control the link and want every byte stripped.
     if !is_msvc {
         for f in &[
             "-fno-exceptions",
             "-fno-rtti",
             "-fno-stack-protector",
             "-fno-math-errno",
-            "-fno-unwind-tables",
-            "-fno-asynchronous-unwind-tables",
         ] {
             build.flag_if_supported(f);
         }
     }
+    if is_bare_metal {
+        build.flag_if_supported("-fno-unwind-tables");
+        build.flag_if_supported("-fno-asynchronous-unwind-tables");
+    }
 
-    // Bare-metal additional plumbing.
+    // Non-hosted runtime plumbing.
+    //
+    // On any target that isn't a hosted Unix / Apple / Windows
+    // platform, cc-rs's automatic `-lstdc++` / `-lc++` emission is
+    // wrong: bare-metal has no system libstdc++, and SDK-style
+    // runtimes (ESP-IDF, NuttX, WASI, …) bring their own as a
+    // dedicated component and would conflict with a duplicate
+    // emission here.  Suppress cc-rs's auto-link so each ecosystem
+    // gets to handle C++ runtime linkage its own way.
+    if !is_hosted {
+        build.cpp_set_stdlib(None);
+    }
+
+    // Bare-metal-only additional plumbing.
     //
     // In a `target_os == "none"` environment the C++ runtime that gcc
-    // normally injects is either missing or only partially present:
+    // normally injects is either missing or only partially present.
+    // SDK-backed targets (ESP-IDF, etc.) handle these in their own
+    // build glue and should not get them applied a second time here.
     //
     //   * `-fno-threadsafe-statics` suppresses the `__cxa_guard_*` calls
     //     emitted around function-local statics, which pull in pthread
     //     stubs unavailable on bare metal.
     //   * `-fno-use-cxa-atexit` avoids registrations against
     //     `__cxa_atexit`, which is a stub on bare-metal newlib.
-    //   * `cpp_set_stdlib(None)` stops cc-rs from emitting `-lstdc++` /
-    //     `-lc++`: the cross-compiler driver already pulls the correct
-    //     libstdc++ multilib from its own sysroot when invoked as the
-    //     linker.
-    //
-    // Optimise for size on embedded targets too — code size dominates
-    // every reasonable bare-metal use of thorvg.
+    //   * The force-included libc shim header + dropping libc.a from
+    //     the link replace newlib entirely.
+    //   * `-Os` because code size dominates every reasonable
+    //     bare-metal use of thorvg.
     if is_bare_metal {
         build.flag_if_supported("-fno-threadsafe-statics");
         build.flag_if_supported("-fno-use-cxa-atexit");
-        build.cpp_set_stdlib(None);
         build.opt_level_str("s");
 
         // Force-include the in-tree libc shim header so every TU sees
@@ -286,14 +332,30 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
         for (_, name) in &found {
             println!("cargo:rustc-link-lib=static={name}");
         }
-    } else {
-        let target_vendor = env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default();
+    } else if is_hosted {
+        // System libc / libstdc++ — request dynamic linkage.  cc-rs
+        // doesn't reliably emit this on cross builds, so we name the
+        // libraries explicitly per platform.
         if target_vendor == "apple" || target_os == "freebsd" {
             println!("cargo:rustc-link-lib=dylib=c++");
         } else if target_os == "linux" || target_env == "gnu" {
             println!("cargo:rustc-link-lib=dylib=stdc++");
         }
     }
+    // Non-hosted, non-bare-metal runtimes (ESP-IDF, NuttX, WASI, …)
+    // emit nothing for the C++ runtime: the SDK is responsible for
+    // putting libstdc++ / libgcc / libc on the link line.  cc-rs's
+    // auto-emit was already suppressed above via
+    // `cpp_set_stdlib(None)` so we don't need to fight it here.
+    //
+    // Note: linker-script-specific fixes (e.g. ESP-IDF's
+    // `.eh_frame_hdr` layout assertion needing `-Wl,--no-eh-frame-hdr`)
+    // do *not* belong here.  `cargo:rustc-link-arg` from a sys crate
+    // applies only to that crate's own link products (its rlib has no
+    // link step), so a directive emitted here would silently no-op
+    // for the downstream binary that actually invokes the linker.
+    // Such flags belong in the consumer's `.cargo/config.toml`
+    // (`rustflags = ["-C", "link-arg=..."]`) or its own build.rs.
 
     println!("cargo:rerun-if-changed=thorvg/src");
 }
@@ -402,9 +464,10 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
 
     println!("cargo:rerun-if-changed={}", capi_header.display());
 
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-    let is_bare_metal = target_os == "none";
+    let host = env::var("HOST").unwrap_or_default();
+    let target = env::var("TARGET").unwrap_or_default();
+    let is_cross = !target.is_empty() && target != host;
 
     let mut builder = bindgen::Builder::default()
         .header(capi_header.to_string_lossy())
@@ -428,21 +491,30 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .use_core()
         .layout_tests(true);
 
-    // On bare-metal targets bindgen invokes libclang directly, *not*
-    // the cross-compiler.  libclang's default include search list is
-    // the host's, so headers like `<stdint.h>` from the embedded
-    // newlib sysroot are invisible — every `uint8_t` / `uint32_t` in
+    // On cross-compilation targets bindgen invokes libclang directly,
+    // *not* the cross-compiler.  libclang's default include search list
+    // is the host's, so headers like `<stdint.h>` from the cross
+    // toolchain's sysroot (newlib on bare metal, ESP-IDF's libcxx on
+    // espidf, …) are invisible — every `uint8_t` / `uint32_t` in
     // `thorvg_capi.h` then fails to resolve.  Ask the user-configured
     // cross-compiler where its sysroot lives and feed its `include/`
     // dir to libclang, and set `--target=` so the ABI matches.
-    if is_bare_metal {
+    //
+    // We key off `TARGET != HOST` rather than `target_os == "none"`
+    // because the same fix is needed for any cross target with a
+    // non-host sysroot (ESP-IDF, NuttX, embedded Linux, …).
+    if is_cross {
         if let Some(inc) = cross_sysroot_include() {
             builder = builder.clang_arg(format!("-I{}", inc.display()));
         }
-        // The Rust triple's vendor/ABI fields (`unknown`, `eabihf`, …)
-        // aren't load-bearing for header parsing, but the arch is:
-        // pass a plain LLVM triple that libclang recognises.
-        builder = builder.clang_arg(format!("--target={}-none-elf", target_arch));
+        // libclang doesn't recognise vendor-specific OS fields like
+        // `espidf` in Rust triples, and the ABI fields it does parse
+        // (`unknown`, `eabihf`, …) aren't load-bearing for header
+        // parsing.  Strip both: `<arch>-none-elf` is the LLVM triple
+        // libclang understands across every embedded target we care
+        // about, and the arch is the only field that affects
+        // sizeof/alignof for `uint32_t` etc.
+        builder = builder.clang_arg(format!("--target={target_arch}-none-elf"));
     }
 
     let bindings = builder.generate().expect("Unable to generate bindings");
