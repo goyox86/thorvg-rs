@@ -199,6 +199,19 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
         build.define("JERRY_VLA(type,name,size)", "type name[size]");
     }
 
+    // JerryScript's default global heap is 512 KB (`JERRY_GLOBAL_HEAP_SIZE`
+    // in jerry-config.h:99), allocated as a single `.bss` static array.
+    // That's larger than ESP32-C6's *entire* 512 KB SRAM, so on bare-metal
+    // we cut it to a tight 16 KB — enough for the small expression
+    // snippets typical Lottie files use, while leaving room for the
+    // esp-alloc heap (416 KB), the ABGR backbuffer (230 KB at runtime),
+    // and esp-hal's own .bss + stack.  Hosted builds keep the upstream
+    // default.  At 32 KB the combined .bss overflows ESP32-C6's 512 KB
+    // SRAM by ~14 KB; 16 KB just fits.
+    if cfg!(feature = "expressions") && is_bare_metal {
+        build.define("JERRY_GLOBAL_HEAP_SIZE", "16");
+    }
+
     // Mirror the GCC/Clang flag set that upstream meson applies
     // unconditionally (`src/meson.build`).  Split into two tiers:
     //
