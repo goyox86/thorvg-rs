@@ -604,7 +604,7 @@ fn test_clip_lifecycle() {
 
     let mut clipper = engine.shape();
     clipper.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
-    shape.set_clip(&clipper).unwrap();
+    shape.set_clip(clipper).unwrap();
 
     canvas.push(shape).unwrap();
     canvas.draw(true).unwrap();

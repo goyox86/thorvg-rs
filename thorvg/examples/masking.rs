@@ -70,7 +70,7 @@ fn main() {
     mask1.append_circle(130.0, 150.0, 90.0, 90.0, true).unwrap();
     mask1.set_linear_gradient(grad).unwrap();
 
-    rect1.set_mask(&mask1, MaskMethod::Alpha).unwrap();
+    rect1.set_mask(mask1, MaskMethod::Alpha).unwrap();
     canvas.push(rect1).unwrap();
 
     // ── InvAlpha mask ──────────────────────────────────────────────
@@ -84,7 +84,7 @@ fn main() {
     mask2.append_circle(360.0, 150.0, 60.0, 60.0, true).unwrap();
     mask2.set_fill_color(255, 255, 255, 255).unwrap();
 
-    rect2.set_mask(&mask2, MaskMethod::InvAlpha).unwrap();
+    rect2.set_mask(mask2, MaskMethod::InvAlpha).unwrap();
     canvas.push(rect2).unwrap();
 
     // ── Luma mask ──────────────────────────────────────────────────
@@ -121,7 +121,7 @@ fn main() {
         .unwrap();
     mask3.set_linear_gradient(grad3).unwrap();
 
-    rect3.set_mask(&mask3, MaskMethod::Luma).unwrap();
+    rect3.set_mask(mask3, MaskMethod::Luma).unwrap();
     canvas.push(rect3).unwrap();
 
     canvas.draw(true).unwrap();

@@ -288,8 +288,14 @@ pub trait Paint {
     }
 
     /// Clips the drawing region to the specified shape's paths.
-    fn set_clip(&mut self, clipper: &Shape<'_>) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_paint_set_clip(self.raw(), clipper.raw()) })
+    ///
+    /// Consumes the `clipper`: the C side stores its raw pointer in this
+    /// paint's state and refcount-manages its lifetime via the canvas's
+    /// destruction.  Taking ownership here lets us call `into_raw` so the
+    /// Rust wrapper's `Drop` never tries to delete a handle the C side
+    /// still references.
+    fn set_clip(&mut self, clipper: Shape<'_>) -> Result<()> {
+        Error::from_raw(unsafe { sys::tvg_paint_set_clip(self.raw(), clipper.into_raw()) })
     }
 
     /// Gets the clip shape, if any.
@@ -303,9 +309,15 @@ pub trait Paint {
     }
 
     /// Sets the masking target and method.
-    fn set_mask<P: Paint>(&mut self, target: &P, method: MaskMethod) -> Result<()> {
+    ///
+    /// Consumes the `mask`: the C side stores its raw pointer in this
+    /// paint's state and refcount-manages its lifetime via the canvas's
+    /// destruction.  Taking ownership here lets us call `into_raw` so the
+    /// Rust wrapper's `Drop` never tries to delete a handle the C side
+    /// still references.
+    fn set_mask<P: Paint>(&mut self, mask: P, method: MaskMethod) -> Result<()> {
         Error::from_raw(unsafe {
-            sys::tvg_paint_set_mask_method(self.raw(), target.raw(), method.to_raw())
+            sys::tvg_paint_set_mask_method(self.raw(), mask.into_raw(), method.to_raw())
         })
     }
 

@@ -52,7 +52,7 @@ fn main() {
     // Circle clip
     let mut clip1 = engine.shape();
     clip1.append_circle(150.0, 200.0, 90.0, 90.0, true).unwrap();
-    rect.set_clip(&clip1).unwrap();
+    rect.set_clip(clip1).unwrap();
 
     canvas.push(rect).unwrap();
 
@@ -83,7 +83,7 @@ fn main() {
     clip2
         .append_rect(360.0, 100.0, 160.0, 200.0, 20.0, 20.0, true)
         .unwrap();
-    star.set_clip(&clip2).unwrap();
+    star.set_clip(clip2).unwrap();
 
     canvas.push(star).unwrap();
 
