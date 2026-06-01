@@ -403,6 +403,17 @@ fn test_paint_type() {
     assert_eq!(text.paint_type().unwrap(), PaintType::Text);
 }
 
+#[test]
+fn test_gradient_type_roundtrip() {
+    let engine = Thorvg::init(0).unwrap();
+
+    let linear = engine.linear_gradient();
+    assert_eq!(linear.gradient_type().unwrap(), PaintType::LinearGradient);
+
+    let radial = engine.radial_gradient();
+    assert_eq!(radial.gradient_type().unwrap(), PaintType::RadialGradient);
+}
+
 // ── Gradient Properties ────────────────────────────────────────────
 
 #[test]
