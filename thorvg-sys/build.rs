@@ -61,6 +61,7 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let target_vendor = env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
 
     let is_bare_metal = target_os == "none";
     let is_msvc = target_env == "msvc";
@@ -270,6 +271,59 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
         // `__stack_chk_fail`).
         let shim = src.join("common").join("tvgLibcShim.h");
         build.flag(format!("-include{}", shim.display()));
+
+        // RISC-V multilib normalisation.  cc-rs picks `-march=rv32imac`
+        // (the short Rust-style form) for the riscv32imac-* triples;
+        // most embedded toolchains (Espressif's riscv32-esp-elf, the
+        // SiFive bsp, …) ship their no-FPU `libgcc.a` under the
+        // *canonical* GCC multilib name `rv32imac_zicsr_zifencei` and
+        // leave the toolchain's default multilib (`.`) built assuming
+        // a hardware FPU.  Without this override, the
+        // `cross_runtime_libs` probe returns the FPU-enabled libgcc
+        // whose soft-float helpers (`__fixunsdfdi`, `__floatdidf`, …)
+        // read `frm` / `fcsr` CSRs that don't exist on a pure rv32imac
+        // chip, producing an illegal-instruction trap the first time
+        // any `double`-to-integer conversion runs.
+        //
+        // Reconstruct the canonical march from
+        // `CARGO_CFG_TARGET_FEATURE` (which Cargo populates from the
+        // Rust target spec) and append `_zicsr_zifencei`, matching the
+        // multilib naming used by every GCC ≥ 12 RISC-V cross
+        // toolchain.  Applies to the cc compile *and*, via
+        // `tool.args()`, to the runtime-libs / sysroot probes.
+    }
+
+    // RISC-V canonical-multilib selection, derived once so the same
+    // `-march` / `-mabi` pair drives both the cc compile and the
+    // `cross_runtime_libs` / `cross_sysroot_include` probes (which
+    // otherwise spawn a fresh `cc::Build` and never see our flags).
+    let riscv_multilib_args: Vec<String> = if is_bare_metal && target_arch == "riscv32" {
+        let features = env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
+        let has = |c: char| features.split(',').any(|f| f.eq_ignore_ascii_case(&c.to_string()));
+        let mut isa = String::from("rv32i");
+        for ext in ['m', 'a', 'f', 'd', 'c'] {
+            if has(ext) {
+                isa.push(ext);
+            }
+        }
+        isa.push_str("_zicsr_zifencei");
+        let abi = if has('d') { "ilp32d" } else if has('f') { "ilp32f" } else { "ilp32" };
+        // We also include `-fno-rtti` here because the runtime-libs
+        // probe needs to match cc-rs's compile (which gets it from the
+        // upstream meson flag block above).  Without it, the probe
+        // resolves to the `*/rtti/` multilib whose objects reference
+        // typeinfo helpers our `-fno-rtti` build deliberately omits.
+        vec![
+            format!("-march={isa}"),
+            format!("-mabi={abi}"),
+            "-fno-rtti".to_string(),
+        ]
+    } else {
+        Vec::new()
+    };
+
+    for f in &riscv_multilib_args {
+        build.flag(f);
     }
 
     // -- Compile -----------------------------------------------------------
@@ -316,13 +370,16 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
         // required because thorvg uses sqrt/sin/cos/atan2 extensively
         // and replacing those is impractical; libm.a does not ship
         // colliding shims on any toolchain we know of.
-        let found = cross_runtime_libs(&[
-            "libstdc++.a",
-            "libc++.a",
-            "libsupc++.a",
-            "libgcc.a",
-            "libm.a",
-        ]);
+        let found = cross_runtime_libs(
+            &[
+                "libstdc++.a",
+                "libc++.a",
+                "libsupc++.a",
+                "libgcc.a",
+                "libm.a",
+            ],
+            &riscv_multilib_args,
+        );
         let mut seen = std::collections::HashSet::new();
         for (dir, _) in &found {
             if seen.insert(dir.clone()) {
@@ -369,16 +426,28 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
 /// distinct directory and `rustc-link-lib=static=<link_name>` for
 /// each entry.  Archives the driver can't find are silently skipped
 /// (some toolchains fold libsupc++ into libstdc++, for example).
-fn cross_runtime_libs(wanted: &[&str]) -> Vec<(PathBuf, String)> {
+fn cross_runtime_libs(wanted: &[&str], extra_args: &[String]) -> Vec<(PathBuf, String)> {
     let Ok(tool) = cc::Build::new().cpp(true).try_get_compiler() else {
         return Vec::new();
     };
     let mut out = Vec::with_capacity(wanted.len());
     for file in wanted {
-        let res = std::process::Command::new(tool.path())
-            .arg(format!("-print-file-name={file}"))
-            .output();
-        let Ok(res) = res else { continue };
+        let mut cmd = std::process::Command::new(tool.path());
+        // Forward cc-rs's resolved compile args + any caller-supplied
+        // multilib selectors (e.g. RISC-V canonical
+        // `-march=rv32imac_zicsr_zifencei` / `-mabi=ilp32` /
+        // `-fno-rtti`).  Without them, embedded GCC toolchains return
+        // the *default* multilib, which on most RISC-V cross builds
+        // was built assuming a hardware FPU.  Linking its soft-float
+        // helpers (`__fixunsdfdi`, `__floatdidf`, …) into a no-FPU
+        // chip (`rv32imac` / `ilp32`) produces SIGILL the first time
+        // any `double`-to-integer conversion runs at runtime.
+        cmd.args(tool.args());
+        for f in extra_args {
+            cmd.arg(f);
+        }
+        cmd.arg(format!("-print-file-name={file}"));
+        let Ok(res) = cmd.output() else { continue };
         let s = String::from_utf8_lossy(&res.stdout).trim().to_string();
         // Drivers echo the bare filename when they can't locate the lib.
         if s == *file {
@@ -533,10 +602,14 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
 /// bindings for a bare-metal target.
 fn cross_sysroot_include() -> Option<PathBuf> {
     let tool = cc::Build::new().cpp(true).try_get_compiler().ok()?;
-    let out = std::process::Command::new(tool.path())
-        .arg("-print-sysroot")
-        .output()
-        .ok()?;
+    let mut cmd = std::process::Command::new(tool.path());
+    // Forward `-march` / `-mabi` etc. so that toolchains which keep a
+    // per-multilib sysroot return the right include tree (currently
+    // newlib's `<sysroot>/include` is shared across multilibs, but
+    // matching the runtime-libs probe avoids subtle drift later).
+    cmd.args(tool.args());
+    cmd.arg("-print-sysroot");
+    let out = cmd.output().ok()?;
     let sysroot = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if sysroot.is_empty() {
         return None;
