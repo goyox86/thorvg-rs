@@ -19,7 +19,9 @@
 //! ```no_run
 //! use thorvg::{Thorvg, ColorSpace};
 //!
-//! // Initialize the engine — all objects borrow from this guard
+//! // Initialize the engine — all objects borrow from this guard.
+//! // With the `threads` feature (default): `Thorvg::init(threads: u32)`.
+//! // Without it (bare-metal builds): `Thorvg::init()` — single-threaded only.
 //! let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
 //!
 //! // Create a canvas with a buffer
@@ -88,6 +90,20 @@ use thorvg_sys as sys;
 #[cfg(test)]
 mod tests;
 
+#[cfg(all(test, not(feature = "threads")))]
+mod tests_no_threads {
+    use super::Thorvg;
+
+    #[test]
+    fn init_no_arg_signature() {
+        let _engine = Thorvg::init().expect("init() should succeed");
+        let (major, _minor, _micro, version_str) =
+            Thorvg::version().expect("Failed to get version");
+        assert!(major >= 1);
+        assert!(!version_str.is_empty());
+    }
+}
+
 /// RAII guard for the `ThorVG` engine lifetime.
 ///
 /// The engine is terminated when this guard is dropped.
@@ -102,6 +118,8 @@ mod tests;
 /// ```no_run
 /// use thorvg::{Thorvg, ColorSpace};
 ///
+/// // `init` takes a thread count with the `threads` feature (default)
+/// // and takes no arguments when that feature is disabled.
 /// let engine = Thorvg::init(0).unwrap();
 /// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
 /// let mut shape = engine.shape();
@@ -115,12 +133,33 @@ pub struct Thorvg {
 impl Thorvg {
     /// Initialize the `ThorVG` engine.
     ///
-    /// `threads` specifies the number of worker threads. Use `0` for single-threaded mode.
+    /// Available when the `threads` feature is enabled (the default).
+    /// `threads` specifies the number of worker threads; use `0` for single-threaded mode.
+    ///
+    /// When the `threads` feature is disabled (e.g. bare-metal builds), this
+    /// function takes no arguments — see the no-arg variant below.
     ///
     /// Returns a guard that will terminate the engine when dropped.
     /// Create all `ThorVG` objects via methods on this guard.
+    #[cfg(feature = "threads")]
     pub fn init(threads: u32) -> Result<Self> {
         let result = unsafe { sys::tvg_engine_init(threads) };
+        Error::from_raw(result)?;
+        Ok(Self {
+            _not_send_sync: core::marker::PhantomData,
+        })
+    }
+
+    /// Initialize the `ThorVG` engine in single-threaded mode.
+    ///
+    /// Available when the `threads` feature is disabled (e.g. bare-metal builds).
+    /// All work runs synchronously on the calling thread.
+    ///
+    /// Returns a guard that will terminate the engine when dropped.
+    /// Create all `ThorVG` objects via methods on this guard.
+    #[cfg(not(feature = "threads"))]
+    pub fn init() -> Result<Self> {
+        let result = unsafe { sys::tvg_engine_init(0) };
         Error::from_raw(result)?;
         Ok(Self {
             _not_send_sync: core::marker::PhantomData,

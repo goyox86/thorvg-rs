@@ -29,6 +29,8 @@ pub struct Marker {
 /// ```no_run
 /// use thorvg::{Thorvg, ColorSpace};
 ///
+/// // `Thorvg::init` takes a thread count under the default `threads` feature
+/// // and takes no arguments when that feature is disabled.
 /// let engine = Thorvg::init(0).unwrap();
 /// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
 /// let mut buffer = vec![0u32; 800 * 600];

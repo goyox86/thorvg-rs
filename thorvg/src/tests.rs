@@ -1,3 +1,4 @@
+#![cfg(feature = "threads")]
 #![allow(clippy::cast_precision_loss)]
 
 extern crate alloc;
@@ -14,6 +15,16 @@ fn test_init_and_version() {
     let (major, _minor, _micro, version_str) = Thorvg::version().expect("Failed to get version");
     assert!(major >= 1);
     assert!(!version_str.is_empty());
+}
+
+// `Thorvg::init` takes a thread count only when the `threads` feature is
+// enabled; without it, the signature collapses to `init()` so callers cannot
+// request a count the engine cannot honor.
+#[test]
+fn test_init_signature_with_threads() {
+    let _engine = Thorvg::init(0).expect("init(0) should succeed");
+    drop(_engine);
+    let _engine = Thorvg::init(2).expect("init(2) should succeed");
 }
 
 // ── Canvas Lifecycle ───────────────────────────────────────────────
