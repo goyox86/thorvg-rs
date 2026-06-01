@@ -22,8 +22,8 @@ fn test_init_and_version() {
 // request a count the engine cannot honor.
 #[test]
 fn test_init_signature_with_threads() {
-    let _engine = Thorvg::init(0).expect("init(0) should succeed");
-    drop(_engine);
+    let engine = Thorvg::init(0).expect("init(0) should succeed");
+    drop(engine);
     let _engine = Thorvg::init(2).expect("init(2) should succeed");
 }
 
