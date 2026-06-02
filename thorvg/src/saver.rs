@@ -49,24 +49,39 @@ impl Saver<'_> {
     }
 
     /// Saves an animation to a file path string.
+    ///
+    /// Consumes the `Animation` — the C side takes ownership of the
+    /// handle on every exit path where `picture()->refCnt() <= 1`
+    /// (which is the case for a freshly-constructed `Animation`).
+    /// See `tvgSaver.cpp:142-172`: the animation is `delete`d on
+    /// failure, and handed off to the save module on success.
+    /// Keeping the Rust `Drop` active would double-free.  Same
+    /// shape as `Paint::set_mask` / `Paint::set_clip`.
     pub fn save_animation_to_str(
         &mut self,
-        animation: &Animation<'_>,
+        animation: Animation<'_>,
         path: &str,
         quality: u32,
         fps: u32,
     ) -> Result<()> {
         let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
-            sys::tvg_saver_save_animation(self.raw, animation.raw(), c_path.as_ptr(), quality, fps)
+            sys::tvg_saver_save_animation(
+                self.raw,
+                animation.into_raw(),
+                c_path.as_ptr(),
+                quality,
+                fps,
+            )
         })
     }
 
-    /// Saves an animation to a file.
+    /// Saves an animation to a file.  Consumes the `Animation` — see
+    /// [`save_animation_to_str`](Self::save_animation_to_str).
     #[cfg(feature = "std")]
     pub fn save_animation<P: AsRef<std::path::Path>>(
         &mut self,
-        animation: &Animation<'_>,
+        animation: Animation<'_>,
         path: P,
         quality: u32,
         fps: u32,

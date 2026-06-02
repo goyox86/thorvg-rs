@@ -33,6 +33,18 @@ impl Animation<'_> {
         self.raw
     }
 
+    /// Consumes the Animation and returns the raw `Tvg_Animation`.
+    ///
+    /// Suppresses `Drop`, so the caller is responsible for the C
+    /// handle's lifetime.  Used by `Saver::save_animation_to_str`,
+    /// where the C side takes ownership of the handle on every exit
+    /// path under `refCnt <= 1` (see `tvgSaver.cpp:142-172`) —
+    /// keeping the Rust `Drop` active would double-free.
+    pub(crate) fn into_raw(self) -> sys::Tvg_Animation {
+        let me = core::mem::ManuallyDrop::new(self);
+        me.raw
+    }
+
     /// Wraps an existing raw animation pointer.
     ///
     /// # Safety

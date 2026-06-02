@@ -547,6 +547,22 @@ fn test_saver_create_destroy() {
     // Dropped without saving — should not crash
 }
 
+#[test]
+fn test_saver_save_animation_ownership_transfer() {
+    // A fresh Animation has totalFrame == 0, which makes
+    // Saver::save_animation hit the InsufficientCondition path and
+    // delete the underlying handle (refCnt == 1).  The binding must
+    // consume the Animation so Rust's Drop doesn't double-free on
+    // the now-freed C handle.  Under ASan, the pre-fix `&Animation`
+    // signature triggered a heap-use-after-free here.
+    let engine = Thorvg::init(0).unwrap();
+    let mut saver = engine.saver();
+    let anim = engine.animation();
+    let r = saver.save_animation_to_str(anim, "/tmp/thorvg-rs-test.gif", 100, 30);
+    assert!(r.is_err()); // InsufficientCondition — no frames loaded
+    // `anim` was moved into the call; no Drop runs on freed memory.
+}
+
 // ── Accessor Lifecycle ─────────────────────────────────────────────
 
 #[test]
