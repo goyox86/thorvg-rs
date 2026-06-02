@@ -315,11 +315,31 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
         // `tool.args()`, to the runtime-libs / sysroot probes.
     }
 
-    // RISC-V canonical-multilib selection, derived once so the same
-    // `-march` / `-mabi` pair drives both the cc compile and the
-    // `cross_runtime_libs` / `cross_sysroot_include` probes (which
-    // otherwise spawn a fresh `cc::Build` and never see our flags).
-    let riscv_multilib_args: Vec<String> = if is_bare_metal && target_arch == "riscv32" {
+    // Cross-toolchain multilib flag normalisation.
+    //
+    // This is NOT a picolibc concern — it's a cc-rs ↔ GCC flag-naming
+    // mismatch that surfaces during the toolchain's runtime-archive
+    // probes (`cross_runtime_libs`, `cross_sysroot_include`).  Currently
+    // only RISC-V is affected:
+    //
+    //   cc-rs picks `-march=rv32imac` (the short Rust-style form) for the
+    //   riscv32imac-* triples; most embedded toolchains (Espressif's
+    //   riscv32-esp-elf, the SiFive bsp, …) ship their no-FPU `libgcc.a`
+    //   under the *canonical* GCC multilib name `rv32imac_zicsr_zifencei`
+    //   and leave the toolchain's default multilib (`.`) built assuming
+    //   a hardware FPU.  Without this override, the `cross_runtime_libs`
+    //   probe returns the FPU-enabled libgcc whose soft-float helpers
+    //   (`__fixunsdfdi`, `__floatdidf`, …) read `frm` / `fcsr` CSRs that
+    //   don't exist on a pure rv32imac chip, producing an
+    //   illegal-instruction trap the first time any `double`-to-integer
+    //   conversion runs.
+    //
+    // ARM / aarch64 cross toolchains agree with cc-rs on `-mcpu=` /
+    // `-mfpu=` / `-mfloat-abi=` naming, so they need no equivalent
+    // block — cc-rs's auto-emitted flags already select the right
+    // multilib.  If a future arch shows the same mismatch, add it here
+    // (and *not* inside `build_picolibc`, which stays arch-agnostic).
+    let cross_toolchain_multilib_args: Vec<String> = if is_bare_metal && target_arch == "riscv32" {
         let features = env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
         let has = |c: char| {
             features
@@ -354,7 +374,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
         Vec::new()
     };
 
-    for f in &riscv_multilib_args {
+    for f in &cross_toolchain_multilib_args {
         build.flag(f);
     }
 
@@ -372,9 +392,9 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     //   * Err(why):  cargo:warning explains, and the legacy shim
     //                stays active so non-wired arches still build.
     //
-    // Currently wired: riscv32 / riscv64.  arm / aarch64 / xtensa
-    // fall through to the shim path — their `libc/machine/<arch>/`
-    // enumeration lands in follow-up commits.
+    // Arch coverage is driven entirely by `picolibc_machine_subdir`:
+    // any `target_arch` it maps to an existing `libc/machine/<dir>/`
+    // is built; anything else returns Err and falls back to the shim.
     let picolibc_root = manifest_dir.join("picolibc");
     let picolibc_config = manifest_dir.join("picolibc-config");
     let picolibc_active = if is_bare_metal {
@@ -382,7 +402,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
             &picolibc_root,
             &picolibc_config,
             &target_arch,
-            &riscv_multilib_args,
+            &cross_toolchain_multilib_args,
         ) {
             Ok(()) => true,
             Err(reason) => {
@@ -434,10 +454,8 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
         // header tree.  See `build_picolibc` for the same ordering
         // applied to picolibc's own compile.
         build.include(&picolibc_config);
-        let machine_subdir = match target_arch.as_str() {
-            "riscv32" | "riscv64" => "riscv",
-            _ => unreachable!("picolibc_active gated on supported arches"),
-        };
+        let machine_subdir = picolibc_machine_subdir(&target_arch)
+            .expect("picolibc_active gated on supported arches");
         build.include(picolibc_root.join("libc/machine").join(machine_subdir));
         build.include(picolibc_root.join("libc/stdio"));
         build.include(picolibc_root.join("libc/locale"));
@@ -506,7 +524,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
                 "libgcc.a",
                 "libm.a",
             ],
-            &riscv_multilib_args,
+            &cross_toolchain_multilib_args,
         );
         let mut seen = std::collections::HashSet::new();
         for (dir, _) in &found {
@@ -618,50 +636,37 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
 ///
 /// # Architecture support
 ///
-/// Phase 3 wires only riscv32 / riscv64.  Other architectures
-/// receive a structured `Err` and the caller logs a
-/// `cargo:warning=` — the build still succeeds because
-/// `tvgLibcShim.cpp` is still in the source set on this commit.
-/// arm / aarch64 / xtensa land in follow-up commits; their
-/// `libc/machine/<arch>/meson.build` lists have more variants
-/// (ARMv4 vs ARMv6 vs ARMv7-M `.S` selectors, aarch64 `*-stub.c`
-/// trampolines, xtensa esp32 PSRAM cache fix flag) than riscv's
-/// flat 12-file set and warrant per-arch attention.
+/// Coverage is driven by `picolibc_machine_subdir` (Rust `target_arch`
+/// → picolibc `libc/machine/<dir>/`).  Any arch the helper maps to an
+/// existing machine dir is built; arches it doesn't know about get a
+/// structured `Err` and the caller logs a `cargo:warning=`.
+///
+/// The machine dir is walked the same way as the generic dirs — `.c`
+/// and `.S` files at the top level (no recursion into nested
+/// `machine/` header subdirs), filtered by `MACHINE_DENYLIST`.  This
+/// keeps `build_picolibc` arch-agnostic: a new picolibc release that
+/// adds files to an arch's machine dir is picked up automatically,
+/// and adding a new arch is a one-line edit to
+/// `picolibc_machine_subdir`.
+///
+/// ARM caveat: picolibc's `libc/machine/arm/` ships multiple ISA
+/// variants of some files (e.g. `setjmp.S` per armv4t / armv6m /
+/// armv7m / armv8m), gated by meson on `-mcpu=`.  A naive directory
+/// walk would pick up all variants and produce duplicate-symbol link
+/// errors.  When the first ARM consumer appears, port the meson
+/// selection rule into a per-arch hook here.  Until then, ARM is
+/// deliberately not in the translator table.
 fn build_picolibc(
     picolibc_root: &Path,
     picolibc_config: &Path,
     target_arch: &str,
-    riscv_multilib_args: &[String],
+    cross_toolchain_multilib_args: &[String],
 ) -> Result<(), String> {
     // ── Arch resolution ───────────────────────────────────────────────
 
-    let (machine_subdir, machine_sources): (&str, &[&str]) = match target_arch {
-        "riscv32" | "riscv64" => (
-            "riscv",
-            // From `libc/machine/riscv/meson.build:srcs_machine`,
-            // minus `tls.c` (TLS disabled in picolibc.h).  The
-            // `memcpy-asm.S` file is the per-arch fast path that
-            // `memcpy.c` may delegate to.
-            &[
-                "ieeefp.c",
-                "memcpy-asm.S",
-                "memcpy.c",
-                "memmove.S",
-                "memmove.c",
-                "memset.S",
-                "setjmp.S",
-                "stpcpy.c",
-                "strcmp.S",
-                "strcpy.c",
-                "strlen.c",
-            ],
-        ),
-        other => {
-            return Err(format!(
-                "target_arch={other} not yet enumerated (only riscv32/riscv64 wired in phase 3)"
-            ));
-        }
-    };
+    let machine_subdir = picolibc_machine_subdir(target_arch).ok_or_else(|| {
+        format!("target_arch={target_arch} not mapped to a picolibc machine dir")
+    })?;
 
     let machine_dir = picolibc_root.join("libc/machine").join(machine_subdir);
     if !machine_dir.is_dir() {
@@ -722,13 +727,33 @@ fn build_picolibc(
     }
 
     // ── Architecture-specific machine sources ─────────────────────────
-
-    for f in machine_sources {
-        let p = machine_dir.join(f);
-        if !p.is_file() {
-            return Err(format!("picolibc machine source missing: {}", p.display()));
+    //
+    // Walk the arch's machine dir (non-recursive — the nested
+    // `machine/` subdir holds headers only, never sources) picking up
+    // both `.c` and `.S` files.  Single shared denylist:
+    // `tls.c` / `inittls.c` (TLS disabled by `__SINGLE_THREAD` in
+    // picolibc.h).  Anything else picolibc ships per-arch — ieeefp
+    // helpers, hand-written memcpy/memmove/strlen, setjmp.S, etc. —
+    // comes along automatically, matching exactly what upstream
+    // `libc/machine/<arch>/meson.build:srcs_machine` enumerates for
+    // the arches whose machine dirs are flat (riscv, aarch64, x86,
+    // x86_64, …).
+    for entry in std::fs::read_dir(&machine_dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+            continue;
+        };
+        if ext != "c" && ext != "S" {
+            continue;
         }
-        sources.push(p);
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if MACHINE_DENYLIST.contains(&name) {
+            continue;
+        }
+        sources.push(path);
     }
 
     // ── thorvg-sys runtime stubs ──────────────────────────────────
@@ -820,8 +845,11 @@ fn build_picolibc(
     build.flag(format!("-include{}", picolibc_h.display()));
 
     // Same multilib args as thorvg uses, so picolibc TUs build for
-    // the same ABI as the rest of the link surface.
-    for f in riscv_multilib_args {
+    // the same ABI as the rest of the link surface.  Empty (no flags
+    // emitted) on arches where cc-rs and the cross toolchain agree
+    // on multilib naming (ARM, aarch64, …) — see the long comment
+    // next to `cross_toolchain_multilib_args` in `build_vendored_cc`.
+    for f in cross_toolchain_multilib_args {
         build.flag(f);
     }
 
@@ -998,6 +1026,60 @@ fn denylist_files() -> &'static [&'static str] {
         "bsd_qsort_r.c",
         "qsort_r.c",
     ]
+}
+
+/// Files excluded from any `libc/machine/<arch>/` walk.
+///
+/// Single shared list across all arches because the exclusion
+/// reasons are config-driven, not arch-driven:
+///   * `tls.c` / `inittls.c` — TLS setup; `__SINGLE_THREAD` in
+///     `picolibc.h` deselects TLS, so these would be dead code.
+///
+/// Kept tight on purpose.  If a future picolibc bump adds a
+/// per-arch file we don't want, the right move is usually to add
+/// the matching `__*` knob to `picolibc.h` (which removes the
+/// reference path-wide) before reaching for this list.
+const MACHINE_DENYLIST: &[&str] = &["tls.c", "inittls.c"];
+
+/// Map a Rust `CARGO_CFG_TARGET_ARCH` value to picolibc's
+/// `libc/machine/<dir>/` subdirectory name.
+///
+/// This is the single point of arch-policy in the picolibc build.
+/// Every arch whose machine dir is a flat source set (no per-ISA
+/// variant selection) lands here as a one-line entry and is built
+/// automatically with no other code changes.
+///
+/// Returns `None` for arches picolibc upstream does not support
+/// (xtensa, wasm32, …) and for arches that need per-ISA variant
+/// selection that `build_picolibc`'s plain directory walk would
+/// mis-resolve (arm — see the caveat in `build_picolibc`'s rustdoc).
+/// Caller surfaces the `None` via `cargo:warning=` and falls back
+/// to the legacy `tvgLibcShim.cpp` source set.
+fn picolibc_machine_subdir(target_arch: &str) -> Option<&'static str> {
+    // Matches the directory names that exist under
+    // `picolibc/libc/machine/` in the vendored submodule.  When
+    // bumping picolibc, sanity-check this table against
+    // `ls picolibc/libc/machine/` — new arches in picolibc upstream
+    // are additive, but the directory naming for x86 vs i386 etc.
+    // has historically been stable.
+    match target_arch {
+        "riscv32" | "riscv64" => Some("riscv"),
+        "aarch64" => Some("aarch64"),
+        "x86" => Some("i386"),
+        "x86_64" => Some("x86_64"),
+        "powerpc" | "powerpc64" => Some("powerpc"),
+        "mips" | "mips64" => Some("mips"),
+        "sparc" | "sparc64" => Some("sparc"),
+        "m68k" => Some("m68k"),
+        "msp430" => Some("msp430"),
+        // arm intentionally absent — its machine dir ships multiple
+        // ISA-variant `.S` files (setjmp / memcpy / strcmp per
+        // armv4t / armv6m / armv7m / armv8m) that picolibc's meson
+        // selects between via `-mcpu=`.  A flat walk would pick all
+        // variants and link-error on duplicate symbols.  Wire ARM
+        // by porting that selection rule into `build_picolibc`.
+        _ => None,
+    }
 }
 
 /// Discover the cross-compiler's builtin-headers include directory.
