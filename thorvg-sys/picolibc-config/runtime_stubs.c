@@ -193,3 +193,36 @@ int raise(int sig)
     (void)sig;
     return -1;
 }
+
+/* ── newlib ↔ picolibc errno bridge ─────────────────────────── *
+ *
+ * The cross toolchain's pre-compiled archives — libm.a in
+ * particular, plus assorted bits of libstdc++ — were built against
+ * newlib's `<errno.h>`.  Newlib defines `errno` as a macro:
+ *
+ *     #define errno (*__errno())
+ *
+ * which means every `errno = E_FOO` and `if (errno == E_BAR)` site
+ * in those archives emits a reference to the **function** `__errno`.
+ *
+ * Picolibc, by contrast, defines `errno` as a plain `int` global
+ * (because we set `__GLOBAL_ERRNO` in `picolibc.h`).  So
+ * picolibc's `libc/errno/errno.c` exports `int errno;` — not
+ * `int *__errno(void)`.  The pre-compiled newlib-side TUs then
+ * fail to link with an `undefined symbol: __errno`.
+ *
+ * Bridge: provide `__errno` here as a tiny accessor that returns
+ * the address of picolibc's `errno` global.  Both worlds now see
+ * the same underlying storage, errno values set from a math
+ * routine in libm.a are readable by thorvg's C++ code through
+ * picolibc's `<errno.h>`, and vice versa.
+ *
+ * Surfaced by the `gradient_linear` example bin: libm's float-to-
+ * int conversions in gradient interpolation hit `__errno` on
+ * domain errors. */
+extern int errno;
+
+int *__errno(void)
+{
+    return &errno;
+}
