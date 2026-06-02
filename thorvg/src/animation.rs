@@ -13,6 +13,13 @@ use thorvg_sys as sys;
 /// thread, but you must not share references across threads.
 pub struct Animation<'eng> {
     raw: sys::Tvg_Animation,
+    // Borrowed picture handle owned by the C-side animation.  We
+    // build it once in `new` so [`Animation::picture`] can return a
+    // stable `&mut Picture<'_>` rather than reconstructing a fresh
+    // wrapper on every call.  The wrapper is `owned: false`, so
+    // its Drop is a no-op — the C animation handle owns the actual
+    // picture and releases it via `tvg_animation_del`.
+    picture: Picture<'eng>,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
@@ -27,7 +34,7 @@ pub struct Animation<'eng> {
 // C handle would be a data race.
 unsafe impl Send for Animation<'_> {}
 
-impl Animation<'_> {
+impl<'eng> Animation<'eng> {
     /// Returns the raw `Tvg_Animation` handle.
     pub(crate) fn raw(&self) -> sys::Tvg_Animation {
         self.raw
@@ -50,8 +57,11 @@ impl Animation<'_> {
     /// # Safety
     /// `raw` must be a valid, owned `Tvg_Animation`.
     pub(crate) unsafe fn from_raw(raw: sys::Tvg_Animation) -> Self {
+        let pic_raw = unsafe { sys::tvg_animation_get_picture(raw) };
+        assert!(!pic_raw.is_null(), "animation has no picture");
         Self {
             raw,
+            picture: unsafe { Picture::from_raw(pic_raw, false) },
             _engine: core::marker::PhantomData,
         }
     }
@@ -60,19 +70,20 @@ impl Animation<'_> {
     pub(crate) fn new() -> Self {
         let raw = unsafe { sys::tvg_animation_new() };
         assert!(!raw.is_null(), "failed to create Animation");
-        Self {
-            raw,
-            _engine: core::marker::PhantomData,
-        }
+        // SAFETY: `raw` was just returned non-null by tvg_animation_new.
+        unsafe { Self::from_raw(raw) }
     }
 
-    /// Returns the associated Picture object.
-    ///
-    /// The returned Picture is **not owned** — it is managed by the Animation.
-    pub fn picture(&self) -> Picture<'_> {
-        let raw = unsafe { sys::tvg_animation_get_picture(self.raw) };
-        assert!(!raw.is_null(), "animation has no picture");
-        unsafe { Picture::from_raw(raw, false) }
+    /// Returns a borrow of the picture managed by this animation.
+    /// Cheap — the wrapper is built once in `new` and re-borrowed
+    /// on each call (no C call, no allocation).
+    pub fn picture(&self) -> &Picture<'eng> {
+        &self.picture
+    }
+
+    /// Mutable counterpart to [`picture`](Self::picture).
+    pub fn picture_mut(&mut self) -> &mut Picture<'eng> {
+        &mut self.picture
     }
 
     /// Sets the current animation frame.

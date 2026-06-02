@@ -41,7 +41,7 @@ pub struct Marker {
 /// };
 ///
 /// let mut lottie = engine.lottie_animation();
-/// let mut pic = lottie.picture();
+/// let pic = lottie.picture_mut();
 /// pic.load_from_str("animation.json").ok();
 /// ```
 ///
@@ -71,7 +71,7 @@ impl LottieAnimation<'_> {
     /// (e.g. external asset `resource_path`), access the picture
     /// directly via [`Animation::picture`].
     pub fn load_data(&mut self, data: &[u8]) -> Result<()> {
-        let mut pic = self.picture();
+        let pic = self.picture_mut();
         pic.load_data(data, crate::picture::MimeType::Lottie, None, true)
     }
 
@@ -80,7 +80,7 @@ impl LottieAnimation<'_> {
     /// Convenience wrapper around [`Picture::load_from_str`](crate::Picture::load_from_str).
     #[cfg(feature = "std")]
     pub fn load_file(&mut self, path: &str) -> Result<()> {
-        let mut pic = self.picture();
+        let pic = self.picture_mut();
         pic.load_from_str(path)
     }
 
@@ -88,7 +88,7 @@ impl LottieAnimation<'_> {
     ///
     /// Convenience wrapper around [`Picture::set_size`](crate::Picture::set_size).
     pub fn set_size(&mut self, w: f32, h: f32) -> Result<()> {
-        let mut pic = self.picture();
+        let pic = self.picture_mut();
         pic.set_size(w, h)
     }
 
