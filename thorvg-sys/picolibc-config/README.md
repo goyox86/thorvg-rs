@@ -15,7 +15,33 @@ sees the same static configuration.
 |---|---|---|
 | `picolibc.h` | `picolibc.h.in` (resolved by meson) | All ~50 picolibc compile-time knobs: errno shape, threading mode, stdio family, math errno policy, locale support, version macros |
 | `pthread.h` | none (picolibc doesn't ship one) | Minimal stub so libstdc++ headers parse under `__SINGLE_THREAD` |
-| `runtime_stubs.c` | none | Strong-symbol stubs for pthread / getenv / `_exit` / `__errno` / `_on_exit` |
+| `runtime_stubs/*.c` | none | Weak-symbol stubs for surface picolibc doesn't ship (pthread, getenv, getentropy, `_exit`, `__errno`, `_on_exit`) |
+
+## runtime_stubs/
+
+One `.c` per override unit so a consumer's strong replacement causes
+the linker to skip exactly that one TU from `libpicolibc.a`:
+
+| File | Symbols | When to override |
+|---|---|---|
+| `pthread.c` | `pthread_{mutex,key,…}_*`, `pthread_once` | Real threading (also flip `__SINGLE_THREAD` in picolibc.h) |
+| `errno_bridge.c` | `__errno` | Custom errno storage (must re-bridge to picolibc's `errno`) |
+| `onexit.c` | `_on_exit` | Want real atexit dispatch (also un-denylist `exitprocs.c`) |
+| `env.c` | `getenv` | Real environment surface |
+| `entropy.c` | `getentropy`, `arc4random` | TRNG hardware |
+| `hal.c` | `_exit`, `raise` | Breakpoint trap, watchdog reset, power-off |
+
+All stubs use `__attribute__((weak))`.  Consumer crates supply
+strong replacements via the usual mechanism:
+
+```rust
+// somewhere in the consumer crate
+#[unsafe(no_mangle)]
+pub extern "C" fn _exit(_status: core::ffi::c_int) -> ! {
+    // HAL-specific halt / reset / breakpoint trap
+    loop { core::hint::spin_loop() }
+}
+```
 
 ## Editing
 

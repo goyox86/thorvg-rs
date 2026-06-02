@@ -540,18 +540,27 @@ fn build_picolibc(
 
     // ── thorvg-sys runtime stubs ──────────────────────────────────────
     //
-    // Strong-symbol stubs for the pthread / getenv / getentropy /
-    // _on_exit surface libsupc++ pulls in but picolibc doesn't ship.
-    // Compiled into the picolibc archive to share its include path
-    // and multilib configuration.
-    let runtime_stubs = picolibc_config.join("runtime_stubs.c");
-    if !runtime_stubs.is_file() {
+    // Weak-symbol stubs for the pthread / getenv / getentropy /
+    // _on_exit / __errno / _exit surface libsupc++ and newlib-built
+    // archives pull in but picolibc doesn't ship.  Split per concern
+    // (one `.c` per override unit) so a consumer's strong override
+    // of, say, `_exit` makes the linker skip `hal.c` from the archive
+    // entirely without dragging unrelated stubs.  Compiled into the
+    // picolibc archive to share its include path and multilib config.
+    let runtime_stubs_dir = picolibc_config.join("runtime_stubs");
+    if !runtime_stubs_dir.is_dir() {
         return Err(format!(
-            "picolibc-config runtime_stubs.c missing: {}",
-            runtime_stubs.display()
+            "picolibc-config runtime_stubs/ dir missing: {}",
+            runtime_stubs_dir.display()
         ));
     }
-    sources.push(runtime_stubs);
+    for entry in std::fs::read_dir(&runtime_stubs_dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "c") {
+            sources.push(path);
+        }
+    }
 
     // ── Include paths ─────────────────────────────────────────────────
     //
