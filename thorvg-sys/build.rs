@@ -1038,13 +1038,17 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .use_core()
         .layout_tests(true);
 
-    // On cross-compilation, bindgen invokes libclang directly rather
-    // than the cross-compiler.  libclang's default include search list
-    // is the host's, so headers like `<stdint.h>` from the cross
-    // toolchain's sysroot are invisible.  Forward the cross sysroot's
-    // `include/` dir and set `--target=` so the ABI matches.  Keyed on
-    // `TARGET != HOST` because the fix applies to any cross target,
-    // not just bare-metal.
+    // bindgen invokes libclang directly rather than the cross- or
+    // host compiler, so libclang's defaults — not Rust's — drive the
+    // include search list and target ABI.  Two corrections:
+    //
+    //   * On cross builds, forward the cross sysroot's `include/`
+    //     dir so headers like `<stdint.h>` resolve.
+    //   * Always set `--target=`.  libclang's default target can
+    //     disagree with Rust's `HOST` (e.g. a 32-bit ABI on a
+    //     64-bit machine if only an i386 libclang is on the library
+    //     path), which trips bindgen's debug-assert that
+    //     `target_pointer_size() == size_of::<*mut ()>()`.
     if is_cross {
         if let Some(inc) = cross_sysroot_include() {
             builder = builder.clang_arg(format!("-I{}", inc.display()));
@@ -1054,6 +1058,10 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         // understands across embedded targets.  Arch is the only field
         // that affects sizeof/alignof for `uint32_t` etc.
         builder = builder.clang_arg(format!("--target={target_arch}-none-elf"));
+    } else {
+        // Host build: pass Rust's full triple so libclang matches
+        // the actual ABI.
+        builder = builder.clang_arg(format!("--target={target}"));
     }
 
     let bindings = builder.generate().expect("Unable to generate bindings");
