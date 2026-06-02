@@ -23,6 +23,43 @@ impl FilterMethod {
     }
 }
 
+/// Picture data format passed to [`Picture::load_data`].
+///
+/// Maps to the mime strings thorvg's loader manager recognises (see
+/// `tvgLoaderMgr.cpp`).  Runtime availability of each loader
+/// depends on the `thorvg-sys` features enabled (e.g. `svg`,
+/// `png`, `lottie`); selecting a format whose loader isn't
+/// compiled returns `Error::NonSupport`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum MimeType {
+    /// Scalable Vector Graphics (`svg`, `svg+xml`).
+    Svg,
+    /// PNG bitmap (`png`).
+    Png,
+    /// JPEG bitmap (`jpg`, `jpeg`).
+    Jpg,
+    /// WebP bitmap (`webp`).
+    Webp,
+    /// Lottie animation (`lot`, `lottie+json`).
+    Lottie,
+    /// Raw pixel buffer (`raw`).
+    Raw,
+}
+
+impl MimeType {
+    fn as_c_str(self) -> &'static core::ffi::CStr {
+        match self {
+            MimeType::Svg => c"svg",
+            MimeType::Png => c"png",
+            MimeType::Jpg => c"jpg",
+            MimeType::Webp => c"webp",
+            MimeType::Lottie => c"lottie+json",
+            MimeType::Raw => c"raw",
+        }
+    }
+}
+
 /// A picture object for loading and displaying images (SVG, PNG, JPG, Lottie, etc.).
 ///
 /// The lifetime `'eng` ties this picture to a [`Thorvg`](crate::Thorvg) engine
@@ -79,15 +116,19 @@ impl Picture<'_> {
     }
 
     /// Loads a picture from memory.
+    ///
+    /// `mime` selects the loader (see [`MimeType`]).  `resource_path`
+    /// is the base directory for SVG external assets; pass `None`
+    /// for self-contained content.  `copy=false` borrows the buffer
+    /// — caller must keep it alive for the picture's lifetime.
     #[allow(clippy::cast_possible_truncation)]
     pub fn load_data(
         &mut self,
         data: &[u8],
-        mimetype: &str,
+        mime: MimeType,
         resource_path: Option<&str>,
         copy: bool,
     ) -> Result<()> {
-        let c_mime = CString::new(mimetype).map_err(|_| Error::InvalidArguments)?;
         let c_rpath = resource_path
             .map(|p| CString::new(p).map_err(|_| Error::InvalidArguments))
             .transpose()?;
@@ -97,7 +138,7 @@ impl Picture<'_> {
                 self.raw,
                 data.as_ptr().cast::<core::ffi::c_char>(),
                 data.len() as u32,
-                c_mime.as_ptr(),
+                mime.as_c_str().as_ptr(),
                 rpath_ptr,
                 copy,
             )

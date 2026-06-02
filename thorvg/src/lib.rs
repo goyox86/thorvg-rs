@@ -79,7 +79,7 @@ pub use error::{Error, Result};
 pub use gradient::{ColorStop, FillSpread, LinearGradient, RadialGradient};
 pub use lottie::{LottieAnimation, Marker};
 pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType, Point};
-pub use picture::{FilterMethod, Picture};
+pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
 pub use scene::Scene;
 pub use shape::{FillRule, Shape, StrokeCap, StrokeJoin};
