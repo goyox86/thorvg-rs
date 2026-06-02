@@ -70,22 +70,26 @@ no PNG/font loaders — suitable for microcontrollers with limited RAM.
 ## Cross-Compilation
 
 ThorVG is compiled from C++ source using the [`cc`](https://crates.io/crates/cc) crate, which
-automatically picks up the correct cross-compiler from Cargo's target
-environment. No meson or ninja required.
+picks up the correct cross-compiler from Cargo's target environment.
+No meson or ninja required.
 
 Tested targets:
 
-| Target | Compiler | Notes |
-|--------|----------|-------|
-| `x86_64-unknown-linux-gnu` | `g++` / `clang++` | Desktop default |
-| `xtensa-esp32s3-espidf` | `xtensa-esp32s3-elf-g++` | ESP32-S3 (Waveshare Knob Touch S3) |
-| `xtensa-esp32-espidf` | `xtensa-esp32-elf-g++` | ESP32 |
-| `riscv32imc-esp-espidf` | `riscv32-esp-elf-g++` | ESP32-C6 |
-| `thumbv8m.main-none-eabihf` | `arm-none-eabi-g++` | RP2350 / Cortex-M33 |
+| Target | Runtime | Notes |
+|--------|---------|-------|
+| `x86_64-unknown-linux-gnu` | system libc | Desktop default |
+| `xtensa-esp32s3-espidf` | ESP-IDF | SDK provides libc |
+| `xtensa-esp32-espidf` | ESP-IDF | SDK provides libc |
+| `riscv32imc-esp-espidf` | ESP-IDF | SDK provides libc |
+| `riscv32imac-unknown-none-elf` | bare-metal | Vendored picolibc — see [`thorvg-sys/docs/bare_metal.md`](thorvg-sys/docs/bare_metal.md) |
 
-For Xtensa targets, the build script automatically selects the correct
-target-specific compiler wrapper (e.g. `xtensa-esp32s3-elf-g++`) to
-ensure the right endianness and ABI.
+On `target_os == "none"` targets, `thorvg-sys` vendors and compiles
+[picolibc](https://github.com/picolibc/picolibc) as the libc; the
+cross toolchain's `libstdc++` / `libgcc` / `libm` are still used.
+Wired architectures today: `riscv32`, `riscv64`, `aarch64`, `x86`,
+`x86_64`, `powerpc[64]`, `mips[64]`, `sparc[64]`, `m68k`, `msp430`.
+See the [bare-metal docs](thorvg-sys/docs/bare_metal.md) for the
+build pipeline, runtime stubs, and how to override them.
 
 ## API Coverage
 
@@ -109,6 +113,9 @@ Both crates are `no_std` compatible. The safe wrapper requires `alloc`.
 File I/O APIs (`Picture::load`, `Text::load_font`, `Saver::save`) are
 gated behind the `std` feature. All rendering, shapes, gradients,
 scenes, and canvas operations work in `no_std`.
+
+For `target_os == "none"` targets, `thorvg-sys` ships its own libc
+(vendored picolibc) — see [`thorvg-sys/docs/bare_metal.md`](thorvg-sys/docs/bare_metal.md).
 
 ## Examples
 
