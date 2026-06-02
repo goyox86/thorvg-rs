@@ -7,7 +7,7 @@ fn main() {
     let thorvg_src = manifest_dir.join("thorvg");
 
     if cfg!(feature = "vendored") {
-        build_vendored_cc(&thorvg_src, &out_dir);
+        build_vendored_cc(&thorvg_src, &manifest_dir, &out_dir);
     } else {
         link_system();
     }
@@ -31,7 +31,7 @@ fn main() {
 /// `CARGO_CFG_TARGET_*` signals — chiefly `target_os == "none"` for
 /// bare-metal — matching the convention used by `ring`, `mbedtls-sys-auto`,
 /// and other no_std sys crates.
-fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
+fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     let src = thorvg_src.join("src");
 
     // Write config.h based on enabled features.
@@ -339,6 +339,48 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
         build.flag(f);
     }
 
+    // -- Picolibc compile-only validation (bare-metal) --------------------
+    //
+    // Phase 3 of the picolibc landing.  We invoke `cc-rs` against the
+    // vendored picolibc sources to confirm they all compile cleanly
+    // with our `picolibc-config/picolibc.h`, but we use
+    // `try_compile_intermediates()` rather than `compile()` — that
+    // produces `.o` files in OUT_DIR without an archive and without
+    // emitting `cargo:rustc-link-*` directives.  No picolibc symbol
+    // ends up in the final link.
+    //
+    // Why compile-only at this stage:
+    //
+    //   The next commit (phase 4) flips thorvg's own compile to use
+    //   picolibc's headers in place of the cross-toolchain's libc.
+    //   That's the risky step.  Splitting it cleanly from this
+    //   one — where we verify the picolibc compile in isolation —
+    //   means a failure post-flip can be triaged as either
+    //   "picolibc itself doesn't build for this target" or "thorvg
+    //   doesn't like picolibc's headers", not both at once.
+    //
+    // Currently wired arches: riscv32 / riscv64 only.  arm, aarch64,
+    // xtensa enumeration lands in follow-up commits — they need
+    // per-arch source curation (the `libc/machine/<arch>/meson.build`
+    // lists are more elaborate than riscv's flat 12-file set).
+    if is_bare_metal {
+        let picolibc_root = manifest_dir.join("picolibc");
+        let picolibc_config = manifest_dir.join("picolibc-config");
+        match build_picolibc(
+            &picolibc_root,
+            &picolibc_config,
+            &target_arch,
+            &riscv_multilib_args,
+        ) {
+            Ok(()) => {}
+            Err(reason) => {
+                println!(
+                    "cargo:warning=picolibc compile-only validation skipped: {reason}"
+                );
+            }
+        }
+    }
+
     // -- Compile -----------------------------------------------------------
 
     for dir in &include_dirs {
@@ -429,6 +471,497 @@ fn build_vendored_cc(thorvg_src: &Path, out_dir: &Path) {
 
     println!("cargo:rerun-if-changed=thorvg/src");
 }
+
+// ---------------------------------------------------------------------------
+// Vendored picolibc (bare-metal libc replacement)
+// ---------------------------------------------------------------------------
+
+/// Compile-only validation pass over the vendored picolibc tree.
+///
+/// Walks the curated set of C / .S source files under
+/// `thorvg-sys/picolibc/libc/`, configures a fresh `cc::Build` with
+/// our hand-authored `picolibc-config/picolibc.h` first on the
+/// include path, and runs `try_compile_intermediates()` — which
+/// produces `.o` files but neither a `.a` archive nor any
+/// `cargo:rustc-link-*` directives.
+///
+/// Returns `Ok(())` when every source file compiles cleanly, or
+/// `Err(reason)` when the architecture is not yet wired or the
+/// compile failed.  The caller surfaces the reason via
+/// `cargo:warning=` rather than aborting the build — phase 3 of the
+/// picolibc landing is meant to be observational, not
+/// load-bearing.  Phase 4 will flip the actual link path.
+///
+/// # Source enumeration
+///
+/// We walk the picolibc tree (rather than parsing its `meson.build`
+/// files or hand-coding the full list) and apply two filters:
+///
+///   * A **path filter** — only files under directories we actually
+///     want (`libc/ctype`, `libc/string`, `libc/stdlib`, …).
+///   * A **denylist** — file basenames or basename suffixes we
+///     never want in the build:
+///       - `*_l.c`     locale-aware variants; we disabled locale
+///                     in picolibc.h (`__MB_CAPABLE` undefined).
+///       - `*_s.c`     C11 Annex K bounds-checking; not used.
+///       - `wcs*.c`, `wmem*.c`, `wcp*.c`, `wcw*.c`, `wc[rs]*toc*.c`,
+///         `mb[srl]*.c`, `mbtowc*.c`, `wctomb*.c`, `btowc.c`,
+///         `wctob.c`  — wide-char and multi-byte machinery.
+///       - `malloc.c`, `free.c`, `realloc.c`, `calloc.c`,
+///         `aligned_alloc.c`, `memalign.c`, `posix-memalign.c`,
+///         `valloc.c`, `pvalloc.c`, `reallocarray.c`, `reallocf.c`,
+///         `mallinfo.c`, `mallopt.c`, `malloc-stats.c`,
+///         `malloc-usable-size.c`  — consumer (esp-alloc, …)
+///         provides the allocator.
+///       - `getenv.c`, `getenv_r.c`, `putenv.c`, `setenv.c`,
+///         `environ.c`, `system.c`  — no environment on bare metal.
+///       - `drand48.c`, `erand48.c`, `jrand48.c`, `lrand48.c`,
+///         `mrand48.c`, `nrand48.c`, `seed48.c`, `srand48.c`,
+///         `lcong48.c`, `rand48.c`  — duplicate PRNGs; we keep
+///         the plain `rand.c` / `srand.c` pair.
+///       - `cxa-atexit.c`, `onexit.c`  — built with
+///         `-fno-use-cxa-atexit`; we don't want the C++ side.
+///       - `getopt.c`, `getsubopt.c`, `getauxval.c`,
+///         `getpagesize.c`, `rpmatch.c`  — POSIX surface, unused.
+///       - `assert.c`, `eprintf.c`  — assert paths pulling in stdio;
+///         the `__ASSERT_VERBOSE` knob in picolibc.h covers what
+///         we actually need via `assert_func.c`.
+///       - `inittls.c`, `tls.c` (under `machine/`)  — TLS setup;
+///         `__SINGLE_THREAD` deselects TLS for us.
+///       - `lock.c`  — non-trivial lock helpers; collapsed to
+///         no-ops by `<sys/lock.h>` under `__SINGLE_THREAD`.
+///       - `picosbrk.c`, `init.c`, `fini.c`  — picocrt startup
+///         glue; the consumer's HAL handles startup.
+///       - The whole `libc/stdio/` directory is INCLUDED — option
+///         (b) from the planning conversation (full tinystdio).
+///
+/// The denylist is intentionally explicit / file-level rather than
+/// pattern-only: a future picolibc bump that adds a new
+/// `strerror_l_new_variant.c` (or whatever) will land naturally
+/// without needing build.rs changes, and a one-time `cargo build`
+/// failure with a clear compiler error is a fine signal to update
+/// the list.
+///
+/// # Architecture support
+///
+/// Phase 3 wires only riscv32 / riscv64.  Other architectures
+/// receive a structured `Err` and the caller logs a
+/// `cargo:warning=` — the build still succeeds because
+/// `tvgLibcShim.cpp` is still in the source set on this commit.
+/// arm / aarch64 / xtensa land in follow-up commits; their
+/// `libc/machine/<arch>/meson.build` lists have more variants
+/// (ARMv4 vs ARMv6 vs ARMv7-M `.S` selectors, aarch64 `*-stub.c`
+/// trampolines, xtensa esp32 PSRAM cache fix flag) than riscv's
+/// flat 12-file set and warrant per-arch attention.
+fn build_picolibc(
+    picolibc_root: &Path,
+    picolibc_config: &Path,
+    target_arch: &str,
+    riscv_multilib_args: &[String],
+) -> Result<(), String> {
+    // ── Arch resolution ───────────────────────────────────────────────
+
+    let (machine_subdir, machine_sources): (&str, &[&str]) = match target_arch {
+        "riscv32" | "riscv64" => (
+            "riscv",
+            // From `libc/machine/riscv/meson.build:srcs_machine`,
+            // minus `tls.c` (TLS disabled in picolibc.h).  The
+            // `memcpy-asm.S` file is the per-arch fast path that
+            // `memcpy.c` may delegate to.
+            &[
+                "ieeefp.c",
+                "memcpy-asm.S",
+                "memcpy.c",
+                "memmove.S",
+                "memmove.c",
+                "memset.S",
+                "setjmp.S",
+                "stpcpy.c",
+                "strcmp.S",
+                "strcpy.c",
+                "strlen.c",
+            ],
+        ),
+        other => {
+            return Err(format!(
+                "target_arch={other} not yet enumerated (only riscv32/riscv64 wired in phase 3)"
+            ));
+        }
+    };
+
+    let machine_dir = picolibc_root.join("libc/machine").join(machine_subdir);
+    if !machine_dir.is_dir() {
+        return Err(format!(
+            "picolibc machine dir missing: {}",
+            machine_dir.display()
+        ));
+    }
+
+    // ── Generic sources (walked + denylisted) ─────────────────────────
+
+    // Subtrees we want compiled, relative to `picolibc/`.
+    let walk_dirs: &[&str] = &[
+        "libc/ctype",
+        "libc/string",
+        "libc/stdlib",
+        "libc/stdio",
+        "libc/errno",
+        "libc/search",
+    ];
+
+    let denylist_files = denylist_files();
+    let denylist_suffixes: &[&str] = &["_l.c", "_s.c"];
+    let denylist_prefixes: &[&str] = &[
+        "wcs", "wmem", "wcp", "wcw",            // wide-char
+        "mblen", "mbr", "mbs", "mbt", "mbst",   // multi-byte
+    ];
+
+    let mut sources: Vec<PathBuf> = Vec::new();
+    for sub in walk_dirs {
+        let dir = picolibc_root.join(sub);
+        if !dir.is_dir() {
+            return Err(format!("picolibc dir missing: {}", dir.display()));
+        }
+        for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            let Some(ext) = path.extension() else { continue };
+            if ext != "c" {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if denylist_files.contains(&name) {
+                continue;
+            }
+            if denylist_suffixes.iter().any(|s| name.ends_with(s)) {
+                continue;
+            }
+            if denylist_prefixes.iter().any(|p| name.starts_with(p)) {
+                continue;
+            }
+            sources.push(path);
+        }
+    }
+
+    // ── Architecture-specific machine sources ─────────────────────────
+
+    for f in machine_sources {
+        let p = machine_dir.join(f);
+        if !p.is_file() {
+            return Err(format!("picolibc machine source missing: {}", p.display()));
+        }
+        sources.push(p);
+    }
+
+    // ── Include paths ─────────────────────────────────────────────────
+    //
+    // Order matters: our `picolibc-config/` *must* come first so that
+    // every `#include <picolibc.h>` (both direct, from setjmp.S, and
+    // indirect, via `<sys/cdefs.h>`) finds our authored config rather
+    // than the upstream `.in` template (which isn't a valid C header).
+    //
+    // Then the per-arch `machine/` override (so e.g. `<machine/setjmp.h>`
+    // picks up the riscv variant), then the generic include tree.
+
+    // Mirror the include-dir set picolibc's meson build constructs
+    // (`meson.build:inc_dirs`).  Beyond the obvious `libc/include`
+    // (public headers) and `libc/machine/<arch>` (arch overrides),
+    // picolibc TUs rely on `libc/stdio` and `libc/locale` being on
+    // the path so cross-directory bare-name includes like
+    // `#include "locale_private.h"` from `libc/ctype/local.h`
+    // resolve.  We don't *compile* anything from `libc/locale/`
+    // — the locale knobs are off in `picolibc.h` — but the
+    // headers still need to be reachable.
+    let include_dirs: Vec<PathBuf> = vec![
+        picolibc_config.to_path_buf(),
+        machine_dir.clone(),
+        picolibc_root.join("libc/stdio"),
+        picolibc_root.join("libc/locale"),
+        picolibc_root.join("libc/include"),
+    ];
+
+    // ── cc::Build for picolibc ────────────────────────────────────────
+
+    let mut build = cc::Build::new();
+    build.warnings(false);
+
+    // Plain C (not C++).  picolibc is all C99 sources.
+    // `cpp(false)` is the default but we set it explicitly to make
+    // intent obvious next to the existing C++ thorvg build above.
+    build.cpp(false);
+
+    // Drop the cross-toolchain's libc/system header search paths,
+    // then add back the *compiler* builtin-header dir (stdarg.h,
+    // stddef.h, limits.h, …) via `-isystem`.  This is the central
+    // mechanism for header isolation in the picolibc landing: a
+    // picolibc TU that does `#include <stdio.h>` *must* resolve to
+    // picolibc's `libc/include/stdio.h`, never newlib's.
+    build.flag("-nostdinc");
+    if let Some(builtin_inc) = cross_compiler_builtin_includes() {
+        build.flag(format!("-isystem{}", builtin_inc.display()));
+    }
+
+    // Match the size-tuned flag set thorvg's own build uses, so the
+    // emitted .o files have consistent unwind / RTTI / stack-protector
+    // policy.  (Most of these are no-ops for C TUs but cost nothing.)
+    for f in &[
+        "-fno-stack-protector",
+        "-fno-math-errno",
+        "-fno-unwind-tables",
+        "-fno-asynchronous-unwind-tables",
+    ] {
+        build.flag_if_supported(f);
+    }
+    build.opt_level_str("s");
+
+    // Mirror cc-rs's auto-suppression on bare-metal: we don't want
+    // the C++ runtime auto-link here (picolibc is pure C and our
+    // outer thorvg build already handles libstdc++ separately).
+    build.cpp_set_stdlib(None);
+
+    // Force-include `picolibc.h` so even TUs that don't include
+    // `<sys/cdefs.h>` (e.g. some `.S` files routed through the C
+    // preprocessor) see our config.
+    let picolibc_h = picolibc_config.join("picolibc.h");
+    build.flag(format!("-include{}", picolibc_h.display()));
+
+    // Same multilib args as thorvg uses, so picolibc TUs build for
+    // the same ABI as the rest of the link surface.
+    for f in riscv_multilib_args {
+        build.flag(f);
+    }
+
+    for dir in &include_dirs {
+        build.include(dir);
+    }
+    for src in &sources {
+        build.file(src);
+    }
+
+    // Compile-only.  `try_compile_intermediates()` runs cc-rs's
+    // normal compiler invocation per file and returns the resulting
+    // `.o` paths, but it does NOT invoke `ar` and does NOT emit
+    // any `cargo:rustc-link-*` directives.  The objects sit unused
+    // in OUT_DIR until phase 4 promotes this to `compile("picolibc")`.
+    match build.try_compile_intermediates() {
+        Ok(objs) => {
+            println!(
+                "cargo:warning=picolibc: {} TUs compiled cleanly (phase 3 validation; not linked yet)",
+                objs.len()
+            );
+            Ok(())
+        }
+        Err(e) => Err(format!("compile failed: {e}")),
+    }
+}
+
+/// File-basenames excluded from the picolibc compile.
+///
+/// Kept as a function (not a `const`) because some entries are short
+/// pattern groups (PRNG variants, malloc family) we want to read as
+/// one logical block; the function form lets us comment each group
+/// inline.  The whole list is filtered against `Path::file_name()`,
+/// so subdirectory placement doesn't matter — a `malloc.c` anywhere
+/// in the walked tree is dropped.
+fn denylist_files() -> &'static [&'static str] {
+    &[
+        // Allocator — consumer (esp-alloc, embedded-alloc, …)
+        // provides malloc/free/realloc/calloc as strong symbols.
+        "malloc.c",
+        "free.c",
+        "realloc.c",
+        "calloc.c",
+        "aligned_alloc.c",
+        "memalign.c",
+        "posix-memalign.c",
+        "valloc.c",
+        "pvalloc.c",
+        "reallocarray.c",
+        "reallocf.c",
+        "mallinfo.c",
+        "mallopt.c",
+        "malloc-stats.c",
+        "malloc-usable-size.c",
+
+        // Environment / POSIX — no environment on bare metal.
+        "getenv.c",
+        "getenv_r.c",
+        "putenv.c",
+        "setenv.c",
+        "environ.c",
+        "system.c",
+        "getopt.c",
+        "getsubopt.c",
+        "getauxval.c",
+        "getpagesize.c",
+        "rpmatch.c",
+
+        // Duplicate PRNG families (we keep plain `rand.c` + `srand.c`).
+        "drand48.c",
+        "erand48.c",
+        "jrand48.c",
+        "lrand48.c",
+        "mrand48.c",
+        "nrand48.c",
+        "seed48.c",
+        "srand48.c",
+        "lcong48.c",
+        "rand48.c",
+        "rand_r.c",
+        "a64l.c",
+        "l64a.c",
+        "random.c",
+        "srandom.c",
+
+        // C11 Annex K bounds-checking — not used.  (Covered by the
+        // `_s.c` suffix denylist too, but `set_constraint_handler_s.c`
+        // doesn't fit the pattern.)
+        "set_constraint_handler_s.c",
+        "ignore_handler_s.c",
+        "strerrorlen_s.c",
+
+        // C++ ABI atexit glue — we build with `-fno-use-cxa-atexit`.
+        "cxa-atexit.c",
+        "onexit.c",
+        "exitprocs.c",
+
+        // Multi-byte / wide-char single files not caught by prefix.
+        "btowc.c",
+        "wctob.c",
+        "wctomb.c",
+        "wctomb_r.c",
+        "sb_charsets.c",
+        "ejtouc.c",
+        "jitouc.c",
+        "sjtouc.c",
+        "uctoej.c",
+        "uctoji.c",
+        "uctosj.c",
+
+        // Wide-char ctype.
+        "ctype_wide.c",
+
+        // Assert family pulling stdio paths we don't need (the
+        // verbose `__assert_func` from `assert_func.c` stays).
+        "assert.c",
+        "assert_no_arg.c",
+        "eprintf.c",
+
+        // POSIX wide-char console.
+        "posixiob_stdin.c",
+        "posixiob_stdout.c",
+        "posixiob_stderr.c",
+
+        // Stdio Ryu fast-but-large dtoa path — picolibc.h leaves
+        // `__IO_FLOAT_EXACT` undefined, which selects the smaller
+        // engine-based dtoa.  Drop the Ryu sources to keep object
+        // count down.
+        "atod_ryu.c",
+        "atof_ryu.c",
+        "dtoa_ryu.c",
+        "ftoa_ryu.c",
+        "ryu_divpow2.c",
+        "ryu_log10.c",
+        "ryu_log2pow5.c",
+        "ryu_pow5bits.c",
+        "ryu_table.c",
+        "ryu_umul128.c",
+
+        // Stdio templates — .c files that exist as preprocessor
+        // sub-units (`#include`d from variant wrappers like
+        // `vfprintf.c`, `vffprintf.c`, etc.) and are NOT compiled
+        // standalone.  Picolibc upstream achieves this by simply
+        // not listing them in `srcs_stdio`; our walk-the-dir
+        // strategy needs them named explicitly.  Identifiable
+        // because they reference `PRINTF_VARIANT` / `SCANF_VARIANT`
+        // / `ULTOA_NAME` macros without defining them — those
+        // come from the wrapper that pulls them in.
+        "conv_flt.c",
+        "ultoa_invert.c",
+        "vfprintf_char.c",
+        "vfprintf_float.c",
+        "vfprintf_int.c",
+        "vfprintf_n.c",
+        "vfprintf_str.c",
+
+        // Tree/hash search (libc/search) — we use bsearch + qsort only.
+        "hash.c",
+        "hash_bigkey.c",
+        "hash_buf.c",
+        "hash_func.c",
+        "hash_log2.c",
+        "hash_page.c",
+        "hcreate.c",
+        "hcreate_r.c",
+        "ndbm.c",
+        "tdelete.c",
+        "tdestroy.c",
+        "tfind.c",
+        "tsearch.c",
+        "twalk.c",
+        "bsd_qsort_r.c",
+        "qsort_r.c",
+    ]
+}
+
+/// Discover the cross-compiler's builtin-headers include directory.
+///
+/// GCC and Clang both ship their own copies of `<stdarg.h>`,
+/// `<stddef.h>`, `<limits.h>`, `<stdint.h>`, `<float.h>` etc., which
+/// are pulled in by picolibc TUs even though picolibc itself doesn't
+/// ship these (they're compiler-builtin, not libc).
+///
+/// `-nostdinc` (used by `build_picolibc`) suppresses *all* implicit
+/// system header paths, including these builtins.  We restore only
+/// the builtins by probing the cross compiler with
+/// `-print-file-name=include` (GCC) and falling back to
+/// `-print-resource-dir` + `/include` (Clang).
+///
+/// Returns `None` when the driver produces no useful answer; the
+/// caller falls back to building without builtin headers, which
+/// will fail loudly at the first `#include <stddef.h>` and surface
+/// a clear error.
+fn cross_compiler_builtin_includes() -> Option<PathBuf> {
+    let tool = cc::Build::new().try_get_compiler().ok()?;
+
+    // GCC path: `-print-file-name=include` returns the absolute path
+    // to the toolchain-bundled include dir.
+    let mut cmd = std::process::Command::new(tool.path());
+    cmd.args(tool.args());
+    cmd.arg("-print-file-name=include");
+    if let Ok(res) = cmd.output() {
+        let s = String::from_utf8_lossy(&res.stdout).trim().to_string();
+        if !s.is_empty() && s != "include" {
+            let p = PathBuf::from(s);
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+
+    // Clang path: `-print-resource-dir` returns `<resource>`; the
+    // include dir is `<resource>/include`.
+    let mut cmd = std::process::Command::new(tool.path());
+    cmd.args(tool.args());
+    cmd.arg("-print-resource-dir");
+    if let Ok(res) = cmd.output() {
+        let s = String::from_utf8_lossy(&res.stdout).trim().to_string();
+        if !s.is_empty() {
+            let p = PathBuf::from(s).join("include");
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Cross-toolchain runtime-archive discovery
+// ---------------------------------------------------------------------------
 
 /// Discover bare-metal runtime archives from the configured cross-compiler.
 ///
