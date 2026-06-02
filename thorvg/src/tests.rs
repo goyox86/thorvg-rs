@@ -655,6 +655,36 @@ fn test_clip_lifecycle() {
     // Clipper and shape are cleaned up properly
 }
 
+// ── Masking ────────────────────────────────────────────────────────
+
+#[test]
+fn test_mask_getter_round_trip() {
+    // After set_mask, mask() must return the same target handle and
+    // method.  Under the pre-fix `mask_method(&P)` API the C side
+    // wrote through the supplied `target.raw()` pointer, corrupting
+    // the target paint's vtable — ASan would have flagged the
+    // resulting `tvg_paint_get_type` virtual dispatch as
+    // heap-buffer-overflow on the BorrowedPaint side.
+    let engine = Thorvg::init(0).unwrap();
+
+    let mut paint = engine.shape();
+    paint
+        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+        .unwrap();
+
+    assert!(paint.mask().is_none(), "no mask before set_mask");
+
+    let mut mask_shape = engine.shape();
+    mask_shape
+        .append_circle(50.0, 50.0, 30.0, 30.0, true)
+        .unwrap();
+    paint.set_mask(mask_shape, MaskMethod::Alpha).unwrap();
+
+    let (got, method) = paint.mask().expect("mask should be set");
+    assert_eq!(method, MaskMethod::Alpha);
+    assert_eq!(got.paint_type().unwrap(), PaintType::Shape);
+}
+
 // ── Full Render Pipeline ───────────────────────────────────────────
 
 #[test]

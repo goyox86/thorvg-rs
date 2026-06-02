@@ -151,6 +151,86 @@ impl MaskMethod {
             Self::Darken => sys::Tvg_Mask_Method::TVG_MASK_METHOD_DARKEN,
         }
     }
+
+    pub(crate) fn from_raw(m: sys::Tvg_Mask_Method) -> Self {
+        match m {
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_ALPHA => Self::Alpha,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_INVERSE_ALPHA => Self::InvAlpha,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_LUMA => Self::Luma,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_INVERSE_LUMA => Self::InvLuma,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_ADD => Self::Add,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_SUBTRACT => Self::Subtract,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_INTERSECT => Self::Intersect,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_DIFFERENCE => Self::Difference,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_LIGHTEN => Self::Lighten,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_DARKEN => Self::Darken,
+            _ => Self::None,
+        }
+    }
+}
+
+/// A read-only borrow of a paint owned by another object.
+///
+/// Returned by getters that expose an internal paint handle whose
+/// lifetime is governed by the containing object (e.g. the mask
+/// target stored inside a `Paint::mask` relationship).  The `'a`
+/// lifetime ties the borrow to the source: dropping the source
+/// invalidates the borrow.
+///
+/// Read-only surface only — mutating the borrowed paint via raw
+/// access would race with the owner.
+pub struct BorrowedPaint<'a> {
+    raw: sys::Tvg_Paint,
+    _life: core::marker::PhantomData<&'a ()>,
+}
+
+impl<'a> BorrowedPaint<'a> {
+    /// Returns the underlying raw handle.  Intended for use with
+    /// `thorvg-sys` C APIs not yet wrapped here; lifetime `'a` keeps
+    /// the borrow honest.
+    pub fn raw(&self) -> sys::Tvg_Paint {
+        self.raw
+    }
+
+    /// The runtime paint type of the borrowed handle.
+    pub fn paint_type(&self) -> Result<PaintType> {
+        let mut t = sys::Tvg_Type::TVG_TYPE_UNDEF;
+        Error::from_raw(unsafe { sys::tvg_paint_get_type(self.raw, &raw mut t) })?;
+        Ok(PaintType::from_raw(t))
+    }
+
+    /// The user-assigned id, or 0 if none was set.
+    pub fn id(&self) -> u32 {
+        unsafe { sys::tvg_paint_get_id(self.raw) }
+    }
+
+    /// The opacity (0..=255).
+    pub fn opacity(&self) -> Result<u8> {
+        let mut o: u8 = 0;
+        Error::from_raw(unsafe { sys::tvg_paint_get_opacity(self.raw, &raw mut o) })?;
+        Ok(o)
+    }
+
+    /// The axis-aligned bounding box `(x, y, w, h)` in canvas space.
+    pub fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
+        let (mut x, mut y, mut w, mut h) = (0f32, 0f32, 0f32, 0f32);
+        Error::from_raw(unsafe {
+            sys::tvg_paint_get_aabb(
+                self.raw,
+                &raw mut x,
+                &raw mut y,
+                &raw mut w,
+                &raw mut h,
+            )
+        })?;
+        Ok((x, y, w, h))
+    }
+}
+
+impl core::fmt::Debug for BorrowedPaint<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BorrowedPaint").finish_non_exhaustive()
+    }
 }
 
 /// The concrete type of a paint object.
@@ -321,25 +401,46 @@ pub trait Paint {
         })
     }
 
-    /// Gets the masking method for a given target.
-    fn mask_method<P: Paint>(&self, target: &P) -> Result<MaskMethod> {
+    /// Gets the mask target and method, if a mask is set.
+    ///
+    /// Returns `None` when no mask is attached.  The returned
+    /// [`BorrowedPaint`] is read-only and tied to the source paint's
+    /// lifetime — dropping the source invalidates the borrow.
+    ///
+    /// # Why a borrow rather than `Shape<'_>`
+    ///
+    /// `set_mask` accepts any `Paint` (Shape, Scene, Picture, Text),
+    /// so the returned mask cannot be type-pinned to `Shape` without
+    /// risking a silent type-pun.  `BorrowedPaint::paint_type` lets
+    /// callers dispatch on the runtime type.
+    fn mask(&self) -> Option<(BorrowedPaint<'_>, MaskMethod)> {
+        let mut target: sys::Tvg_Paint = core::ptr::null_mut();
         let mut method = sys::Tvg_Mask_Method::TVG_MASK_METHOD_NONE;
-        Error::from_raw(unsafe {
-            sys::tvg_paint_get_mask_method(self.raw(), target.raw(), &raw mut method)
-        })?;
-        Ok(match method {
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_ALPHA => MaskMethod::Alpha,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_INVERSE_ALPHA => MaskMethod::InvAlpha,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_LUMA => MaskMethod::Luma,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_INVERSE_LUMA => MaskMethod::InvLuma,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_ADD => MaskMethod::Add,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_SUBTRACT => MaskMethod::Subtract,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_INTERSECT => MaskMethod::Intersect,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_DIFFERENCE => MaskMethod::Difference,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_LIGHTEN => MaskMethod::Lighten,
-            sys::Tvg_Mask_Method::TVG_MASK_METHOD_DARKEN => MaskMethod::Darken,
-            _ => MaskMethod::None,
-        })
+
+        // The C signature `tvg_paint_get_mask_method(paint, target,
+        // method)` types `target` as `Tvg_Paint` (= *mut c_void) but
+        // treats it internally as a `Paint**` out-param — passing a
+        // real paint handle here would corrupt that paint's vtable.
+        // We pass the address of a local `Tvg_Paint` slot cast to
+        // `Tvg_Paint`, which is what the C side actually wants.
+        let r = unsafe {
+            sys::tvg_paint_get_mask_method(
+                self.raw(),
+                (&raw mut target).cast::<sys::_Tvg_Paint>(),
+                &raw mut method,
+            )
+        };
+
+        if Error::from_raw(r).is_err() || target.is_null() {
+            return None;
+        }
+        Some((
+            BorrowedPaint {
+                raw: target,
+                _life: core::marker::PhantomData,
+            },
+            MaskMethod::from_raw(method),
+        ))
     }
 
     /// Sets the blending method.
