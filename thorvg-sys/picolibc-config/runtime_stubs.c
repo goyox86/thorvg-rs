@@ -1,69 +1,41 @@
 /*
  * runtime_stubs.c — strong-symbol stubs for libstdc++ / libsupc++ /
  * libc surface that picolibc deliberately doesn't provide and that
- * the thorvg-rs bare-metal contract treats as no-ops.
+ * the bare-metal contract treats as no-ops.
  *
- * Compiled into the picolibc static archive on bare-metal builds
- * when `picolibc_active` (see `thorvg-sys/build.rs`).  Replaces the
- * equivalent weak-symbol definitions formerly in
- * `thorvg/src/common/tvgLibcShim.cpp`.
+ * Compiled into the picolibc static archive (see build.rs) so it
+ * shares picolibc's include path and multilib configuration.
  *
- * Why these stubs are STRONG (not weak):
- *
- *   The old `tvgLibcShim.cpp` used `__attribute__((weak))` to let
- *   consumer code override individual stubs without forking thorvg.
- *   Under picolibc we drop the weak attribute for two reasons:
- *
- *     1. No competing definitions exist on the link line.  We don't
- *        pull newlib's `libc.a`, picolibc itself doesn't define
- *        any of these (it deliberately leaves them as the OS
- *        contract for bare-metal targets), and the cross toolchain's
- *        `libsupc++.a` only *references* them.  So "weak" buys
- *        nothing.
- *     2. Strong symbols give clearer link-time diagnostics if a
- *        consumer accidentally duplicates a definition — the user
- *        gets a multiple-definition error instead of a silent
- *        substitution.
- *
- *   A downstream consumer that needs different behaviour (a real
- *   thread-safe `pthread_mutex_lock`, an entropy-providing
- *   `getentropy`, …) is expected to compile picolibc-config out of
- *   the link entirely or replace the relevant call sites at their
- *   layer.
+ * Strong (not weak) symbols: nothing else on the link line defines
+ * these (we don't pull newlib's libc.a, picolibc leaves them as the
+ * OS contract, and libsupc++ only references them), so weak buys
+ * nothing.  Strong gives clearer link-time diagnostics on
+ * accidental duplicates.  A consumer that needs real implementations
+ * compiles picolibc-config out of the link and supplies its own.
  *
  * Coverage:
+ *   * pthread stubs — referenced unconditionally by libsupc++'s
+ *     `eh_alloc.o` / `eh_globals.o` even though
+ *     `__gthread_active_p()` short-circuits the locks.
+ *   * `getenv` — no environment on bare-metal; returns NULL.
+ *   * `getentropy` — no entropy source; returns -1.
+ *   * `arc4random` — fallback after `getentropy` fails; returns 0.
+ *   * `_exit` / `raise` — picolibc's OS contract; halt loop.
+ *   * `__errno` — bridge for newlib-built libm/libstdc++ archives.
+ *   * `_on_exit` — picolibc's internal exit-registration primitive.
  *
- *   * pthread stubs — referenced by libsupc++'s `eh_alloc.o` and
- *     `eh_globals.o` (exception-handling glue compiled into every
- *     libstdc++-using binary).  Returning 0 / NULL is the
- *     well-defined behaviour for "no threading" mode; libsupc++'s
- *     own `__gthread_active_p()` short-circuits the locks anyway,
- *     but the symbols must still resolve.
- *   * `getenv` — bare-metal has no environment.  Returning NULL is
- *     the documented response for "variable unset" and disables
- *     every consumer's tunables path (libsupc++ probes
- *     `GLIBCXX_TUNABLES`).
- *   * `getentropy` — referenced by libstdc++'s `random.cc` (for
- *     `std::random_device`'s default ctor) and would be referenced
- *     by picolibc's `arc4random.c` if we compiled it (we don't —
- *     denylisted in build.rs).  Returning -1 with `errno = ENOSYS`
- *     is the documented "entropy source unavailable" signal;
- *     `std::random_device` falls through to a deterministic seed.
- *
- * Stack-protector and EH-globals symbols are NOT replicated here —
- * thorvg's build sets `-fno-stack-protector` and the toolchain's
- * libgcc / libsupc++ supply their own.
+ * Stack-protector and EH-globals symbols are NOT here — thorvg
+ * builds with `-fno-stack-protector` and the toolchain's
+ * libgcc / libsupc++ supply EH globals.
  */
 
 #include <stddef.h>
 #include <pthread.h>      /* our minimal stub header */
 #include "local-onexit.h" /* picolibc:libc/stdlib/local-onexit.h —
-                           * pulls enum pico_onexit_kind and union
-                           * on_exit_func so our _on_exit stub stays
-                           * welded to picolibc's signature instead
-                           * of duplicating it.  Resolved by build.rs
-                           * adding libc/stdlib/ to the picolibc
-                           * compile's -I path. */
+                           * `enum pico_onexit_kind` and
+                           * `union on_exit_func` for `_on_exit`.
+                           * Resolved by build.rs adding
+                           * libc/stdlib/ to the include path. */
 
 /* ── pthread no-ops ────────────────────────────────────────────── */
 
@@ -121,11 +93,9 @@ int pthread_setspecific(pthread_key_t k, const void *v)
     return 0;
 }
 
-/* `pthread_once` MUST actually invoke `init_fn` on the first call.
- * Some consumers (rare, but possible — picolibc itself in modes we
- * don't enable, GLIBCXX paths under odd configurations) rely on the
- * first-call init dispatch.  Single-threaded semantics make `*o`
- * a plain "have we run" flag. */
+/* `pthread_once` MUST actually invoke `init_fn` on the first call
+ * — static-init dispatch paths reach it.  Single-threaded
+ * semantics make `*o` a plain "have we run" flag. */
 int pthread_once(pthread_once_t *o, void (*init_fn)(void))
 {
     if (*o == 0) {
@@ -143,12 +113,10 @@ char *getenv(const char *name)
     return NULL;
 }
 
-/* `getentropy` is normally a syscall that fills `buf` with `len`
- * bytes of cryptographic-quality entropy.  We have none on bare
- * metal at this layer, so signal failure: callers (libstdc++'s
- * random.cc, …) treat -1 as "fall through to the next entropy
- * source" without trusting the buffer contents.  We zero the buffer
- * anyway to keep static analysers happy. */
+/* Signal "entropy source unavailable" with -1.  Callers
+ * (libstdc++'s random.cc, …) treat -1 as "fall through to the next
+ * source" without trusting buffer contents.  Zero the buffer to
+ * keep static analysers happy. */
 int getentropy(void *buf, size_t len)
 {
     unsigned char *p = (unsigned char *)buf;
@@ -156,37 +124,27 @@ int getentropy(void *buf, size_t len)
     return -1;
 }
 
-/* `arc4random` is BSD's keystream PRNG, used by libstdc++'s
- * `random.cc` as a fallback entropy source after `getentropy`
- * fails.  We blacklist picolibc's `arc4random.c` in build.rs (it
- * pulls a chacha-based re-seed loop that itself wants entropy),
- * so the symbol is still unresolved.  Return zero — it's a
- * documented legal output, and the caller treats it as a regular
- * sample.  Thorvg never instantiates `std::random_device`.
+/* `arc4random` is libstdc++'s fallback after `getentropy` fails.
+ * Picolibc's `arc4random.c` pulls a chacha-based re-seed loop we
+ * don't want; we provide a stub so the symbol resolves.  Zero is
+ * a documented legal output; consumers treat it as a regular sample.
  *
- * Return type is `__uint32_t` to match picolibc's `<stdlib.h>`
- * declaration (transitively included via `local-onexit.h` above)
- * — typedef'd to `unsigned long int` on rv32, vs. our prior
- * `unsigned int` which is `int`-sized.  Same size, different
- * type — GCC rejects the mismatch. */
+ * Return type matches picolibc's `<stdlib.h>` declaration (pulled
+ * transitively via `local-onexit.h`) — `__uint32_t` is `unsigned
+ * long int` on rv32 vs. `unsigned int` (different typedef, same
+ * size), which GCC rejects on signature mismatch. */
 __uint32_t arc4random(void)
 {
     return 0;
 }
 
-/* ── HAL surface picolibc deliberately leaves to the consumer ── *
+/* ── HAL surface picolibc leaves to the consumer ─────────────── *
  *
- * `_exit` and `raise` are the OS contract picolibc requires the
- * consumer to provide — they're the bottom of the abort / signal
- * / exit machinery.  Bare-metal `main()` never returns and we
- * have no signal handling, so the correct behaviour for both is
- * an infinite halt loop.  A real HAL build may override these
- * with breakpoint traps or HALT instructions; doing so requires
- * compiling picolibc-config out of the link, which is the
- * right escape hatch.
- *
- * Marked `__attribute__((noreturn))` to match their library
- * declarations and let the compiler dead-code subsequent code. */
+ * `_exit` and `raise` are picolibc's required OS contract — bottom
+ * of the abort / signal / exit machinery.  Bare-metal `main()`
+ * doesn't return and we have no signal handling, so both halt.
+ * A real HAL build overrides them by compiling picolibc-config
+ * out of the link. */
 
 __attribute__((noreturn)) void _exit(int status)
 {
@@ -196,11 +154,8 @@ __attribute__((noreturn)) void _exit(int status)
     }
 }
 
-/* `raise` is non-noreturn in POSIX (it returns an int on success),
- * but on bare metal with no signal handling installed, a real
- * `raise(SIGABRT)` from `abort()` should halt.  Returning -1
- * (failure) lets callers fall through to `_exit`, which is the
- * actual halt loop. */
+/* Non-noreturn per POSIX.  Returning -1 lets callers fall through
+ * to `_exit` (the actual halt loop). */
 int raise(int sig)
 {
     (void)sig;
@@ -209,40 +164,25 @@ int raise(int sig)
 
 /* ── newlib ↔ picolibc errno bridge ─────────────────────────── *
  *
- * The cross toolchain's pre-compiled archives — libm.a in
- * particular, plus assorted bits of libstdc++ — were built against
- * newlib's `<errno.h>`.  Newlib defines `errno` as a macro:
+ * The cross toolchain's pre-compiled archives (libm.a, parts of
+ * libstdc++) were built against newlib's `<errno.h>`, which defines
  *
  *     #define errno (*__errno())
  *
- * which means every `errno = E_FOO` and `if (errno == E_BAR)` site
- * in those archives emits a reference to the **function** `__errno`.
+ * so every `errno = E_FOO` in those archives emits a reference to
+ * the **function** `__errno`.  Picolibc's `__GLOBAL_ERRNO` mode
+ * exports `int errno;` as a plain global — no `__errno` function,
+ * so newlib-side TUs fail to link.
  *
- * Picolibc, by contrast, defines `errno` as a plain `int` global
- * (because we set `__GLOBAL_ERRNO` in `picolibc.h`).  So
- * picolibc's `libc/errno/errno.c` exports `int errno;` — not
- * `int *__errno(void)`.  The pre-compiled newlib-side TUs then
- * fail to link with an `undefined symbol: __errno`.
- *
- * Bridge: provide `__errno` here as a tiny accessor that returns
- * the address of picolibc's `errno` global.  Both worlds now see
- * the same underlying storage, errno values set from a math
- * routine in libm.a are readable by thorvg's C++ code through
- * picolibc's `<errno.h>`, and vice versa.
- *
- * Surfaced by the `gradient_linear` example bin: libm's float-to-
- * int conversions in gradient interpolation hit `__errno` on
- * domain errors. */
+ * Bridge: provide `__errno` as a tiny accessor returning the
+ * address of picolibc's `errno` global.  Both worlds then see the
+ * same underlying storage. */
 
-/* DO NOT `#include <errno.h>` here.  If a newlib-flavoured
- * `<errno.h>` ever lands on the include path (a cross-toolchain
- * SDK layering accident, a future include-order regression in
- * `build.rs`, …), its `#define errno (*__errno())` would textually
- * rewrite the line below into `extern int (*__errno());` —
- * declaring `__errno` as a function-pointer variable and producing
- * a multiple-definition link error against our function below.
- * The manual `extern int errno;` resolves to picolibc's strong
- * `int errno;` symbol from `libc/errno/errno.c`. */
+/* DO NOT `#include <errno.h>` here.  Newlib's `<errno.h>` would
+ * `#define errno (*__errno())` and textually rewrite the line
+ * below into `extern int (*__errno());`, breaking the bridge.
+ * The manual declaration resolves to picolibc's strong `int errno;`
+ * symbol from `libc/errno/errno.c`. */
 extern int errno;
 
 int *__errno(void)
@@ -252,32 +192,19 @@ int *__errno(void)
 
 /* ── picolibc's internal atexit primitive ───────────────────── *
  *
- * Picolibc routes every exit-registration API — `atexit()`,
- * `on_exit()`, `__cxa_atexit()` — through a single internal
- * primitive `_on_exit(kind, func_union, arg)` whose real
- * implementation lives in `libc/stdlib/exitprocs.c`.  That file
- * is denylisted in build.rs (it carries the dynamic-storage
- * machinery for atexit registration we don't want on bare
- * metal).  Picolibc's `atexit.c` is still compiled — it's a
- * one-liner that wraps `_on_exit` — and links against this stub.
+ * Picolibc routes every exit-registration API (`atexit()`,
+ * `on_exit()`, `__cxa_atexit()`) through `_on_exit`, whose real
+ * implementation lives in `libc/stdlib/exitprocs.c`.  We denylist
+ * that file (~1 KB BSS for dynamic atexit storage we don't need
+ * — bare-metal `main()` doesn't return) and stub `_on_exit` here.
+ * `__INIT_FINI_ARRAY` in picolibc.h routes C++ static destructors
+ * through `.fini_array` rather than `_on_exit`, so the bypass is
+ * total.  Picolibc's `atexit.c` is still compiled and links
+ * against this stub.
  *
- * Why deny exitprocs.c and stub `_on_exit` instead of including
- * exitprocs.c: bare-metal `main()` never returns, exit handlers
- * never fire, and the static atexit table would waste ~1 KB of
- * BSS for nothing.  We also set `__INIT_FINI_ARRAY` in
- * picolibc.h, which routes C++ static destructors through
- * `.fini_array` rather than through `_on_exit`, so the bypass
- * is total.
- *
- * Type definitions (enum pico_onexit_kind, union on_exit_func) come
- * from picolibc's own `local-onexit.h`, included at the top of this
- * file — that keeps our stub welded to upstream's declaration so a
- * submodule bump surfaces signature drift as a compile error rather
- * than silent ABI mismatch.
- *
- * Surfaced by the `animation_basic` example bin: the Lottie
- * playback path through libstdc++ registers a destructor unwind
- * that bottoms out in `atexit → _on_exit`. */
+ * Signature follows picolibc's `local-onexit.h` (included at the
+ * top); a submodule bump that changes the types surfaces as a
+ * compile error rather than silent ABI drift. */
 
 int _on_exit(enum pico_onexit_kind kind, union on_exit_func func, void *arg)
 {
