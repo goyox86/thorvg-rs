@@ -56,7 +56,14 @@
  */
 
 #include <stddef.h>
-#include <pthread.h>  /* our minimal stub header */
+#include <pthread.h>      /* our minimal stub header */
+#include "local-onexit.h" /* picolibc:libc/stdlib/local-onexit.h —
+                           * pulls enum pico_onexit_kind and union
+                           * on_exit_func so our _on_exit stub stays
+                           * welded to picolibc's signature instead
+                           * of duplicating it.  Resolved by build.rs
+                           * adding libc/stdlib/ to the picolibc
+                           * compile's -I path. */
 
 /* ── pthread no-ops ────────────────────────────────────────────── */
 
@@ -155,8 +162,14 @@ int getentropy(void *buf, size_t len)
  * pulls a chacha-based re-seed loop that itself wants entropy),
  * so the symbol is still unresolved.  Return zero — it's a
  * documented legal output, and the caller treats it as a regular
- * sample.  Thorvg never instantiates `std::random_device`. */
-unsigned int arc4random(void)
+ * sample.  Thorvg never instantiates `std::random_device`.
+ *
+ * Return type is `__uint32_t` to match picolibc's `<stdlib.h>`
+ * declaration (transitively included via `local-onexit.h` above)
+ * — typedef'd to `unsigned long int` on rv32, vs. our prior
+ * `unsigned int` which is `int`-sized.  Same size, different
+ * type — GCC rejects the mismatch. */
+__uint32_t arc4random(void)
 {
     return 0;
 }
@@ -220,6 +233,16 @@ int raise(int sig)
  * Surfaced by the `gradient_linear` example bin: libm's float-to-
  * int conversions in gradient interpolation hit `__errno` on
  * domain errors. */
+
+/* DO NOT `#include <errno.h>` here.  If a newlib-flavoured
+ * `<errno.h>` ever lands on the include path (a cross-toolchain
+ * SDK layering accident, a future include-order regression in
+ * `build.rs`, …), its `#define errno (*__errno())` would textually
+ * rewrite the line below into `extern int (*__errno());` —
+ * declaring `__errno` as a function-pointer variable and producing
+ * a multiple-definition link error against our function below.
+ * The manual `extern int errno;` resolves to picolibc's strong
+ * `int errno;` symbol from `libc/errno/errno.c`. */
 extern int errno;
 
 int *__errno(void)
@@ -246,21 +269,17 @@ int *__errno(void)
  * `.fini_array` rather than through `_on_exit`, so the bypass
  * is total.
  *
- * Signature matches picolibc's `local-onexit.h` exactly so the
- * union-passing convention picolibc uses internally lines up
- * (we don't dereference, just drop).
+ * Type definitions (enum pico_onexit_kind, union on_exit_func) come
+ * from picolibc's own `local-onexit.h`, included at the top of this
+ * file — that keeps our stub welded to upstream's declaration so a
+ * submodule bump surfaces signature drift as a compile error rather
+ * than silent ABI mismatch.
  *
  * Surfaced by the `animation_basic` example bin: the Lottie
  * playback path through libstdc++ registers a destructor unwind
  * that bottoms out in `atexit → _on_exit`. */
 
-union on_exit_func {
-    void (*atexit)(void);
-    void (*on_exit)(int, void *);
-    void (*cxa_atexit)(void *);
-};
-
-int _on_exit(int kind, union on_exit_func func, void *arg)
+int _on_exit(enum pico_onexit_kind kind, union on_exit_func func, void *arg)
 {
     (void)kind;
     (void)func;

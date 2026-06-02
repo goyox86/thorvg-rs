@@ -785,17 +785,22 @@ fn build_picolibc(
     // Mirror the include-dir set picolibc's meson build constructs
     // (`meson.build:inc_dirs`).  Beyond the obvious `libc/include`
     // (public headers) and `libc/machine/<arch>` (arch overrides),
-    // picolibc TUs rely on `libc/stdio` and `libc/locale` being on
-    // the path so cross-directory bare-name includes like
-    // `#include "locale_private.h"` from `libc/ctype/local.h`
-    // resolve.  We don't *compile* anything from `libc/locale/`
-    // — the locale knobs are off in `picolibc.h` — but the
-    // headers still need to be reachable.
+    // picolibc TUs rely on `libc/stdio`, `libc/locale`, and
+    // `libc/stdlib` being on the path so cross-directory bare-name
+    // includes like `#include "locale_private.h"` from
+    // `libc/ctype/local.h` resolve.  We don't *compile* anything from
+    // `libc/locale/` — the locale knobs are off in `picolibc.h` —
+    // but the headers still need to be reachable.  `libc/stdlib/` is
+    // on the path so our `runtime_stubs.c` can pull picolibc's own
+    // `local-onexit.h` for the `_on_exit` enum / union types
+    // (keeps the stub signature welded to upstream — see
+    // runtime_stubs.c).
     let include_dirs: Vec<PathBuf> = vec![
         picolibc_config.to_path_buf(),
         machine_dir.clone(),
         picolibc_root.join("libc/stdio"),
         picolibc_root.join("libc/locale"),
+        picolibc_root.join("libc/stdlib"),
         picolibc_root.join("libc/include"),
     ];
 

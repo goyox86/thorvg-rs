@@ -56,7 +56,18 @@
 /* #undef __THREAD_LOCAL_STORAGE_STACK_GUARD */
 
 /* Plain `int errno;` (vs. `int* __errno()` indirection).  Matches the
- * shape `tvgLibcShim.cpp`'s `__errno` weak-symbol stub provided. */
+ * shape `tvgLibcShim.cpp`'s `__errno` weak-symbol stub provided.
+ *
+ * LOAD-BEARING for the newlib ↔ picolibc errno bridge: with this
+ * set, picolibc's `libc/errno/errno.c` emits `int errno;` as a
+ * strong global, and `runtime_stubs.c:__errno()` returns the
+ * address of that exact symbol so cross-toolchain archives built
+ * against newlib's `#define errno (*__errno())` resolve through
+ * the same storage.  Unsetting this knob silently breaks the bridge
+ * — errno becomes per-TLS, the strong `int` storage disappears,
+ * and the `__errno()` accessor in runtime_stubs.c references a
+ * symbol that no longer exists.  Touch the two files together
+ * or not at all. */
 #define __GLOBAL_ERRNO
 
 /* When __GLOBAL_ERRNO is set, `__PICOLIBC_ERRNO_FUNCTION` is unused;
