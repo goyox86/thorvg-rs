@@ -37,16 +37,14 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     // Write config.h based on enabled features.
     write_config_h(out_dir);
 
-    // Canonical Cargo signals — see also the policy block below.  Read
-    // here so the source-collection step can gate the bare-metal libc
-    // shim TU on `target_os == "none"`.
+    // Canonical Cargo signals — see also the policy block below.
     //
     // Three orthogonal predicates drive every target-derived decision:
     //
     //   * `is_bare_metal`  — `target_os == "none"`.  The system
     //                        provides nothing: no libc, no C++
     //                        runtime, no stdint.h.  Triggers the
-    //                        full shim treatment.
+    //                        picolibc compile + header isolation.
     //   * `is_hosted`      — target_env is gnu/musl/msvc, or
     //                        target_vendor is apple.  The system
     //                        provides a working libc + libstdc++ and
@@ -111,29 +109,6 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
         let s = p.to_string_lossy();
         !s.contains("gpu_engine") && !s.contains("tvgGl") && !s.contains("tvgWg")
     });
-
-    // The vendored thorvg tree carries `src/common/tvgLibcShim.{h,cpp}`
-    // from an earlier era when this crate replaced libc with an
-    // in-tree weak-symbol shim.  Three paths converge on dropping
-    // it from the source set:
-    //
-    //   * Hosted (`!is_bare_metal`):  the system libc already provides
-    //     `strlen`/`strcmp`/etc. with strong linkage, so the weak
-    //     shim symbols lose at link time — compiling them is just
-    //     dead code in `libthorvg.a`.
-    //   * Bare-metal with picolibc wired (`picolibc_active`):  picolibc
-    //     provides every symbol the shim does, with stronger
-    //     correctness (full UTF-8 ctype, locale-aware sorting that
-    //     we leave disabled but is correctly stubbed, etc.).
-    //   * Bare-metal *without* picolibc (legacy / non-wired arches):
-    //     the shim stays, because nothing else provides those
-    //     symbols.  Until arm / aarch64 / xtensa get their
-    //     `libc/machine/<arch>/` enumeration in build.rs, this is
-    //     the fallback that keeps those targets building.
-    //
-    // `picolibc_active` is computed below alongside the picolibc
-    // build step; we defer the actual `sources.retain(...)` to after
-    // that point so the gate has both signals available.
 
     // ── Include paths ────────────────────────────────────────────────────
 
@@ -277,9 +252,11 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     //     emitted around function-local statics, which pull in pthread
     //     stubs unavailable on bare metal.
     //   * `-fno-use-cxa-atexit` avoids registrations against
-    //     `__cxa_atexit`, which is a stub on bare-metal newlib.
-    //   * The force-included libc shim header + dropping libc.a from
-    //     the link replace newlib entirely.
+    //     `__cxa_atexit`, which is stubbed in `runtime_stubs.c`.
+    //   * Dropping libc.a from the link + vendoring picolibc replaces
+    //     newlib entirely — see the picolibc include-path block
+    //     after the picolibc compile call below for the header-
+    //     isolation that switches thorvg's compile to picolibc.
     //   * `-Os` because code size dominates every reasonable
     //     bare-metal use of thorvg.
     if is_bare_metal {
@@ -287,13 +264,6 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
         build.flag_if_supported("-fno-use-cxa-atexit");
         build.opt_level_str("s");
 
-        // The `-include tvgLibcShim.h` force-include used to live
-        // here, force-pulling the in-tree weak ctype/str shim header
-        // into every thorvg TU.  Replaced by picolibc's headers —
-        // see the picolibc include-path block after the picolibc
-        // compile call below, which conditionally adds `-nostdinc`
-        // + picolibc's own header tree to thorvg's compile.
-        //
         // RISC-V multilib normalisation.  cc-rs picks `-march=rv32imac`
         // (the short Rust-style form) for the riscv32imac-* triples;
         // most embedded toolchains (Espressif's riscv32-esp-elf, the
@@ -380,58 +350,45 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
 
     // -- Picolibc build (bare-metal) --------------------------------------
     //
-    // On bare-metal targets where `build_picolibc` recognises the
-    // architecture, we compile picolibc into a static archive
-    // alongside thorvg and link the result.  `picolibc_active`
-    // records the outcome so the rest of this function can pivot
-    // header isolation and shim selection accordingly:
-    //
-    //   * Ok(()):    picolibc.a built and linked, thorvg's own
-    //                compile switches to `-nostdinc` + picolibc
-    //                headers, `tvgLibcShim.cpp` dropped from sources.
-    //   * Err(why):  cargo:warning explains, and the legacy shim
-    //                stays active so non-wired arches still build.
-    //
-    // Arch coverage is driven entirely by `picolibc_machine_subdir`:
-    // any `target_arch` it maps to an existing `libc/machine/<dir>/`
-    // is built; anything else returns Err and falls back to the shim.
+    // On bare-metal targets we compile picolibc into a static archive
+    // alongside thorvg and link the result.  This is no longer
+    // optional: picolibc is the libc on `target_os == "none"`, full
+    // stop.  Arch coverage is driven by `picolibc_machine_subdir` —
+    // an unrecognised arch panics the build with a clear error
+    // rather than silently falling back to a shim (the old
+    // `tvgLibcShim.cpp` path was removed once picolibc was proven
+    // on hardware; the file no longer exists in the vendored thorvg
+    // tree).  To add a new arch, wire it into
+    // `picolibc_machine_subdir` and (if needed) handle per-ISA
+    // variant selection in `build_picolibc`.
     let picolibc_root = manifest_dir.join("picolibc");
     let picolibc_config = manifest_dir.join("picolibc-config");
-    let picolibc_active = if is_bare_metal {
-        match build_picolibc(
+    if is_bare_metal {
+        build_picolibc(
             &picolibc_root,
             &picolibc_config,
             &target_arch,
             &cross_toolchain_multilib_args,
-        ) {
-            Ok(()) => true,
-            Err(reason) => {
-                println!("cargo:warning=picolibc disabled, shim fallback active: {reason}");
-                false
-            }
-        }
-    } else {
-        false
-    };
-
-    // -- Shim selection ---------------------------------------------------
-    //
-    // See the long comment up in the source-collection block: drop
-    // `tvgLibcShim.cpp` whenever it isn't the active libc replacement.
-    // The shim is only active when bare-metal AND picolibc isn't
-    // wired for this arch.
-    let shim_active = is_bare_metal && !picolibc_active;
-    if !shim_active {
-        sources.retain(|p| !p.to_string_lossy().contains("tvgLibcShim"));
+        )
+        .unwrap_or_else(|reason| {
+            panic!(
+                "picolibc build failed for target_arch={target_arch}: {reason}\n\
+                 \n\
+                 thorvg-sys requires picolibc on `target_os == \"none\"`.\n\
+                 To add a new arch, wire it into `picolibc_machine_subdir`\n\
+                 in build.rs and ensure `picolibc/libc/machine/<dir>/` exists\n\
+                 in the vendored submodule."
+            )
+        });
     }
 
     // -- Thorvg header isolation under picolibc ---------------------------
     //
-    // When picolibc is the active libc, thorvg's C++ TUs must see
-    // picolibc's `<ctype.h>` / `<string.h>` / etc., not newlib's.
-    // The same header-isolation policy `build_picolibc` applies to
-    // picolibc's own sources — `-nostdinc` + explicit re-add of the
-    // compiler builtin-includes — carries over here.
+    // On bare-metal, thorvg's C++ TUs must see picolibc's
+    // `<ctype.h>` / `<string.h>` / etc., not newlib's.  The same
+    // header-isolation policy `build_picolibc` applies to picolibc's
+    // own sources — `-nostdinc` + explicit re-add of the compiler
+    // builtin-includes — carries over here.
     //
     // Order matters: `picolibc-config/` first so `<picolibc.h>`
     // resolves to our hand-authored config; arch-specific machine
@@ -440,7 +397,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     // some of its public headers transitively pull in); then the
     // generic `libc/include/`.  Compiler builtins (`stdarg.h`,
     // `stddef.h`, `limits.h`) are restored via `-isystem`.
-    if picolibc_active {
+    if is_bare_metal {
         // `-nostdinc` strips ALL of GCC/Clang's default include
         // search paths: libc headers (newlib), compiler builtins
         // (stdarg.h, stddef.h, …) AND libstdc++ headers.  We want
@@ -455,7 +412,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
         // applied to picolibc's own compile.
         build.include(&picolibc_config);
         let machine_subdir = picolibc_machine_subdir(&target_arch)
-            .expect("picolibc_active gated on supported arches");
+            .expect("build_picolibc would have panicked on an unsupported arch");
         build.include(picolibc_root.join("libc/machine").join(machine_subdir));
         build.include(picolibc_root.join("libc/stdio"));
         build.include(picolibc_root.join("libc/locale"));
@@ -508,14 +465,14 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     //     `malloc` shims, …).
     if is_bare_metal {
         // `libc.a` is intentionally *not* probed: thorvg's ctype /
-        // str-family / parser needs are covered by `tvgLibcShim.{h,cpp}`
-        // (force-included header + weak-linkage TU compiled above), and
-        // pulling newlib's libc.a tends to drag objects like
-        // `stack_protector.o` that collide with HAL-defined symbols
-        // (`__stack_chk_fail` on esp-hal, for example).  `libm.a` is
-        // required because thorvg uses sqrt/sin/cos/atan2 extensively
-        // and replacing those is impractical; libm.a does not ship
-        // colliding shims on any toolchain we know of.
+        // str-family / parser needs are covered by the vendored
+        // picolibc archive built above, and pulling newlib's libc.a
+        // tends to drag objects like `stack_protector.o` that
+        // collide with HAL-defined symbols (`__stack_chk_fail` on
+        // esp-hal, for example).  `libm.a` is required because
+        // thorvg uses sqrt/sin/cos/atan2 extensively and replacing
+        // those is impractical; libm.a does not ship colliding
+        // shims on any toolchain we know of.
         let found = cross_runtime_libs(
             &[
                 "libstdc++.a",
@@ -579,10 +536,9 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
 /// are visible to the final rustc link.
 ///
 /// Returns `Ok(())` when the archive is built, or `Err(reason)`
-/// when the architecture isn't yet wired or the compile failed.
-/// The caller surfaces the reason via `cargo:warning=` and falls
-/// back to the legacy `tvgLibcShim.cpp` source set — keeping the
-/// build green on arches we haven't enumerated yet.
+/// when the architecture isn't wired or the compile failed.  The
+/// caller panics on `Err` (picolibc is the only libc on bare-metal;
+/// there is no fallback path).
 ///
 /// # Source enumeration
 ///
@@ -639,7 +595,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
 /// Coverage is driven by `picolibc_machine_subdir` (Rust `target_arch`
 /// → picolibc `libc/machine/<dir>/`).  Any arch the helper maps to an
 /// existing machine dir is built; arches it doesn't know about get a
-/// structured `Err` and the caller logs a `cargo:warning=`.
+/// structured `Err` that the caller turns into a build-time panic.
 ///
 /// The machine dir is walked the same way as the generic dirs — `.c`
 /// and `.S` files at the top level (no recursion into nested
@@ -869,8 +825,8 @@ fn build_picolibc(
     // archive pipeline and emits `cargo:rustc-link-search=native=<out>`
     // + `cargo:rustc-link-lib=static=picolibc` so the archive is
     // visible to the final rustc link.  `try_*` variant chosen so a
-    // failure surfaces as a structured `Err` (the caller logs and
-    // falls back to the shim) rather than a `panic!` from `compile()`.
+    // failure surfaces as a structured `Err` (the caller wraps the
+    // message and panics) rather than cc-rs's own raw `panic!`.
     build
         .try_compile("picolibc")
         .map_err(|e| format!("compile failed: {e}"))?;
@@ -1058,8 +1014,8 @@ const MACHINE_DENYLIST: &[&str] = &["tls.c", "inittls.c"];
 /// (xtensa, wasm32, …) and for arches that need per-ISA variant
 /// selection that `build_picolibc`'s plain directory walk would
 /// mis-resolve (arm — see the caveat in `build_picolibc`'s rustdoc).
-/// Caller surfaces the `None` via `cargo:warning=` and falls back
-/// to the legacy `tvgLibcShim.cpp` source set.
+/// `build_picolibc` turns `None` into an `Err` and the top-level
+/// caller panics with a clear message — there is no fallback path.
 fn picolibc_machine_subdir(target_arch: &str) -> Option<&'static str> {
     // Matches the directory names that exist under
     // `picolibc/libc/machine/` in the vendored submodule.  When
