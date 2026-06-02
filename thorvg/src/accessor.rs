@@ -75,24 +75,6 @@ impl Accessor<'_> {
         })
     }
 
-    /// Iterates through descendants via a raw C callback.
-    ///
-    /// Escape hatch for callers that need the raw FFI shape.  Prefer
-    /// [`for_each`](Self::for_each) for closure-based iteration.
-    ///
-    /// # Safety
-    /// `data` must remain valid for the duration of the iteration,
-    /// and `func` must be safe to call with the paint handles
-    /// supplied by thorvg.
-    pub unsafe fn set<P: Paint>(
-        &mut self,
-        paint: &P,
-        func: unsafe extern "C" fn(sys::Tvg_Paint, *mut core::ffi::c_void) -> bool,
-        data: *mut core::ffi::c_void,
-    ) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_accessor_set(self.raw, paint.raw(), Some(func), data) })
-    }
-
     /// Generates a unique ID (hash key) from a name string.
     ///
     /// Pure hashing function — no engine state involved; the name
