@@ -145,16 +145,21 @@ exactly what we want, in this order:
 
 1. `picolibc-config/` — `<picolibc.h>` config, `<pthread.h>` stub
 2. `libc/machine/<arch>/` — arch-specific machine overrides
-3. `libc/{stdio,locale,stdlib}/` — internal cross-directory dirs
-4. `libc/include/` — picolibc's public header tree
-5. `-isystem <compiler-builtins>` — `<stdarg.h>`, `<stddef.h>`, …
-6. `-isystem <libstdc++>` — `<string>`, `<algorithm>`, …
+3. `libc/stdio`, `libc/locale` — internal cross-directory dirs that
+   picolibc's public headers reach via bare-name includes
+4. `libc/stdlib` — **picolibc compile only**, so
+   `runtime_stubs/onexit.c` can pull `local-onexit.h`
+5. `libc/include/` — picolibc's public header tree
+6. `-isystem <compiler-builtins>` — `<stdarg.h>`, `<stddef.h>`, …
+7. `-isystem <libstdc++>` — `<string>`, `<algorithm>`, … (thorvg
+   compile only — picolibc itself is pure C)
 
-This applies to both picolibc's own TUs (in `build_picolibc`) and
-thorvg's C++ TUs (in `apply_picolibc_header_isolation`).  The probe
-helpers `cross_compiler_builtin_includes()` and
-`cross_cxx_include_paths()` discover (5) and (6) from the cross
-compiler via `-print-file-name=include` / `-E -x c++ -v`.
+The shared part (1, 2, 3, 5, 6) applies to both picolibc's own TUs
+(in `build_picolibc`) and thorvg's C++ TUs (in
+`apply_picolibc_header_isolation`).  The probe helpers
+`cross_compiler_builtin_includes()` and `cross_cxx_include_paths()`
+discover (6) and (7) from the cross compiler via
+`-print-file-name=include` / `-E -x c++ -v`.
 
 ## Runtime stubs
 

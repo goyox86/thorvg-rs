@@ -13,7 +13,10 @@ For a safe, idiomatic Rust API, use the [`thorvg`](https://crates.io/crates/thor
 | Vendored (default) | `vendored` feature | ThorVG is compiled from the vendored submodule via [`cc`](https://crates.io/crates/cc) |
 | System | `--no-default-features` | Links a system-installed ThorVG via `pkg-config` (>= 1.0) |
 
-Vendored builds need only a C++ cross compiler; no meson, ninja, or pkg-config required.
+Vendored builds need a C++ cross compiler plus `libclang` (used by
+[`bindgen`](https://rust-lang.github.io/rust-bindgen/requirements.html)
+at build time to parse `thorvg_capi.h`).  No meson, ninja, or
+pkg-config required.
 
 ## Features
 

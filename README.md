@@ -14,15 +14,18 @@ Rust bindings for [ThorVG](https://github.com/thorvg/thorvg), a production-ready
 ## Quick Start
 
 ```rust
-use thorvg::{Thorvg, SwCanvas, Shape, ColorSpace};
+use thorvg::{Thorvg, ColorSpace};
 
-let _engine = Thorvg::init(0).unwrap();
+let engine = Thorvg::init(0).unwrap();
 
-let mut canvas = SwCanvas::new(Default::default()).unwrap();
+let mut canvas = engine.sw_canvas(Default::default()).unwrap();
 let mut buffer = vec![0u32; 800 * 600];
-canvas.set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888).unwrap();
+// SAFETY: `buffer` outlives `canvas`; not moved or reallocated until set_target is called again
+unsafe {
+    canvas.set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888).unwrap();
+}
 
-let mut shape = Shape::new();
+let mut shape = engine.shape();
 shape.append_rect(10.0, 10.0, 200.0, 150.0, 10.0, 10.0, true).unwrap();
 shape.set_fill_color(255, 0, 0, 255).unwrap();
 
@@ -38,7 +41,7 @@ canvas.sync().unwrap();
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `std` | ✅ | File I/O APIs (`Picture::load`, `Text::load_font`, etc.) |
+| `std` | ✅ | Enables `std::path::Path`-taking wrappers (`Picture::load`, `Text::load_font`); implies `file-io` |
 | `vendored` | ✅ | Build ThorVG from source via the `cc` crate |
 | `lottie` | ✅ | Lottie animation loader |
 | `svg` | ✅ | SVG loader |
@@ -46,15 +49,18 @@ canvas.sync().unwrap();
 | `fonts` | ✅ | SFNT / OTF / TTF font loaders |
 | `expressions` | ✅ | Lottie expressions via JerryScript (~200 KB RAM) |
 | `threads` | ✅ | Multi-threaded TaskScheduler (`std::thread`) |
-| `file-io` | ✅ | Filesystem I/O support in ThorVG |
+| `file-io` | ✅ | Compiles ThorVG's filesystem I/O code path (without `std`, only the byte-slice-taking `load_data` / `load_from_str` variants are exposed) |
 
-All features are pass-throughs to `thorvg-sys`.
+`vendored`, `lottie`, `svg`, `png`, `fonts`, `expressions`,
+`threads`, and `file-io` are pass-throughs to the corresponding
+`thorvg-sys` features.  `std` is wrapper-only — it enables
+`thorvg-sys/file-io` plus the path-taking wrapper APIs.
 
 ### Desktop (default — everything enabled)
 
 ```toml
 [dependencies]
-thorvg = "0.1"
+thorvg = "0.2"
 ```
 
 ### Embedded / `no_std` (pick only what you need)
@@ -93,13 +99,20 @@ build pipeline, runtime stubs, and how to override them.
 
 ## API Coverage
 
-100% of the ThorVG C API surface (158 functions) is wrapped:
+154 of the 158 ThorVG C API functions are wrapped (~97%).  Unwrapped:
+the four `tvg_paint_ref` / `tvg_paint_unref` / `tvg_paint_get_ref` /
+`tvg_paint_get_parent` refcount-and-parent helpers (ownership is
+already modelled in the Rust types).
 
-- **Canvas** — `SwCanvas`, `GlCanvas`, `WgCanvas`
+- **Canvas** — `SwCanvas` (software, fully wired).  `GlCanvas` and
+  `WgCanvas` type wrappers exist for API parity, but the vendored
+  build strips the GPU engine — they are not yet runtime-usable
 - **Paint** — opacity, visibility, transforms, clipping, masking, blending, hit-testing
 - **Shape** — paths, rectangles, circles, fill, stroke, gradients, trim path
 - **Gradient** — linear, radial, color stops, spread, transforms
-- **Picture** — load SVG/PNG/JPG/WebP/Lottie from file or memory
+- **Picture** — load SVG / PNG / Lottie / raw from file or memory
+  (JPG and WebP loaders exist in the upstream tree but are not
+  compiled by `thorvg-sys`)
 - **Scene** — grouping, effects (blur, drop shadow, fill, tint, tritone)
 - **Text** — font loading, styling, wrapping, metrics, outline
 - **Animation** — frame control, segments, duration
@@ -141,8 +154,10 @@ All examples output PNG files in the current directory.
 ## Building
 
 ThorVG is vendored as a git submodule and compiled automatically via
-the [`cc`](https://crates.io/crates/cc) crate. You need a C++ compiler
-(any `g++` or `clang++` will do):
+the [`cc`](https://crates.io/crates/cc) crate.  You need a C++ compiler
+(any `g++` or `clang++` will do) plus `libclang` for
+[`bindgen`](https://rust-lang.github.io/rust-bindgen/requirements.html)
+(typically packaged as `libclang-dev` / `clang-devel` / `llvm` on macOS).
 
 ```bash
 git clone --recurse-submodules https://github.com/goyox86/thorvg-rs
@@ -161,7 +176,6 @@ just ci-quick    # fmt, clippy, test, no_std check
 just ci          # full CI: above + AddressSanitizer + ThreadSanitizer
 just test-asan   # run tests under AddressSanitizer
 just examples    # run all 14 examples
-just coverage    # show C API coverage stats
 just --list      # show all recipes
 ```
 
