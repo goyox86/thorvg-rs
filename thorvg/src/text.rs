@@ -208,9 +208,52 @@ impl Text<'_> {
         Self::unload_font_from_str(&path.as_ref().to_string_lossy())
     }
 
-    /// Loads a font from memory.
+    /// Loads a font from memory, copying `data` into thorvg's
+    /// internal registry.
+    ///
+    /// The font is registered under `name` and remains usable for
+    /// the rest of the engine's lifetime (or until unloaded via
+    /// `unload_font_from_str(name)`).  Use this variant when
+    /// `data` is owned or has a non-`'static` lifetime.
+    ///
+    /// For zero-copy registration of `'static` data (e.g.
+    /// `include_bytes!(...)`), use
+    /// [`load_font_data_static`](Self::load_font_data_static).
+    pub fn load_font_data(name: &str, data: &[u8], mimetype: Option<&str>) -> Result<()> {
+        Self::load_font_data_inner(name, data, mimetype, /* copy = */ true)
+    }
+
+    /// Loads a font from `'static` memory without copying.
+    ///
+    /// thorvg stores the pointer to `data` in its global font
+    /// registry and dereferences it on every subsequent text-render
+    /// call, so the buffer must outlive the engine — the `'static`
+    /// bound enforces this at compile time.  Typical use:
+    /// `Text::load_font_data_static("Roboto", include_bytes!("Roboto.ttf"), None)`.
+    ///
+    /// For non-`'static` buffers, use
+    /// [`load_font_data`](Self::load_font_data) which copies into
+    /// thorvg-owned memory.
+    ///
+    /// # Compile-time safety
+    ///
+    /// The `'static` bound rejects local buffers at the type level:
+    ///
+    /// ```compile_fail,E0597
+    /// let local: Vec<u8> = vec![0; 32];
+    /// thorvg::Text::load_font_data_static("nope", &local, None).unwrap();
+    /// // error[E0597]: `local` does not live long enough
+    /// ```
+    pub fn load_font_data_static(
+        name: &str,
+        data: &'static [u8],
+        mimetype: Option<&str>,
+    ) -> Result<()> {
+        Self::load_font_data_inner(name, data, mimetype, /* copy = */ false)
+    }
+
     #[allow(clippy::cast_possible_truncation)]
-    pub fn load_font_data(
+    fn load_font_data_inner(
         name: &str,
         data: &[u8],
         mimetype: Option<&str>,
