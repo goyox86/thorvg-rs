@@ -883,7 +883,8 @@ fn denylist_files() -> &'static [&'static str] {
         "getauxval.c",
         "getpagesize.c",
         "rpmatch.c",
-        // Duplicate PRNG families (we keep plain `rand.c` + `srand.c`).
+        // 48-bit PRNG family (`drand48` / `erand48` / …) — same
+        // generator with different output types; not used.
         "drand48.c",
         "erand48.c",
         "jrand48.c",
@@ -894,11 +895,21 @@ fn denylist_files() -> &'static [&'static str] {
         "srand48.c",
         "lcong48.c",
         "rand48.c",
+        // Re-entrant rand variant — single-threaded build.
         "rand_r.c",
+        // BSD base-64 ASCII encoders, unrelated to PRNG.
         "a64l.c",
         "l64a.c",
-        "random.c",
-        "srandom.c",
+        // NOTE: `random.c` / `srandom.c` are KEPT (un-denylisted).
+        // Earlier drafts dropped them under a "duplicate PRNG"
+        // banner, but `random()` is a separate POSIX API from
+        // `rand()` — different signature (`long int random(void)`
+        // vs `int rand(void)`) and different output range.  The
+        // cross-toolchain's libstdc++ — specifically the Lottie /
+        // animation paths pulled by the `animation_basic` example
+        // bin — takes a weak external reference to `random` that
+        // the link surfaces if absent.  Cost is 133 lines of pure
+        // C; gain is one less runtime_stubs.c entry.
         // `arc4random.c` pulls `getentropy` and a chacha-based
         // re-seeding loop we don't want.  Our `runtime_stubs.c`
         // provides a `getentropy` stub for libstdc++'s benefit,

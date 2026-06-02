@@ -226,3 +226,44 @@ int *__errno(void)
 {
     return &errno;
 }
+
+/* ── picolibc's internal atexit primitive ───────────────────── *
+ *
+ * Picolibc routes every exit-registration API — `atexit()`,
+ * `on_exit()`, `__cxa_atexit()` — through a single internal
+ * primitive `_on_exit(kind, func_union, arg)` whose real
+ * implementation lives in `libc/stdlib/exitprocs.c`.  That file
+ * is denylisted in build.rs (it carries the dynamic-storage
+ * machinery for atexit registration we don't want on bare
+ * metal).  Picolibc's `atexit.c` is still compiled — it's a
+ * one-liner that wraps `_on_exit` — and links against this stub.
+ *
+ * Why deny exitprocs.c and stub `_on_exit` instead of including
+ * exitprocs.c: bare-metal `main()` never returns, exit handlers
+ * never fire, and the static atexit table would waste ~1 KB of
+ * BSS for nothing.  We also set `__INIT_FINI_ARRAY` in
+ * picolibc.h, which routes C++ static destructors through
+ * `.fini_array` rather than through `_on_exit`, so the bypass
+ * is total.
+ *
+ * Signature matches picolibc's `local-onexit.h` exactly so the
+ * union-passing convention picolibc uses internally lines up
+ * (we don't dereference, just drop).
+ *
+ * Surfaced by the `animation_basic` example bin: the Lottie
+ * playback path through libstdc++ registers a destructor unwind
+ * that bottoms out in `atexit → _on_exit`. */
+
+union on_exit_func {
+    void (*atexit)(void);
+    void (*on_exit)(int, void *);
+    void (*cxa_atexit)(void *);
+};
+
+int _on_exit(int kind, union on_exit_func func, void *arg)
+{
+    (void)kind;
+    (void)func;
+    (void)arg;
+    return 0;
+}
