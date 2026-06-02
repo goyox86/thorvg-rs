@@ -19,18 +19,10 @@ fn main() {
 // cc-based vendored build
 // ---------------------------------------------------------------------------
 
-/// Build ThorVG from vendored source using the `cc` crate.
+/// Build thorvg from vendored source via cc-rs.
 ///
-/// Cross-compiler selection follows cc-rs's standard contract: the user
-/// supplies `CC_<triple>` / `CXX_<triple>` (or `TARGET_CC` / `TARGET_CXX`)
-/// in their environment or `.cargo/config.toml`.  This crate does not
-/// hardcode any vendor-specific binary names.
-///
-/// Which loaders and capabilities are compiled is controlled by cargo
-/// features.  Target-derived policy is limited to the canonical
-/// `CARGO_CFG_TARGET_*` signals — chiefly `target_os == "none"` for
-/// bare-metal — matching the convention used by `ring`, `mbedtls-sys-auto`,
-/// and other no_std sys crates.
+/// Cross-compiler selection follows cc-rs's standard `CC_<triple>` /
+/// `CXX_<triple>` contract; no vendor binary names are hardcoded.
 fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     let src = thorvg_src.join("src");
     write_config_h(out_dir);
@@ -53,8 +45,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
                      \n\
                      thorvg-sys requires picolibc on `target_os == \"none\"`.\n\
                      To add a new arch, wire it into `picolibc_machine_subdir`\n\
-                     in build.rs and ensure `picolibc/libc/machine/<dir>/` exists\n\
-                     in the vendored submodule.",
+                     and ensure `picolibc/libc/machine/<dir>/` exists.",
                     target.arch,
                 )
             });
@@ -83,26 +74,18 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
 // Target classification
 // ---------------------------------------------------------------------------
 
-/// Cargo-derived target classification driving every per-target decision
-/// in this build script.
+/// Cargo-derived target classification.
 ///
-/// Three orthogonal predicates split the build matrix into a small number
-/// of behaviour classes:
+/// Three predicates drive every per-target decision:
 ///
-///   * `is_bare_metal`  — `target_os == "none"`.  The system provides
-///                        nothing: no libc, no C++ runtime, no stdint.h.
-///                        Triggers the picolibc compile + header isolation.
-///   * `is_hosted`      — target_env is gnu/musl/msvc, or target_vendor is
-///                        apple.  System libc + libstdc++ are present and
-///                        cc-rs's defaults are correct.
-///   * everything else  — a self-contained runtime sits between those two
-///                        extremes (ESP-IDF, NuttX, WASI, …).  The runtime
-///                        is provided externally; we just need to *not*
-///                        emit directives that conflict with the SDK.
+///   * `is_bare_metal` (`target_os == "none"`) — no system libc / C++
+///     runtime; triggers the picolibc compile and header isolation.
+///   * `is_hosted` (gnu/musl/msvc env, or apple vendor) — system libc +
+///     libstdc++ are present; cc-rs defaults are correct.
+///   * neither — a self-contained SDK runtime owns the link surface;
+///     we suppress directives that would conflict with it.
 ///
-/// `is_msvc` is a separate concern (different flag dialect entirely);
-/// it's tracked here for the flag-suppression branch in
-/// `configure_thorvg_build`.
+/// `is_msvc` is a separate flag-dialect branch in `configure_thorvg_build`.
 struct TargetInfo {
     os: String,
     env: String,
@@ -131,14 +114,12 @@ impl TargetInfo {
 // Source / include enumeration
 // ---------------------------------------------------------------------------
 
-/// Collect the thorvg `.cpp` source set for the enabled cargo features.
+/// Collect thorvg `.cpp` sources for the enabled cargo features.
 ///
-/// Always-compiled: renderer + CPU engine + common + C API binding + raw
-/// loader.  Loaders (lottie / svg / png / fonts) are feature-gated; the
-/// JerryScript expression evaluator under `loaders/lottie/jerryscript/` is
-/// pulled recursively when `expressions` is on.  GPU engine sources
-/// (`gpu_engine`, `tvgGl*`, `tvgWg*`) are unconditionally excluded —
-/// thorvg-sys is SW-only.
+/// Always compiled: renderer, CPU engine, common, C API binding, raw
+/// loader.  Loaders (lottie / svg / png / fonts) are feature-gated;
+/// JerryScript is pulled recursively when `expressions` is on.  GPU
+/// engine sources are always excluded — thorvg-sys is SW-only.
 fn collect_thorvg_sources(src: &Path) -> Vec<PathBuf> {
     let mut sources: Vec<PathBuf> = Vec::new();
 
@@ -153,8 +134,8 @@ fn collect_thorvg_sources(src: &Path) -> Vec<PathBuf> {
         if cfg!(feature = "expressions") {
             add_dir_cpp_recursive(&mut sources, &src.join("loaders/lottie/jerryscript"));
         } else {
-            // Drop the expressions TU — it references JerryScript headers
-            // we won't have on the include path.
+            // Drop the expressions TU — references JerryScript headers
+            // we don't put on the include path.
             sources.retain(|p| !p.to_string_lossy().contains("tvgLottieExpressions"));
         }
     }
@@ -175,11 +156,10 @@ fn collect_thorvg_sources(src: &Path) -> Vec<PathBuf> {
     sources
 }
 
-/// Include-dir set matching the source set from `collect_thorvg_sources`.
+/// Include-dir set matching `collect_thorvg_sources`.
 ///
-/// `out_dir` carries the generated `config.h` (see `write_config_h`); the
-/// rest mirror the source directories so cross-TU `#include "tvg*.h"`
-/// bare-name lookups resolve.
+/// `out_dir` carries the generated `config.h`; the rest mirror source
+/// directories so cross-TU `#include "tvg*.h"` lookups resolve.
 fn thorvg_include_dirs(thorvg_src: &Path, src: &Path, out_dir: &Path) -> Vec<PathBuf> {
     let mut include_dirs: Vec<PathBuf> = vec![
         out_dir.to_path_buf(),  // config.h
@@ -234,48 +214,32 @@ fn thorvg_include_dirs(thorvg_src: &Path, src: &Path, out_dir: &Path) -> Vec<Pat
 
 /// Build a configured `cc::Build` for thorvg's C++ compile.
 ///
-/// Composed in tiers so the policy per target class stays auditable:
-///
-///   1. Defines (POSIX surface, JerryScript knobs).
-///   2. Meson-mirror flags (`-fno-exceptions`, …) — non-MSVC universal.
-///   3. Unwind stripping — bare-metal only (SDK targets bring their own
-///      EH-frame layout).
-///   4. C++ runtime auto-link suppression — every non-hosted target.
-///   5. Bare-metal extras (`-fno-threadsafe-statics`, `-Os`, …).
-///   6. Cross-toolchain multilib args (currently RISC-V-only — see
-///      `cross_toolchain_multilib_args`).
-///
 /// Include paths and source files are appended by the caller after
-/// picolibc header isolation has had a chance to inject `-nostdinc` +
-/// picolibc's own header tree.
+/// `apply_picolibc_header_isolation` has had a chance to inject
+/// `-nostdinc` + picolibc's header tree.
 fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build {
     let mut build = cc::Build::new();
     build.cpp(true).std("c++14").warnings(false);
 
-    // Expose POSIX functions (strdup, strncasecmp, …) on newlib
-    // toolchains where they're gated behind feature-test macros.
+    // Expose POSIX surface (strdup, strncasecmp, …) on libcs that gate
+    // it behind feature-test macros.
     build.define("_DEFAULT_SOURCE", None);
 
     // JerryScript's JERRY_VLA fallback uses alloca() without including
-    // <alloca.h>.  Override to C99 VLAs (GCC/Clang support natively).
+    // <alloca.h>.  Redirect to C99 VLAs.
     if cfg!(feature = "expressions") {
         build.define("JERRY_VLA(type,name,size)", "type name[size]");
     }
 
-    // JerryScript's default global heap is 512 KB (jerry-config.h:99),
-    // a single `.bss` static array — larger than ESP32-C6's *entire*
-    // 512 KB SRAM.  On bare-metal we cut to 16 KB — enough for the small
-    // expression snippets typical Lottie files use, while leaving room
-    // for the esp-alloc heap (416 KB), the ABGR backbuffer (230 KB),
-    // and esp-hal's own .bss + stack.  At 32 KB the combined .bss
-    // overflows ESP32-C6's SRAM by ~14 KB; 16 KB just fits.
+    // JerryScript's default global heap is 512 KB allocated as a single
+    // `.bss` static array — too large for typical bare-metal SRAM
+    // budgets.  16 KB fits most expression snippets used by Lottie.
     if cfg!(feature = "expressions") && target.is_bare_metal {
         build.define("JERRY_GLOBAL_HEAP_SIZE", "16");
     }
 
-    // Mirror the GCC/Clang flag set upstream meson applies unconditionally
-    // (`src/meson.build`).  Pure code-shape choices — safe on every
-    // non-MSVC target regardless of link environment.
+    // Mirror upstream's meson flag set (`src/meson.build`) — pure
+    // code-shape choices, safe on every non-MSVC target.
     if !target.is_msvc {
         for f in &[
             "-fno-exceptions",
@@ -287,13 +251,9 @@ fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build
         }
     }
 
-    // Unwind stripping — bare-metal only.  SDK-style embedded targets
-    // (ESP-IDF, NuttX, …) assert on EH-frame section layout (e.g.
-    // ESP-IDF's `sections.ld` requires zero gap between `.flash.rodata`
-    // and `.eh_frame_hdr`); compiling our TUs with mismatched unwind
-    // policy vs. the SDK's own C++ TUs can leave the linker unable to
-    // satisfy those asserts.  On `target_os == "none"` we control the
-    // link and want every byte stripped.
+    // Unwind stripping — bare-metal only.  SDK targets often assert on
+    // EH-frame section layout in their linker scripts, so mismatched
+    // unwind policy between our TUs and the SDK's would fail the link.
     if target.is_bare_metal {
         build.flag_if_supported("-fno-unwind-tables");
         build.flag_if_supported("-fno-asynchronous-unwind-tables");
@@ -301,31 +261,25 @@ fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build
 
     // Suppress cc-rs's automatic `-lstdc++` / `-lc++` emission on any
     // non-hosted target.  Bare-metal has no system libstdc++; SDK
-    // runtimes (ESP-IDF, NuttX, WASI, …) bring their own as a
-    // dedicated component and would conflict with a duplicate emission.
+    // runtimes bring their own and would conflict with a duplicate.
     if !target.is_hosted {
         build.cpp_set_stdlib(None);
     }
 
-    // Bare-metal-only C++ runtime plumbing.  In a `target_os == "none"`
-    // environment the C++ runtime gcc normally injects is either missing
-    // or only partially present:
-    //
-    //   * `-fno-threadsafe-statics` suppresses `__cxa_guard_*` calls
-    //     around function-local statics (would pull in pthread stubs).
-    //   * `-fno-use-cxa-atexit` avoids registrations against
-    //     `__cxa_atexit`, which is stubbed in `runtime_stubs.c`.
-    //   * `-Os` because code size dominates every reasonable bare-metal
-    //     use of thorvg.
+    // Bare-metal C++ runtime plumbing:
+    //   * `-fno-threadsafe-statics` suppresses `__cxa_guard_*` around
+    //     function-local statics (would pull pthread stubs).
+    //   * `-fno-use-cxa-atexit` avoids `__cxa_atexit` registrations
+    //     (stubbed in `runtime_stubs.c`).
+    //   * `-Os` because code size dominates bare-metal use.
     if target.is_bare_metal {
         build.flag_if_supported("-fno-threadsafe-statics");
         build.flag_if_supported("-fno-use-cxa-atexit");
         build.opt_level_str("s");
     }
 
-    // Apply the cross-toolchain multilib normaliser.  Empty (no-op) on
-    // every arch where cc-rs and the cross toolchain agree on flag
-    // naming — currently a RISC-V-only concern.
+    // Empty on every arch where cc-rs and the cross toolchain agree on
+    // flag naming — see `cross_toolchain_multilib_args`.
     for f in multilib {
         build.flag(f);
     }
@@ -333,32 +287,21 @@ fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build
     build
 }
 
-/// Compute cross-toolchain multilib flags for `cross_runtime_libs` /
-/// `cross_sysroot_include` probes and the matching cc compile.
+/// Cross-toolchain multilib flag normaliser.
 ///
-/// This is NOT a picolibc concern — it's a cc-rs ↔ GCC flag-naming
-/// mismatch that surfaces during the toolchain's runtime-archive probes.
-/// Currently only RISC-V is affected:
+/// cc-rs ↔ GCC flag-naming mismatches that surface during runtime-
+/// archive probes (`cross_runtime_libs`, `cross_sysroot_include`).
+/// Currently only RISC-V is affected: cc-rs emits `-march=rv32imac`
+/// while GCC's multilib is `rv32imac_zicsr_zifencei`, so the probe
+/// returns the FPU-enabled libgcc whose soft-float helpers trap on a
+/// no-FPU chip.  `-fno-rtti` is here so the probe doesn't pick the
+/// `*/rtti/` multilib (we build `-fno-rtti`).
 ///
-///   cc-rs picks `-march=rv32imac` (the short Rust-style form) for the
-///   riscv32imac-* triples; most embedded toolchains (Espressif's
-///   riscv32-esp-elf, the SiFive BSP, …) ship their no-FPU `libgcc.a`
-///   under the *canonical* GCC multilib name `rv32imac_zicsr_zifencei`
-///   and leave the toolchain's default multilib (`.`) built assuming a
-///   hardware FPU.  Without this override, the `cross_runtime_libs`
-///   probe returns the FPU-enabled libgcc whose soft-float helpers
-///   (`__fixunsdfdi`, `__floatdidf`, …) read `frm` / `fcsr` CSRs that
-///   don't exist on a pure rv32imac chip, producing an
-///   illegal-instruction trap the first time any `double`-to-integer
-///   conversion runs.
+/// ARM / aarch64 cross toolchains agree with cc-rs naming and need
+/// nothing here.  Add a branch for any future arch that diverges —
+/// keep `build_picolibc` itself arch-agnostic.
 ///
-/// ARM / aarch64 cross toolchains agree with cc-rs on `-mcpu=` /
-/// `-mfpu=` / `-mfloat-abi=` naming, so they need no equivalent block
-/// — cc-rs's auto-emitted flags already select the right multilib.
-/// If a future arch shows the same mismatch, add a branch here (and
-/// *not* inside `build_picolibc`, which stays arch-agnostic).
-///
-/// Returns an empty `Vec` on every non-RISC-V or non-bare-metal target.
+/// Empty `Vec` on non-RISC-V or non-bare-metal targets.
 fn cross_toolchain_multilib_args(target: &TargetInfo) -> Vec<String> {
     if !(target.is_bare_metal && target.arch == "riscv32") {
         return Vec::new();
@@ -384,10 +327,6 @@ fn cross_toolchain_multilib_args(target: &TargetInfo) -> Vec<String> {
     } else {
         "ilp32"
     };
-    // `-fno-rtti` ties the runtime-libs probe back to cc-rs's compile
-    // (which gets it from the meson flag block in `configure_thorvg_build`).
-    // Without it, the probe resolves to the `*/rtti/` multilib whose
-    // objects reference typeinfo helpers our `-fno-rtti` build omits.
     vec![
         format!("-march={isa}"),
         format!("-mabi={abi}"),
@@ -399,27 +338,15 @@ fn cross_toolchain_multilib_args(target: &TargetInfo) -> Vec<String> {
 // Header isolation & link emission
 // ---------------------------------------------------------------------------
 
-/// Switch thorvg's C++ compile from the cross toolchain's newlib headers
-/// to picolibc's.
+/// Switch thorvg's C++ compile from the toolchain's libc headers to
+/// picolibc's.
 ///
-/// `-nostdinc` strips ALL of GCC/Clang's default include search paths:
-/// libc headers (newlib), compiler builtins (stdarg.h, stddef.h, …),
-/// AND libstdc++ headers.  We want to drop only the libc set; everything
-/// else gets added back explicitly:
-///
-///   1. `picolibc-config/` — resolves `<picolibc.h>` (our hand-authored
-///      config) and the `<pthread.h>` stub libstdc++ pulls in for
-///      `<bits/gthr-default.h>`.
-///   2. `libc/machine/<arch>/` — arch-specific machine overrides
-///      (`<machine/setjmp.h>`, …).
-///   3. `libc/stdio` + `libc/locale` — needed for picolibc's internal
-///      cross-directory bare-name includes that some of its public
-///      headers transitively pull in.  We don't compile anything from
-///      `libc/locale/` — the locale knobs are off in `picolibc.h` —
-///      but the headers still need to be reachable.
-///   4. `libc/include/` — the public header tree.
-///   5. `-isystem <compiler-builtin-include>` — stddef.h, stdarg.h, …
-///   6. `-isystem <libstdc++-include>` — std::string, <algorithm>, …
+/// `-nostdinc` drops libc, compiler builtins, AND libstdc++ together.
+/// We re-add what we need: picolibc-config (resolves `<picolibc.h>` and
+/// our `<pthread.h>` stub), the per-arch machine dir, the internal
+/// cross-directory dirs (`libc/stdio`, `libc/locale`), the public
+/// header tree, then `-isystem` for the toolchain's builtins and
+/// libstdc++.
 fn apply_picolibc_header_isolation(
     build: &mut cc::Build,
     picolibc_root: &Path,
@@ -444,39 +371,23 @@ fn apply_picolibc_header_isolation(
     }
 }
 
-/// Emit `cargo:rustc-link-{search,lib}=` directives for the C++ runtime
-/// and friends.
-///
-/// Three behaviour classes:
+/// Emit `cargo:rustc-link-{search,lib}=` directives for the C++ runtime.
 ///
 ///   * Bare-metal: probe the cross toolchain for `libstdc++.a` /
-///     `libc++.a` / `libsupc++.a` / `libgcc.a` / `libm.a` via
-///     `-print-file-name=` and emit `static=` link directives.  `libc.a`
-///     is intentionally *not* probed: thorvg's ctype / str-family /
-///     parser needs are covered by the vendored picolibc archive, and
-///     pulling newlib's libc.a tends to drag objects like
-///     `stack_protector.o` that collide with HAL-defined symbols
-///     (`__stack_chk_fail` on esp-hal, for example).  `libm.a` is
-///     required — thorvg uses sqrt/sin/cos/atan2 extensively and
-///     replacing those is impractical; libm.a doesn't ship colliding
-///     shims on any toolchain we know of.
-///   * Hosted (gnu / musl / msvc / apple): dynamic `c++` / `stdc++`
-///     request, named per platform because cc-rs's auto-emit isn't
-///     reliable on cross builds.
-///   * Non-hosted, non-bare-metal (ESP-IDF, NuttX, WASI, …): emit
-///     nothing.  The SDK is responsible for putting libstdc++ / libgcc
-///     / libc on the link line; cc-rs's auto-emit was already
-///     suppressed via `cpp_set_stdlib(None)` in
-///     `configure_thorvg_build`.
+///     `libc++.a` / `libsupc++.a` / `libgcc.a` / `libm.a` and emit
+///     static link directives.  `libc.a` is intentionally not probed
+///     (picolibc provides it, and pulling newlib's libc.a drags
+///     objects that collide with HAL-defined symbols).  libm is
+///     required — thorvg uses sqrt/sin/cos/atan2 extensively.
+///   * Hosted: dynamic `c++` / `stdc++` request named per platform
+///     (cc-rs auto-emit is unreliable on cross builds).
+///   * Other: nothing — the SDK is responsible for the runtime, and
+///     cc-rs auto-emit was already suppressed in `configure_thorvg_build`.
 ///
-/// Note: linker-script-specific fixes (e.g. ESP-IDF's `.eh_frame_hdr`
-/// layout assertion needing `-Wl,--no-eh-frame-hdr`) do *not* belong
-/// here.  `cargo:rustc-link-arg` from a sys crate applies only to that
-/// crate's own link products (its rlib has no link step), so a
-/// directive emitted here would silently no-op for the downstream
-/// binary that actually invokes the linker.  Such flags belong in the
-/// consumer's `.cargo/config.toml` (`rustflags = ["-C", "link-arg=..."]`)
-/// or its own build.rs.
+/// Note: `cargo:rustc-link-arg` from a sys crate applies only to that
+/// crate's own link products (the rlib has no link step), so linker-
+/// script-specific fixes must live in the consumer's `.cargo/config.toml`
+/// or build.rs, not here.
 fn emit_runtime_link_directives(target: &TargetInfo, multilib: &[String]) {
     if target.is_bare_metal {
         let found = cross_runtime_libs(
@@ -508,97 +419,33 @@ fn emit_runtime_link_directives(target: &TargetInfo, multilib: &[String]) {
 }
 
 // ---------------------------------------------------------------------------
-// Vendored picolibc (bare-metal libc replacement)
+// Vendored picolibc (bare-metal libc)
 // ---------------------------------------------------------------------------
 
-/// Compile-only validation pass over the vendored picolibc tree.
-///
-/// Walks the curated set of C / .S source files under
-/// `thorvg-sys/picolibc/libc/`, configures a fresh `cc::Build` with
-/// our hand-authored `picolibc-config/picolibc.h` first on the
-/// include path, and calls `cc::Build::try_compile("picolibc")`,
-/// which produces a `libpicolibc.a` archive in OUT_DIR and emits
-/// `cargo:rustc-link-search=native=<out>` plus
-/// `cargo:rustc-link-lib=static=picolibc` so the resulting symbols
-/// are visible to the final rustc link.
-///
-/// Returns `Ok(())` when the archive is built, or `Err(reason)`
-/// when the architecture isn't wired or the compile failed.  The
-/// caller panics on `Err` (picolibc is the only libc on bare-metal;
-/// there is no fallback path).
+/// Build picolibc as `libpicolibc.a` and emit link directives.
 ///
 /// # Source enumeration
 ///
-/// We walk the picolibc tree (rather than parsing its `meson.build`
-/// files or hand-coding the full list) and apply two filters:
-///
-///   * A **path filter** — only files under directories we actually
-///     want (`libc/ctype`, `libc/string`, `libc/stdlib`, …).
-///   * A **denylist** — file basenames or basename suffixes we
-///     never want in the build:
-///       - `*_l.c`     locale-aware variants; we disabled locale
-///                     in picolibc.h (`__MB_CAPABLE` undefined).
-///       - `*_s.c`     C11 Annex K bounds-checking; not used.
-///       - `wcs*.c`, `wmem*.c`, `wcp*.c`, `wcw*.c`, `wc[rs]*toc*.c`,
-///         `mb[srl]*.c`, `mbtowc*.c`, `wctomb*.c`, `btowc.c`,
-///         `wctob.c`  — wide-char and multi-byte machinery.
-///       - `malloc.c`, `free.c`, `realloc.c`, `calloc.c`,
-///         `aligned_alloc.c`, `memalign.c`, `posix-memalign.c`,
-///         `valloc.c`, `pvalloc.c`, `reallocarray.c`, `reallocf.c`,
-///         `mallinfo.c`, `mallopt.c`, `malloc-stats.c`,
-///         `malloc-usable-size.c`  — consumer (esp-alloc, …)
-///         provides the allocator.
-///       - `getenv.c`, `getenv_r.c`, `putenv.c`, `setenv.c`,
-///         `environ.c`, `system.c`  — no environment on bare metal.
-///       - `drand48.c`, `erand48.c`, `jrand48.c`, `lrand48.c`,
-///         `mrand48.c`, `nrand48.c`, `seed48.c`, `srand48.c`,
-///         `lcong48.c`, `rand48.c`  — duplicate PRNGs; we keep
-///         the plain `rand.c` / `srand.c` pair.
-///       - `cxa-atexit.c`, `onexit.c`  — built with
-///         `-fno-use-cxa-atexit`; we don't want the C++ side.
-///       - `getopt.c`, `getsubopt.c`, `getauxval.c`,
-///         `getpagesize.c`, `rpmatch.c`  — POSIX surface, unused.
-///       - `assert.c`, `eprintf.c`  — assert paths pulling in stdio;
-///         the `__ASSERT_VERBOSE` knob in picolibc.h covers what
-///         we actually need via `assert_func.c`.
-///       - `inittls.c`, `tls.c` (under `machine/`)  — TLS setup;
-///         `__SINGLE_THREAD` deselects TLS for us.
-///       - `lock.c`  — non-trivial lock helpers; collapsed to
-///         no-ops by `<sys/lock.h>` under `__SINGLE_THREAD`.
-///       - `picosbrk.c`, `init.c`, `fini.c`  — picocrt startup
-///         glue; the consumer's HAL handles startup.
-///       - The whole `libc/stdio/` directory is INCLUDED — option
-///         (b) from the planning conversation (full tinystdio).
-///
-/// The denylist is intentionally explicit / file-level rather than
-/// pattern-only: a future picolibc bump that adds a new
-/// `strerror_l_new_variant.c` (or whatever) will land naturally
-/// without needing build.rs changes, and a one-time `cargo build`
-/// failure with a clear compiler error is a fine signal to update
-/// the list.
+/// Walks a fixed set of `libc/<subtree>/` directories under the
+/// vendored picolibc tree and applies two filters: a `denylist_files`
+/// of file basenames, and basename suffix/prefix patterns (`*_l.c`,
+/// `*_s.c`, `wcs*`, `mb*`, …) for whole categories we don't compile.
+/// The arch-specific machine dir is walked separately with its own
+/// `MACHINE_DENYLIST`.  Walking + denylist means a picolibc bump that
+/// adds new files lands automatically; a one-time compile failure on
+/// an unwanted new file is the signal to update the denylist.
 ///
 /// # Architecture support
 ///
-/// Coverage is driven by `picolibc_machine_subdir` (Rust `target_arch`
-/// → picolibc `libc/machine/<dir>/`).  Any arch the helper maps to an
-/// existing machine dir is built; arches it doesn't know about get a
-/// structured `Err` that the caller turns into a build-time panic.
+/// `picolibc_machine_subdir` is the single arch policy point: any
+/// `target_arch` it maps to an existing machine dir is built; anything
+/// else returns `Err` and the top-level caller panics.
 ///
-/// The machine dir is walked the same way as the generic dirs — `.c`
-/// and `.S` files at the top level (no recursion into nested
-/// `machine/` header subdirs), filtered by `MACHINE_DENYLIST`.  This
-/// keeps `build_picolibc` arch-agnostic: a new picolibc release that
-/// adds files to an arch's machine dir is picked up automatically,
-/// and adding a new arch is a one-line edit to
-/// `picolibc_machine_subdir`.
-///
-/// ARM caveat: picolibc's `libc/machine/arm/` ships multiple ISA
-/// variants of some files (e.g. `setjmp.S` per armv4t / armv6m /
-/// armv7m / armv8m), gated by meson on `-mcpu=`.  A naive directory
-/// walk would pick up all variants and produce duplicate-symbol link
-/// errors.  When the first ARM consumer appears, port the meson
-/// selection rule into a per-arch hook here.  Until then, ARM is
-/// deliberately not in the translator table.
+/// ARM is deliberately not in the table — its machine dir ships
+/// multiple ISA-variant `.S` files (per armv4t / armv6m / armv7m /
+/// armv8m) that picolibc's meson selects between via `-mcpu=`.  A flat
+/// walk would link-error on duplicate symbols.  Adding ARM means
+/// porting that selection rule into this function.
 fn build_picolibc(
     picolibc_root: &Path,
     picolibc_config: &Path,
@@ -621,7 +468,6 @@ fn build_picolibc(
 
     // ── Generic sources (walked + denylisted) ─────────────────────────
 
-    // Subtrees we want compiled, relative to `picolibc/`.
     let walk_dirs: &[&str] = &[
         "libc/ctype",
         "libc/string",
@@ -669,18 +515,11 @@ fn build_picolibc(
         }
     }
 
-    // ── Architecture-specific machine sources ─────────────────────────
+    // ── Machine sources ───────────────────────────────────────────────
     //
-    // Walk the arch's machine dir (non-recursive — the nested
-    // `machine/` subdir holds headers only, never sources) picking up
-    // both `.c` and `.S` files.  Single shared denylist:
-    // `tls.c` / `inittls.c` (TLS disabled by `__SINGLE_THREAD` in
-    // picolibc.h).  Anything else picolibc ships per-arch — ieeefp
-    // helpers, hand-written memcpy/memmove/strlen, setjmp.S, etc. —
-    // comes along automatically, matching exactly what upstream
-    // `libc/machine/<arch>/meson.build:srcs_machine` enumerates for
-    // the arches whose machine dirs are flat (riscv, aarch64, x86,
-    // x86_64, …).
+    // Non-recursive walk for `.c` + `.S`; the nested `machine/` subdir
+    // holds headers only.  `MACHINE_DENYLIST` covers TLS files
+    // (deselected by `__SINGLE_THREAD` in picolibc.h).
     for entry in std::fs::read_dir(&machine_dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
@@ -699,13 +538,12 @@ fn build_picolibc(
         sources.push(path);
     }
 
-    // ── thorvg-sys runtime stubs ──────────────────────────────────
+    // ── thorvg-sys runtime stubs ──────────────────────────────────────
     //
-    // Strong-symbol implementations of the pthread no-op surface
-    // libsupc++ pulls in unconditionally, plus `getenv` / `getentropy`
-    // stubs.  Compiled into the picolibc archive so they share its
-    // include-path / multilib configuration; conceptually they're
-    // "libc surface picolibc leaves to the OS", not picolibc itself.
+    // Strong-symbol stubs for the pthread / getenv / getentropy /
+    // _on_exit surface libsupc++ pulls in but picolibc doesn't ship.
+    // Compiled into the picolibc archive to share its include path
+    // and multilib configuration.
     let runtime_stubs = picolibc_config.join("runtime_stubs.c");
     if !runtime_stubs.is_file() {
         return Err(format!(
@@ -717,27 +555,12 @@ fn build_picolibc(
 
     // ── Include paths ─────────────────────────────────────────────────
     //
-    // Order matters: our `picolibc-config/` *must* come first so that
-    // every `#include <picolibc.h>` (both direct, from setjmp.S, and
-    // indirect, via `<sys/cdefs.h>`) finds our authored config rather
-    // than the upstream `.in` template (which isn't a valid C header).
-    //
-    // Then the per-arch `machine/` override (so e.g. `<machine/setjmp.h>`
-    // picks up the riscv variant), then the generic include tree.
-
-    // Mirror the include-dir set picolibc's meson build constructs
-    // (`meson.build:inc_dirs`).  Beyond the obvious `libc/include`
-    // (public headers) and `libc/machine/<arch>` (arch overrides),
-    // picolibc TUs rely on `libc/stdio`, `libc/locale`, and
-    // `libc/stdlib` being on the path so cross-directory bare-name
-    // includes like `#include "locale_private.h"` from
-    // `libc/ctype/local.h` resolve.  We don't *compile* anything from
-    // `libc/locale/` — the locale knobs are off in `picolibc.h` —
-    // but the headers still need to be reachable.  `libc/stdlib/` is
-    // on the path so our `runtime_stubs.c` can pull picolibc's own
-    // `local-onexit.h` for the `_on_exit` enum / union types
-    // (keeps the stub signature welded to upstream — see
-    // runtime_stubs.c).
+    // `picolibc-config/` must come first so `<picolibc.h>` resolves
+    // to our authored config (upstream ships only a `.in` template).
+    // Then the per-arch machine dir, then the cross-directory dirs
+    // picolibc's internal bare-name includes rely on, then the public
+    // header tree.  `libc/stdlib/` is on the path so `runtime_stubs.c`
+    // can pull `local-onexit.h` for the `_on_exit` types.
     let include_dirs: Vec<PathBuf> = vec![
         picolibc_config.to_path_buf(),
         machine_dir.clone(),
@@ -751,26 +574,18 @@ fn build_picolibc(
 
     let mut build = cc::Build::new();
     build.warnings(false);
-
-    // Plain C (not C++).  picolibc is all C99 sources.
-    // `cpp(false)` is the default but we set it explicitly to make
-    // intent obvious next to the existing C++ thorvg build above.
     build.cpp(false);
 
-    // Drop the cross-toolchain's libc/system header search paths,
-    // then add back the *compiler* builtin-header dir (stdarg.h,
-    // stddef.h, limits.h, …) via `-isystem`.  This is the central
-    // mechanism for header isolation in the picolibc landing: a
-    // picolibc TU that does `#include <stdio.h>` *must* resolve to
-    // picolibc's `libc/include/stdio.h`, never newlib's.
+    // `-nostdinc` strips ALL system include paths; restore the
+    // compiler's builtin-header dir via `-isystem` so picolibc's
+    // `#include <stdio.h>` resolves to picolibc's, never newlib's.
     build.flag("-nostdinc");
     if let Some(builtin_inc) = cross_compiler_builtin_includes() {
         build.flag(format!("-isystem{}", builtin_inc.display()));
     }
 
-    // Match the size-tuned flag set thorvg's own build uses, so the
-    // emitted .o files have consistent unwind / RTTI / stack-protector
-    // policy.  (Most of these are no-ops for C TUs but cost nothing.)
+    // Match thorvg's size-tuned flag set for consistent unwind / RTTI /
+    // stack-protector policy across objects.
     for f in &[
         "-fno-stack-protector",
         "-fno-math-errno",
@@ -781,22 +596,16 @@ fn build_picolibc(
     }
     build.opt_level_str("s");
 
-    // Mirror cc-rs's auto-suppression on bare-metal: we don't want
-    // the C++ runtime auto-link here (picolibc is pure C and our
-    // outer thorvg build already handles libstdc++ separately).
+    // Mirror outer cc-rs auto-suppression (we don't want libstdc++
+    // linked twice — `emit_runtime_link_directives` handles it).
     build.cpp_set_stdlib(None);
 
-    // Force-include `picolibc.h` so even TUs that don't include
-    // `<sys/cdefs.h>` (e.g. some `.S` files routed through the C
-    // preprocessor) see our config.
+    // Force-include `picolibc.h` so `.S` TUs routed through the C
+    // preprocessor also pick up our config.
     let picolibc_h = picolibc_config.join("picolibc.h");
     build.flag(format!("-include{}", picolibc_h.display()));
 
-    // Same multilib args as thorvg uses, so picolibc TUs build for
-    // the same ABI as the rest of the link surface.  Empty (no flags
-    // emitted) on arches where cc-rs and the cross toolchain agree
-    // on multilib naming (ARM, aarch64, …) — see the long comment
-    // next to `cross_toolchain_multilib_args` in `build_vendored_cc`.
+    // Match thorvg's multilib so picolibc TUs build for the same ABI.
     for f in cross_toolchain_multilib_args {
         build.flag(f);
     }
@@ -808,12 +617,8 @@ fn build_picolibc(
         build.file(src);
     }
 
-    // Real link.  `try_compile("picolibc")` runs cc-rs's compile +
-    // archive pipeline and emits `cargo:rustc-link-search=native=<out>`
-    // + `cargo:rustc-link-lib=static=picolibc` so the archive is
-    // visible to the final rustc link.  `try_*` variant chosen so a
-    // failure surfaces as a structured `Err` (the caller wraps the
-    // message and panics) rather than cc-rs's own raw `panic!`.
+    // `try_compile` so a compile failure surfaces as `Err` (caller
+    // wraps and panics) rather than cc-rs's own raw panic.
     build
         .try_compile("picolibc")
         .map_err(|e| format!("compile failed: {e}"))?;
@@ -822,16 +627,11 @@ fn build_picolibc(
 
 /// File-basenames excluded from the picolibc compile.
 ///
-/// Kept as a function (not a `const`) because some entries are short
-/// pattern groups (PRNG variants, malloc family) we want to read as
-/// one logical block; the function form lets us comment each group
-/// inline.  The whole list is filtered against `Path::file_name()`,
-/// so subdirectory placement doesn't matter — a `malloc.c` anywhere
-/// in the walked tree is dropped.
+/// Filtered against `Path::file_name()` so subdirectory placement
+/// doesn't matter — a `malloc.c` anywhere in the walked tree is dropped.
 fn denylist_files() -> &'static [&'static str] {
     &[
-        // Allocator — consumer (esp-alloc, embedded-alloc, …)
-        // provides malloc/free/realloc/calloc as strong symbols.
+        // Allocator — consumer provides malloc/free/realloc/calloc.
         "malloc.c",
         "free.c",
         "realloc.c",
@@ -859,8 +659,8 @@ fn denylist_files() -> &'static [&'static str] {
         "getauxval.c",
         "getpagesize.c",
         "rpmatch.c",
-        // 48-bit PRNG family (`drand48` / `erand48` / …) — same
-        // generator with different output types; not used.
+        // 48-bit PRNG family — duplicate generator with different
+        // output types; keep `rand.c` / `srand.c` only.
         "drand48.c",
         "erand48.c",
         "jrand48.c",
@@ -873,29 +673,20 @@ fn denylist_files() -> &'static [&'static str] {
         "rand48.c",
         // Re-entrant rand variant — single-threaded build.
         "rand_r.c",
-        // BSD base-64 ASCII encoders, unrelated to PRNG.
+        // BSD base-64 ASCII encoders.
         "a64l.c",
         "l64a.c",
-        // NOTE: `random.c` / `srandom.c` are KEPT (un-denylisted).
-        // Earlier drafts dropped them under a "duplicate PRNG"
-        // banner, but `random()` is a separate POSIX API from
-        // `rand()` — different signature (`long int random(void)`
-        // vs `int rand(void)`) and different output range.  The
-        // cross-toolchain's libstdc++ — specifically the Lottie /
-        // animation paths pulled by the `animation_basic` example
-        // bin — takes a weak external reference to `random` that
-        // the link surfaces if absent.  Cost is 133 lines of pure
-        // C; gain is one less runtime_stubs.c entry.
-        // `arc4random.c` pulls `getentropy` and a chacha-based
-        // re-seeding loop we don't want.  Our `runtime_stubs.c`
-        // provides a `getentropy` stub for libstdc++'s benefit,
-        // and thorvg uses `rand()` (→ `rand.c`) when it needs a
-        // sample for Lottie text-range randomisation.
+        // `random.c` / `srandom.c` are KEPT: distinct POSIX API from
+        // `rand()` and libstdc++ takes a weak external ref that
+        // surfaces at link time if absent.
+        //
+        // `arc4random.c` is dropped — it pulls a chacha-based re-seed
+        // loop that wants entropy.  `runtime_stubs.c` provides a
+        // stub for libstdc++'s benefit.
         "arc4random.c",
         "arc4random_uniform.c",
-        // C11 Annex K bounds-checking — not used.  (Covered by the
-        // `_s.c` suffix denylist too, but `set_constraint_handler_s.c`
-        // doesn't fit the pattern.)
+        // C11 Annex K bounds-checking.  Most are caught by the
+        // `_s.c` suffix denylist; these don't fit the pattern.
         "set_constraint_handler_s.c",
         "ignore_handler_s.c",
         "strerrorlen_s.c",
@@ -917,8 +708,8 @@ fn denylist_files() -> &'static [&'static str] {
         "uctosj.c",
         // Wide-char ctype.
         "ctype_wide.c",
-        // Assert family pulling stdio paths we don't need (the
-        // verbose `__assert_func` from `assert_func.c` stays).
+        // Assert family pulling stdio paths (verbose `__assert_func`
+        // from `assert_func.c` stays).
         "assert.c",
         "assert_no_arg.c",
         "eprintf.c",
@@ -926,10 +717,8 @@ fn denylist_files() -> &'static [&'static str] {
         "posixiob_stdin.c",
         "posixiob_stdout.c",
         "posixiob_stderr.c",
-        // Stdio Ryu fast-but-large dtoa path — picolibc.h leaves
-        // `__IO_FLOAT_EXACT` undefined, which selects the smaller
-        // engine-based dtoa.  Drop the Ryu sources to keep object
-        // count down.
+        // Stdio Ryu fast-but-large dtoa — `__IO_FLOAT_EXACT` unset in
+        // picolibc.h selects the smaller engine-based dtoa.
         "atod_ryu.c",
         "atof_ryu.c",
         "dtoa_ryu.c",
@@ -940,15 +729,10 @@ fn denylist_files() -> &'static [&'static str] {
         "ryu_pow5bits.c",
         "ryu_table.c",
         "ryu_umul128.c",
-        // Stdio templates — .c files that exist as preprocessor
-        // sub-units (`#include`d from variant wrappers like
-        // `vfprintf.c`, `vffprintf.c`, etc.) and are NOT compiled
-        // standalone.  Picolibc upstream achieves this by simply
-        // not listing them in `srcs_stdio`; our walk-the-dir
-        // strategy needs them named explicitly.  Identifiable
-        // because they reference `PRINTF_VARIANT` / `SCANF_VARIANT`
-        // / `ULTOA_NAME` macros without defining them — those
-        // come from the wrapper that pulls them in.
+        // Stdio templates — `#include`d from variant wrappers
+        // (`vfprintf.c` etc.); not compiled standalone.  Upstream's
+        // meson achieves this by not listing them; our walk needs
+        // them named.
         "conv_flt.c",
         "ultoa_invert.c",
         "vfprintf_char.c",
@@ -956,7 +740,7 @@ fn denylist_files() -> &'static [&'static str] {
         "vfprintf_int.c",
         "vfprintf_n.c",
         "vfprintf_str.c",
-        // Tree/hash search (libc/search) — we use bsearch + qsort only.
+        // Tree/hash search — we use bsearch + qsort only.
         "hash.c",
         "hash_bigkey.c",
         "hash_buf.c",
@@ -976,40 +760,18 @@ fn denylist_files() -> &'static [&'static str] {
     ]
 }
 
-/// Files excluded from any `libc/machine/<arch>/` walk.
-///
-/// Single shared list across all arches because the exclusion
-/// reasons are config-driven, not arch-driven:
-///   * `tls.c` / `inittls.c` — TLS setup; `__SINGLE_THREAD` in
-///     `picolibc.h` deselects TLS, so these would be dead code.
-///
-/// Kept tight on purpose.  If a future picolibc bump adds a
-/// per-arch file we don't want, the right move is usually to add
-/// the matching `__*` knob to `picolibc.h` (which removes the
-/// reference path-wide) before reaching for this list.
+/// Files excluded from any `libc/machine/<arch>/` walk.  TLS setup;
+/// `__SINGLE_THREAD` in `picolibc.h` deselects TLS.
 const MACHINE_DENYLIST: &[&str] = &["tls.c", "inittls.c"];
 
 /// Map a Rust `CARGO_CFG_TARGET_ARCH` value to picolibc's
 /// `libc/machine/<dir>/` subdirectory name.
 ///
-/// This is the single point of arch-policy in the picolibc build.
-/// Every arch whose machine dir is a flat source set (no per-ISA
-/// variant selection) lands here as a one-line entry and is built
-/// automatically with no other code changes.
-///
-/// Returns `None` for arches picolibc upstream does not support
-/// (xtensa, wasm32, …) and for arches that need per-ISA variant
-/// selection that `build_picolibc`'s plain directory walk would
-/// mis-resolve (arm — see the caveat in `build_picolibc`'s rustdoc).
-/// `build_picolibc` turns `None` into an `Err` and the top-level
-/// caller panics with a clear message — there is no fallback path.
+/// Single arch-policy point for the picolibc build.  Returns `None`
+/// for arches picolibc doesn't ship and for arches that need per-ISA
+/// variant selection a flat directory walk would mis-resolve (see
+/// `build_picolibc`'s ARM caveat).
 fn picolibc_machine_subdir(target_arch: &str) -> Option<&'static str> {
-    // Matches the directory names that exist under
-    // `picolibc/libc/machine/` in the vendored submodule.  When
-    // bumping picolibc, sanity-check this table against
-    // `ls picolibc/libc/machine/` — new arches in picolibc upstream
-    // are additive, but the directory naming for x86 vs i386 etc.
-    // has historically been stable.
     match target_arch {
         "riscv32" | "riscv64" => Some("riscv"),
         "aarch64" => Some("aarch64"),
@@ -1020,38 +782,24 @@ fn picolibc_machine_subdir(target_arch: &str) -> Option<&'static str> {
         "sparc" | "sparc64" => Some("sparc"),
         "m68k" => Some("m68k"),
         "msp430" => Some("msp430"),
-        // arm intentionally absent — its machine dir ships multiple
-        // ISA-variant `.S` files (setjmp / memcpy / strcmp per
-        // armv4t / armv6m / armv7m / armv8m) that picolibc's meson
-        // selects between via `-mcpu=`.  A flat walk would pick all
-        // variants and link-error on duplicate symbols.  Wire ARM
-        // by porting that selection rule into `build_picolibc`.
+        // arm intentionally absent — see build_picolibc.
         _ => None,
     }
 }
 
 /// Discover the cross-compiler's builtin-headers include directory.
 ///
-/// GCC and Clang both ship their own copies of `<stdarg.h>`,
-/// `<stddef.h>`, `<limits.h>`, `<stdint.h>`, `<float.h>` etc., which
-/// are pulled in by picolibc TUs even though picolibc itself doesn't
-/// ship these (they're compiler-builtin, not libc).
+/// Picolibc TUs `#include <stdarg.h>` / `<stddef.h>` / etc., which
+/// are compiler-builtin (not libc).  `-nostdinc` strips them along
+/// with libc; this probe restores only the builtins.
 ///
-/// `-nostdinc` (used by `build_picolibc`) suppresses *all* implicit
-/// system header paths, including these builtins.  We restore only
-/// the builtins by probing the cross compiler with
-/// `-print-file-name=include` (GCC) and falling back to
-/// `-print-resource-dir` + `/include` (Clang).
-///
-/// Returns `None` when the driver produces no useful answer; the
-/// caller falls back to building without builtin headers, which
-/// will fail loudly at the first `#include <stddef.h>` and surface
-/// a clear error.
+/// Returns `None` when the driver yields nothing useful; the compile
+/// then fails loudly at the first builtin include, which is the
+/// right signal.
 fn cross_compiler_builtin_includes() -> Option<PathBuf> {
     let tool = cc::Build::new().try_get_compiler().ok()?;
 
-    // GCC path: `-print-file-name=include` returns the absolute path
-    // to the toolchain-bundled include dir.
+    // GCC: `-print-file-name=include` returns the bundled include dir.
     let mut cmd = std::process::Command::new(tool.path());
     cmd.args(tool.args());
     cmd.arg("-print-file-name=include");
@@ -1065,8 +813,8 @@ fn cross_compiler_builtin_includes() -> Option<PathBuf> {
         }
     }
 
-    // Clang path: `-print-resource-dir` returns `<resource>`; the
-    // include dir is `<resource>/include`.
+    // Clang: `-print-resource-dir` returns `<resource>`; the include
+    // dir is `<resource>/include`.
     let mut cmd = std::process::Command::new(tool.path());
     cmd.args(tool.args());
     cmd.arg("-print-resource-dir");
@@ -1085,44 +833,20 @@ fn cross_compiler_builtin_includes() -> Option<PathBuf> {
 
 /// Discover the cross-compiler's C++ stdlib include search paths.
 ///
-/// `-nostdinc` (applied to thorvg's C++ compile when picolibc is
-/// active) strips ALL default include paths — libc, compiler
-/// builtins, and libstdc++ all disappear together.  Picolibc
-/// replaces libc and `cross_compiler_builtin_includes()` restores
-/// the compiler intrinsics, but libstdc++ still needs to come back
-/// for thorvg's C++ TUs (`<string>`, `<vector>`, `<algorithm>`, …).
-///
-/// GCC and Clang both expose their full default-include search list
-/// via the `-E -x c++ -v` probe: the `-v` output contains a block
-/// labelled `#include <...> search starts here:` listing every
-/// directory `-nostdinc` would otherwise add by default.  We parse
-/// that block and keep only the paths whose absolute name contains
-/// `/c++/` — the universal marker for libstdc++ / libc++ trees
-/// (`include/c++/<gcc-version>`, `include/c++/<gcc-version>/<triple>`,
-/// `include/c++/<gcc-version>/backward` on GCC;
-/// `include/c++/v1` on Clang's libc++).  Compiler builtins and
-/// libc paths fall through and never reach our `-isystem` flags;
-/// the builtin probe handles the former and we deliberately drop
-/// the latter.
-///
-/// Returns an empty vector when the probe fails or the toolchain
-/// has no C++ support — in which case the thorvg compile will
-/// surface a clear `<string>: No such file or directory` error,
-/// which is the right signal: this code path is C++-only.
+/// `-nostdinc` strips libstdc++ along with libc and builtins; this
+/// probe restores libstdc++ for thorvg's C++ TUs.  Asks the driver
+/// for its default include search list via `-E -x c++ -v`, parses
+/// the diagnostic, keeps paths containing `/c++/` (universal marker
+/// for libstdc++ / libc++ trees).
 fn cross_cxx_include_paths() -> Vec<PathBuf> {
     let Ok(tool) = cc::Build::new().cpp(true).try_get_compiler() else {
         return Vec::new();
     };
     let mut cmd = std::process::Command::new(tool.path());
     cmd.args(tool.args());
-    // `-E -x c++ -v -` makes the driver:
-    //   * run preprocessor-only (`-E`),
-    //   * in C++ mode (`-x c++`),
-    //   * print its include search paths (`-v`),
-    //   * read the source from stdin (`-`).
-    // Combined with `Stdio::null()` for stdin, that produces an
-    // empty C++ translation unit whose only purpose is to make the
-    // driver emit its standard search-path diagnostic.
+    // Preprocess-only, C++ mode, verbose, stdin source — produces an
+    // empty TU whose only purpose is to make the driver emit its
+    // standard search-path diagnostic on stderr.
     cmd.arg("-E")
         .arg("-x")
         .arg("c++")
@@ -1132,7 +856,6 @@ fn cross_cxx_include_paths() -> Vec<PathBuf> {
     let Ok(res) = cmd.output() else {
         return Vec::new();
     };
-    // The `-v` diagnostic goes to stderr.
     let stderr = String::from_utf8_lossy(&res.stderr);
 
     let mut paths = Vec::new();
@@ -1152,9 +875,8 @@ fn cross_cxx_include_paths() -> Vec<PathBuf> {
         if trimmed.is_empty() {
             continue;
         }
-        // Universal marker for C++ stdlib trees.  Conservative on
-        // purpose: libc paths sometimes live under the same prefix
-        // as the cross sysroot but they never contain `/c++/`.
+        // Universal libstdc++ / libc++ marker.  libc paths from the
+        // same prefix never contain `/c++/`.
         if !trimmed.contains("/c++/") {
             continue;
         }
@@ -1174,11 +896,9 @@ fn cross_cxx_include_paths() -> Vec<PathBuf> {
 ///
 /// For each `libfoo.a` in `wanted`, asks the cross C++ compiler for
 /// its multilib-correct location via `-print-file-name=libfoo.a`.
-/// Returns `(directory, link_name)` pairs in the order the archives
-/// were probed — the caller emits `rustc-link-search=` once per
-/// distinct directory and `rustc-link-lib=static=<link_name>` for
-/// each entry.  Archives the driver can't find are silently skipped
-/// (some toolchains fold libsupc++ into libstdc++, for example).
+/// Returns `(directory, link_name)` pairs in probe order.  Archives
+/// the driver can't find are silently skipped (some toolchains fold
+/// libsupc++ into libstdc++, for example).
 fn cross_runtime_libs(wanted: &[&str], extra_args: &[String]) -> Vec<(PathBuf, String)> {
     let Ok(tool) = cc::Build::new().cpp(true).try_get_compiler() else {
         return Vec::new();
@@ -1186,15 +906,11 @@ fn cross_runtime_libs(wanted: &[&str], extra_args: &[String]) -> Vec<(PathBuf, S
     let mut out = Vec::with_capacity(wanted.len());
     for file in wanted {
         let mut cmd = std::process::Command::new(tool.path());
-        // Forward cc-rs's resolved compile args + any caller-supplied
-        // multilib selectors (e.g. RISC-V canonical
-        // `-march=rv32imac_zicsr_zifencei` / `-mabi=ilp32` /
-        // `-fno-rtti`).  Without them, embedded GCC toolchains return
-        // the *default* multilib, which on most RISC-V cross builds
-        // was built assuming a hardware FPU.  Linking its soft-float
-        // helpers (`__fixunsdfdi`, `__floatdidf`, …) into a no-FPU
-        // chip (`rv32imac` / `ilp32`) produces SIGILL the first time
-        // any `double`-to-integer conversion runs at runtime.
+        // Forward cc-rs's compile args + caller-supplied multilib
+        // selectors so the probe returns the same multilib the cc
+        // compile targets.  Without this, drivers tend to return the
+        // default multilib (often FPU-enabled on RISC-V), producing
+        // SIGILL on no-FPU chips.
         cmd.args(tool.args());
         for f in extra_args {
             cmd.arg(f);
@@ -1313,29 +1029,21 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .use_core()
         .layout_tests(true);
 
-    // On cross-compilation targets bindgen invokes libclang directly,
-    // *not* the cross-compiler.  libclang's default include search list
+    // On cross-compilation, bindgen invokes libclang directly rather
+    // than the cross-compiler.  libclang's default include search list
     // is the host's, so headers like `<stdint.h>` from the cross
-    // toolchain's sysroot (newlib on bare metal, ESP-IDF's libcxx on
-    // espidf, …) are invisible — every `uint8_t` / `uint32_t` in
-    // `thorvg_capi.h` then fails to resolve.  Ask the user-configured
-    // cross-compiler where its sysroot lives and feed its `include/`
-    // dir to libclang, and set `--target=` so the ABI matches.
-    //
-    // We key off `TARGET != HOST` rather than `target_os == "none"`
-    // because the same fix is needed for any cross target with a
-    // non-host sysroot (ESP-IDF, NuttX, embedded Linux, …).
+    // toolchain's sysroot are invisible.  Forward the cross sysroot's
+    // `include/` dir and set `--target=` so the ABI matches.  Keyed on
+    // `TARGET != HOST` because the fix applies to any cross target,
+    // not just bare-metal.
     if is_cross {
         if let Some(inc) = cross_sysroot_include() {
             builder = builder.clang_arg(format!("-I{}", inc.display()));
         }
-        // libclang doesn't recognise vendor-specific OS fields like
-        // `espidf` in Rust triples, and the ABI fields it does parse
-        // (`unknown`, `eabihf`, …) aren't load-bearing for header
-        // parsing.  Strip both: `<arch>-none-elf` is the LLVM triple
-        // libclang understands across every embedded target we care
-        // about, and the arch is the only field that affects
-        // sizeof/alignof for `uint32_t` etc.
+        // libclang doesn't recognise vendor-specific OS fields in Rust
+        // triples; strip to `<arch>-none-elf`, the LLVM triple it
+        // understands across embedded targets.  Arch is the only field
+        // that affects sizeof/alignof for `uint32_t` etc.
         builder = builder.clang_arg(format!("--target={target_arch}-none-elf"));
     }
 
@@ -1346,20 +1054,14 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .expect("Couldn't write bindings!");
 }
 
-/// Discover the cross-compiler's sysroot include directory.
-///
-/// Asks the user-configured C++ compiler (resolved through cc-rs's
-/// standard `CXX_<triple>` / `TARGET_CXX` / `CXX` precedence) for its
-/// `-print-sysroot`, then probes `<sysroot>/include`.  Used to point
-/// libclang at the cross toolchain's newlib headers when generating
-/// bindings for a bare-metal target.
+/// Discover the cross-compiler's sysroot include directory via
+/// `-print-sysroot` + `/include`.  Used to point libclang at the
+/// cross toolchain's libc headers when generating bindings.
 fn cross_sysroot_include() -> Option<PathBuf> {
     let tool = cc::Build::new().cpp(true).try_get_compiler().ok()?;
     let mut cmd = std::process::Command::new(tool.path());
-    // Forward `-march` / `-mabi` etc. so that toolchains which keep a
-    // per-multilib sysroot return the right include tree (currently
-    // newlib's `<sysroot>/include` is shared across multilibs, but
-    // matching the runtime-libs probe avoids subtle drift later).
+    // Forward `-march` / `-mabi` etc. so toolchains with per-multilib
+    // sysroots return the right include tree.
     cmd.args(tool.args());
     cmd.arg("-print-sysroot");
     let out = cmd.output().ok()?;
@@ -1402,7 +1104,7 @@ fn add_dir_cpp_recursive(out: &mut Vec<PathBuf>, dir: &Path) {
     }
 }
 
-/// Simple recursive directory walk (avoids pulling in the `walkdir` crate).
+/// Simple recursive directory walk (avoids the `walkdir` crate dep).
 fn walkdir(dir: &Path) -> Vec<PathBuf> {
     let mut result = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
