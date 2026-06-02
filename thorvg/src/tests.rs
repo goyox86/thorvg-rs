@@ -572,10 +572,10 @@ fn test_load_font_data_owned_buffer_is_safe() {
     // immediately after the call.  Under ASan, any subsequent
     // text-render attempt would dereference the Vec's freed pages
     // and trip heap-use-after-free if the copy hadn't happened.
-    let _engine = Thorvg::init(0).unwrap();
+    let engine = Thorvg::init(0).unwrap();
     let font_bytes: alloc::vec::Vec<u8> =
         include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf").to_vec();
-    Text::load_font_data("Arial-Owned", &font_bytes, None).unwrap();
+    engine.load_font_data("Arial-Owned", &font_bytes, None).unwrap();
     drop(font_bytes); // C side has its own copy — no dangling reference.
 }
 
@@ -585,9 +585,9 @@ fn test_load_font_data_static_zero_copy() {
     // returns &'static [u8; N], so it coerces to &'static [u8] and
     // thorvg can borrow the buffer for the engine's lifetime
     // without copying.
-    let _engine = Thorvg::init(0).unwrap();
+    let engine = Thorvg::init(0).unwrap();
     static FONT: &[u8] = include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf");
-    Text::load_font_data_static("Arial-Static", FONT, None).unwrap();
+    engine.load_font_data_static("Arial-Static", FONT, None).unwrap();
 }
 
 // ── Accessor Lifecycle ─────────────────────────────────────────────

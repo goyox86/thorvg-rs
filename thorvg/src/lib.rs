@@ -264,6 +264,78 @@ impl Thorvg {
         Saver::new()
     }
 
+    // ── Font registry (engine-global) ──────────────────────────────
+
+    /// Loads a font from a file path string into the engine's font
+    /// registry, keyed by the path.  Fonts persist for the engine's
+    /// lifetime or until [`unload_font_from_str`](Self::unload_font_from_str).
+    pub fn load_font_from_str(&self, path: &str) -> Result<()> {
+        let c_path = alloc::ffi::CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        Error::from_raw(unsafe { sys::tvg_font_load(c_path.as_ptr()) })
+    }
+
+    /// Loads a font from a file path.
+    #[cfg(feature = "std")]
+    pub fn load_font<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
+        self.load_font_from_str(&path.as_ref().to_string_lossy())
+    }
+
+    /// Unloads a previously loaded font by path string.
+    pub fn unload_font_from_str(&self, path: &str) -> Result<()> {
+        let c_path = alloc::ffi::CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        Error::from_raw(unsafe { sys::tvg_font_unload(c_path.as_ptr()) })
+    }
+
+    /// Unloads a previously loaded font.
+    #[cfg(feature = "std")]
+    pub fn unload_font<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
+        self.unload_font_from_str(&path.as_ref().to_string_lossy())
+    }
+
+    /// Loads a font from memory, copying `data` into thorvg's
+    /// internal registry.
+    ///
+    /// The font is registered under `name` and remains usable for
+    /// the engine's lifetime.  Use this variant for owned or
+    /// non-`'static` buffers; for zero-copy registration of
+    /// `'static` data (e.g. `include_bytes!(...)`), use
+    /// [`load_font_data_static`](Self::load_font_data_static).
+    pub fn load_font_data(
+        &self,
+        name: &str,
+        data: &[u8],
+        mimetype: Option<&str>,
+    ) -> Result<()> {
+        load_font_data_inner(name, data, mimetype, /* copy = */ true)
+    }
+
+    /// Loads a font from `'static` memory without copying.
+    ///
+    /// thorvg stores the pointer to `data` in its global font
+    /// registry and dereferences it on every subsequent text-render
+    /// call, so the buffer must outlive the engine — the `'static`
+    /// bound enforces this at compile time.  Typical use:
+    /// `engine.load_font_data_static("Roboto", include_bytes!("Roboto.ttf"), None)`.
+    ///
+    /// # Compile-time safety
+    ///
+    /// The `'static` bound rejects local buffers at the type level:
+    ///
+    /// ```compile_fail,E0597
+    /// let engine = thorvg::Thorvg::init(0).unwrap();
+    /// let local: Vec<u8> = vec![0; 32];
+    /// engine.load_font_data_static("nope", &local, None).unwrap();
+    /// // error[E0597]: `local` does not live long enough
+    /// ```
+    pub fn load_font_data_static(
+        &self,
+        name: &str,
+        data: &'static [u8],
+        mimetype: Option<&str>,
+    ) -> Result<()> {
+        load_font_data_inner(name, data, mimetype, /* copy = */ false)
+    }
+
     /// Creates a new [`Accessor`] tied to this engine.
     pub fn accessor(&self) -> Accessor<'_> {
         Accessor::new()
@@ -276,4 +348,27 @@ impl Drop for Thorvg {
             sys::tvg_engine_term();
         }
     }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn load_font_data_inner(
+    name: &str,
+    data: &[u8],
+    mimetype: Option<&str>,
+    copy: bool,
+) -> Result<()> {
+    let c_name = alloc::ffi::CString::new(name).map_err(|_| Error::InvalidArguments)?;
+    let c_mime = mimetype
+        .map(|m| alloc::ffi::CString::new(m).map_err(|_| Error::InvalidArguments))
+        .transpose()?;
+    let mime_ptr = c_mime.as_ref().map_or(core::ptr::null(), |c| c.as_ptr());
+    Error::from_raw(unsafe {
+        sys::tvg_font_load_data(
+            c_name.as_ptr(),
+            data.as_ptr().cast::<core::ffi::c_char>(),
+            data.len() as u32,
+            mime_ptr,
+            copy,
+        )
+    })
 }
