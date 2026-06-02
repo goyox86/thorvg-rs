@@ -185,6 +185,15 @@ pub struct BorrowedPaint<'a> {
 }
 
 impl<'a> BorrowedPaint<'a> {
+    /// # Safety
+    /// `raw` must be a valid paint handle whose owner outlives `'a`.
+    pub(crate) unsafe fn from_raw(raw: sys::Tvg_Paint) -> Self {
+        Self {
+            raw,
+            _life: core::marker::PhantomData,
+        }
+    }
+
     /// Returns the underlying raw handle.  Intended for use with
     /// `thorvg-sys` C APIs not yet wrapped here; lifetime `'a` keeps
     /// the borrow honest.
@@ -434,13 +443,10 @@ pub trait Paint {
         if Error::from_raw(r).is_err() || target.is_null() {
             return None;
         }
-        Some((
-            BorrowedPaint {
-                raw: target,
-                _life: core::marker::PhantomData,
-            },
-            MaskMethod::from_raw(method),
-        ))
+        // SAFETY: target is non-null and refers to a paint owned by
+        // `self` (the masking source); the BorrowedPaint's lifetime
+        // is bounded by `&self`.
+        Some((unsafe { BorrowedPaint::from_raw(target) }, MaskMethod::from_raw(method)))
     }
 
     /// Sets the blending method.

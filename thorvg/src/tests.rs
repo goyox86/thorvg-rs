@@ -609,6 +609,39 @@ fn test_accessor_generate_id() {
     assert_ne!(id, id3); // Different name → different hash
 }
 
+#[test]
+fn test_accessor_for_each_borrowed_views() {
+    // The closure receives BorrowedAccessor + BorrowedPaint, so the
+    // safe wrapper alone is enough to inspect visited nodes — no
+    // direct thorvg-sys dependency required for id / paint_type
+    // queries.  Also exercises that BorrowedAccessor::get_name is
+    // callable from inside the closure (the borrow that the old
+    // `Accessor::get_name(&self)` API conflicted with).
+    let engine = Thorvg::init(0).unwrap();
+    let mut acc = engine.accessor();
+
+    // Build a tiny scene: parent with one shape child.
+    let mut parent = engine.scene();
+    let mut child = engine.shape();
+    child.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
+    parent.push(child).unwrap();
+
+    let mut visited: alloc::vec::Vec<PaintType> = alloc::vec::Vec::new();
+    acc.for_each(&parent, |view, paint| {
+        // Calling get_name through the BorrowedAccessor is now
+        // possible inside the closure.  Returns None for an
+        // unnamed paint, which is the expected behaviour here.
+        let _ = view.get_name(0);
+        visited.push(paint.paint_type().unwrap_or(PaintType::Undefined));
+        true
+    })
+    .unwrap();
+
+    // Visits both the parent scene and the child shape.
+    assert!(visited.contains(&PaintType::Scene));
+    assert!(visited.contains(&PaintType::Shape));
+}
+
 // ── Error Handling ─────────────────────────────────────────────────
 
 #[test]

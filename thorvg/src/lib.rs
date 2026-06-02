@@ -72,13 +72,13 @@ mod scene;
 mod shape;
 mod text;
 
-pub use accessor::Accessor;
+pub use accessor::{Accessor, BorrowedAccessor};
 pub use animation::Animation;
 pub use canvas::{ColorSpace, EngineOption, GlCanvas, SwCanvas, WgCanvas, WgTargetType};
 pub use error::{Error, Result};
 pub use gradient::{ColorStop, FillSpread, LinearGradient, RadialGradient};
 pub use lottie::{LottieAnimation, Marker};
-pub use paint::{BlendMethod, MaskMethod, Matrix, Paint, PaintType, Point};
+pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType, Point};
 pub use picture::{FilterMethod, Picture};
 pub use saver::Saver;
 pub use scene::Scene;
