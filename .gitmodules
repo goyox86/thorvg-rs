@@ -1,3 +1,6 @@
 [submodule "thorvg-sys/thorvg"]
 	path = thorvg-sys/thorvg
 	url = https://github.com/thorvg/thorvg.git
+[submodule "thorvg-sys/picolibc"]
+	path = thorvg-sys/picolibc
+	url = https://github.com/picolibc/picolibc.git
