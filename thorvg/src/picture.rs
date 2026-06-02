@@ -71,8 +71,20 @@ impl MimeType {
 pub struct Picture<'eng> {
     raw: sys::Tvg_Paint,
     owned: bool,
+    /// Boxed asset resolver, kept alive for the picture's lifetime.
+    /// The C side stores a stable address into this box that fires
+    /// during `load` / `load_data` whenever an external asset is
+    /// referenced.  `None` until [`Picture::set_asset_resolver`]
+    /// is called.
+    resolver: Option<alloc::boxed::Box<AssetResolverFn>>,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
+
+/// Boxed closure type behind the asset resolver registration.
+/// `Send + 'static` so `Picture` stays `Send` and the closure
+/// outlives any rendering thread that may invoke it.
+type AssetResolverFn =
+    dyn FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static;
 
 // SAFETY: `Picture` exclusively owns (or borrows) a heap-allocated ThorVG
 // paint handle.  Shared global state is mutex-protected in C++.  Sole
@@ -87,6 +99,7 @@ impl Picture<'_> {
         Self {
             raw,
             owned: true,
+            resolver: None,
             _engine: core::marker::PhantomData,
         }
     }
@@ -99,6 +112,7 @@ impl Picture<'_> {
         Self {
             raw,
             owned,
+            resolver: None,
             _engine: core::marker::PhantomData,
         }
     }
@@ -193,23 +207,71 @@ impl Picture<'_> {
         Error::from_raw(unsafe { sys::tvg_picture_set_accessible(self.raw, accessible) })
     }
 
-    /// Sets the asset resolver callback for external resources.
+    /// Installs a Rust closure as the external-asset resolver.
     ///
-    /// The `resolver` is called when external assets (images, fonts) need to be loaded.
-    /// `data` is a user pointer passed to every callback invocation.
+    /// thorvg invokes `resolver` from inside [`Picture::load`] /
+    /// [`Picture::load_from_str`] whenever the loaded document
+    /// references an external image, font, etc.  The closure
+    /// receives the requested asset src and returns either the
+    /// resolved bytes paired with a [`MimeType`], or `None` to
+    /// signal that the asset cannot be supplied.
     ///
-    /// Must be called **before** [`Picture::load`] / [`Picture::load_from_str`].
-    /// Pass `None` to unset.
+    /// The closure is stored inside this `Picture` and lives for
+    /// the picture's lifetime; calling `set_asset_resolver` again
+    /// replaces the previous closure (and drops it).
     ///
-    /// # Safety
-    /// `data` must remain valid for the lifetime of the picture, and the `resolver`
-    /// function pointer must be safe to call from any thread `ThorVG` uses.
-    pub unsafe fn set_asset_resolver(
-        &mut self,
-        resolver: sys::Tvg_Picture_Asset_Resolver,
-        data: *mut core::ffi::c_void,
-    ) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_picture_set_asset_resolver(self.raw, resolver, data) })
+    /// Must be called **before** [`Picture::load`] /
+    /// [`Picture::load_from_str`] for asset resolution to kick in.
+    ///
+    /// ```ignore
+    /// pic.set_asset_resolver(|src| {
+    ///     let bytes = my_loader.fetch(src)?;
+    ///     Some((bytes, thorvg::MimeType::Png))
+    /// })?;
+    /// pic.load_from_str("scene.svg")?;
+    /// ```
+    pub fn set_asset_resolver<F>(&mut self, resolver: F) -> Result<()>
+    where
+        F: FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static,
+    {
+        // Detach any previous resolver from the C side first.
+        // Without this, replacing `self.resolver` would drop the
+        // old Box while the C side still holds its address — any
+        // asset resolution in between would dereference freed memory.
+        if self.resolver.is_some() {
+            unsafe {
+                sys::tvg_picture_set_asset_resolver(
+                    self.raw,
+                    None,
+                    core::ptr::null_mut(),
+                );
+            }
+        }
+        // Now safe to swap.  Box<dyn> is fat; we need a thin
+        // pointer for FFI, so we pass the address of the Box
+        // itself (not its pointee).  The trampoline reconstructs
+        // `&mut Box<...>` from this ptr.
+        self.resolver = Some(alloc::boxed::Box::new(resolver));
+        let data_ptr: *mut alloc::boxed::Box<AssetResolverFn> = self.resolver.as_mut().unwrap();
+        // SAFETY: `data_ptr` references a field we just installed;
+        // `Picture::Drop` unregisters the resolver before the Box
+        // is freed, so C never dereferences a dangling pointer.
+        Error::from_raw(unsafe {
+            sys::tvg_picture_set_asset_resolver(
+                self.raw,
+                Some(resolver_trampoline),
+                data_ptr.cast::<core::ffi::c_void>(),
+            )
+        })
+    }
+
+    /// Removes any previously installed asset resolver.
+    pub fn clear_asset_resolver(&mut self) -> Result<()> {
+        let r = Error::from_raw(unsafe {
+            sys::tvg_picture_set_asset_resolver(self.raw, None, core::ptr::null_mut())
+        });
+        self.resolver = None;
+        r
     }
 
     /// Retrieves a paint object from the picture scene by its unique ID.
@@ -237,6 +299,7 @@ impl Paint for Picture<'_> {
         Self {
             raw,
             owned: true,
+            resolver: None,
             _engine: core::marker::PhantomData,
         }
     }
@@ -244,12 +307,56 @@ impl Paint for Picture<'_> {
 
 impl Drop for Picture<'_> {
     fn drop(&mut self) {
+        // Unregister any installed resolver BEFORE freeing the C
+        // handle and our resolver Box.  The C side keeps a pointer
+        // into our Box for asset resolution; if we let the Box drop
+        // first, a subsequent resolution would dereference freed
+        // memory.  This matters for the `owned == false` branch too
+        // because the underlying paint may outlive this wrapper.
+        if self.resolver.is_some() {
+            unsafe {
+                sys::tvg_picture_set_asset_resolver(self.raw, None, core::ptr::null_mut());
+            }
+        }
         if self.owned {
             unsafe {
                 sys::tvg_paint_rel(self.raw);
             }
         }
     }
+}
+
+/// FFI trampoline that bridges thorvg's C callback to the boxed
+/// Rust closure stored in [`Picture::resolver`].  Looks up the
+/// closure via the supplied `data` pointer (a thin pointer to the
+/// Box), invokes it with the requested src path, and on success
+/// loads the resolved bytes into thorvg's target paint.
+unsafe extern "C" fn resolver_trampoline(
+    paint: sys::Tvg_Paint,
+    src: *const core::ffi::c_char,
+    data: *mut core::ffi::c_void,
+) -> bool {
+    if data.is_null() || src.is_null() {
+        return false;
+    }
+    let boxed = unsafe { &mut *data.cast::<alloc::boxed::Box<AssetResolverFn>>() };
+    let src_str = unsafe { core::ffi::CStr::from_ptr(src) }.to_string_lossy();
+    let Some((bytes, mime)) = (boxed)(&src_str) else {
+        return false;
+    };
+    // Copy into thorvg so the consumer's Vec can drop after return.
+    #[allow(clippy::cast_possible_truncation)]
+    let r = unsafe {
+        sys::tvg_picture_load_data(
+            paint,
+            bytes.as_ptr().cast::<core::ffi::c_char>(),
+            bytes.len() as u32,
+            mime.as_c_str().as_ptr(),
+            core::ptr::null(),
+            true,
+        )
+    };
+    r == sys::Tvg_Result::TVG_RESULT_SUCCESS
 }
 
 impl core::fmt::Debug for Picture<'_> {

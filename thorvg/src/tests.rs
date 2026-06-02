@@ -688,6 +688,47 @@ fn test_clip_lifecycle() {
     // Clipper and shape are cleaned up properly
 }
 
+// ── Asset resolver ─────────────────────────────────────────────────
+
+#[test]
+fn test_asset_resolver_install_replace_clear() {
+    use core::sync::atomic::{AtomicUsize, Ordering};
+    use alloc::sync::Arc;
+
+    let engine = Thorvg::init(0).unwrap();
+    let mut pic = engine.picture();
+
+    let calls = Arc::new(AtomicUsize::new(0));
+
+    // Install
+    let calls_clone = Arc::clone(&calls);
+    pic.set_asset_resolver(move |_src| {
+        calls_clone.fetch_add(1, Ordering::SeqCst);
+        None // we don't actually load anything here
+    })
+    .unwrap();
+
+    // Replace (the previous closure's Box must drop cleanly)
+    let calls_clone = Arc::clone(&calls);
+    pic.set_asset_resolver(move |_src| {
+        calls_clone.fetch_add(10, Ordering::SeqCst);
+        None
+    })
+    .unwrap();
+
+    // Clear
+    pic.clear_asset_resolver().unwrap();
+
+    // Drop the picture — Picture::Drop must unregister even when
+    // no resolver remains installed (resolver is None, so the
+    // drop path simply skips the C-side detach).
+    drop(pic);
+
+    // We didn't trigger any actual asset loads here; just verify
+    // the install/replace/clear/drop machinery runs without UAF.
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
 // ── Masking ────────────────────────────────────────────────────────
 
 #[test]
