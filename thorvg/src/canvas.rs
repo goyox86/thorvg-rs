@@ -111,12 +111,18 @@ impl SwCanvas<'_> {
         height: u32,
         colorspace: ColorSpace,
     ) -> Result<()> {
-        assert!(
-            buffer.len() >= (stride * height) as usize,
-            "buffer too small: need {} elements, got {}",
-            stride * height,
-            buffer.len()
-        );
+        // Check `stride * height` in u64 — the obvious `u32 * u32`
+        // wraps in release (overflow-checks off) and would let a
+        // pathological size pass the bound check, after which thorvg
+        // would compute the same product on its side and read/write
+        // past the buffer.
+        let needed = u64::from(stride).checked_mul(u64::from(height));
+        let Some(needed) = needed else {
+            return Err(Error::InvalidArguments);
+        };
+        if (buffer.len() as u64) < needed {
+            return Err(Error::InvalidArguments);
+        }
         let result = unsafe {
             sys::tvg_swcanvas_set_target(
                 self.raw,
