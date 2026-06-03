@@ -409,7 +409,14 @@ unsafe extern "C" fn resolver_trampoline(
     }
     let boxed = unsafe { &mut *data.cast::<alloc::boxed::Box<AssetResolverFn>>() };
     let src_str = unsafe { core::ffi::CStr::from_ptr(src) }.to_string_lossy();
-    let Some((bytes, mime)) = (boxed)(&src_str) else {
+    // SAFETY: user closure runs in Rust context; a panic here would
+    // unwind across the C++ caller above us, which is UB.  Catch and
+    // convert to a "not resolved" return.  In `no_std` builds the
+    // crate-level docs require `panic = "abort"`, which makes panic
+    // termination strictly safer (the process is gone before unwinding
+    // could reach the FFI boundary).
+    let resolved = invoke_resolver(boxed, &src_str);
+    let Some((bytes, mime)) = resolved else {
         return false;
     };
     // Copy into thorvg so the consumer's Vec can drop after return.
@@ -425,6 +432,25 @@ unsafe extern "C" fn resolver_trampoline(
         )
     };
     r == sys::Tvg_Result::TVG_RESULT_SUCCESS
+}
+
+#[cfg(feature = "std")]
+fn invoke_resolver(
+    boxed: &mut alloc::boxed::Box<AssetResolverFn>,
+    src: &str,
+) -> Option<(alloc::vec::Vec<u8>, MimeType)> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (boxed)(src))).unwrap_or(None)
+}
+
+#[cfg(not(feature = "std"))]
+fn invoke_resolver(
+    boxed: &mut alloc::boxed::Box<AssetResolverFn>,
+    src: &str,
+) -> Option<(alloc::vec::Vec<u8>, MimeType)> {
+    // `no_std` users are required to build with `panic = "abort"`
+    // (see crate docs).  An aborting panic cannot cross the FFI
+    // boundary, so no `catch_unwind` is needed.
+    (boxed)(src)
 }
 
 impl core::fmt::Debug for Picture<'_> {

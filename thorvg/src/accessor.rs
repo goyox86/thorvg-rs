@@ -62,7 +62,11 @@ impl Accessor<'_> {
             // handles are live for the duration of the call.
             let acc_view = unsafe { BorrowedAccessor::from_raw(ctx.acc_raw) };
             let paint_view = unsafe { BorrowedPaint::from_raw(paint_raw) };
-            (ctx.func)(acc_view, paint_view)
+            // SAFETY: panic across the C++ caller is UB.  Catch and
+            // stop iteration (return `false`).  In `no_std` builds the
+            // crate requires `panic = "abort"`, which terminates the
+            // process before any unwinding could reach the FFI edge.
+            invoke_user(&mut ctx.func, acc_view, paint_view)
         }
 
         let mut ctx = Ctx {
@@ -83,6 +87,22 @@ impl Accessor<'_> {
         let c_name = CString::new(name).ok()?;
         Some(unsafe { sys::tvg_accessor_generate_id(c_name.as_ptr()) })
     }
+}
+
+#[cfg(feature = "std")]
+fn invoke_user<F>(f: &mut F, acc: BorrowedAccessor<'_>, paint: BorrowedPaint<'_>) -> bool
+where
+    F: FnMut(BorrowedAccessor<'_>, BorrowedPaint<'_>) -> bool,
+{
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(acc, paint))).unwrap_or(false)
+}
+
+#[cfg(not(feature = "std"))]
+fn invoke_user<F>(f: &mut F, acc: BorrowedAccessor<'_>, paint: BorrowedPaint<'_>) -> bool
+where
+    F: FnMut(BorrowedAccessor<'_>, BorrowedPaint<'_>) -> bool,
+{
+    f(acc, paint)
 }
 
 impl Drop for Accessor<'_> {

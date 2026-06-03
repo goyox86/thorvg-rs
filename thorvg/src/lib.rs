@@ -14,6 +14,15 @@
 //! thorvg = { version = "0.1", default-features = false }
 //! ```
 //!
+//! **`no_std` panic policy:** the crate executes user-supplied closures
+//! (asset resolvers, accessor visitors) from inside `extern "C"`
+//! trampolines invoked by the C++ engine.  In `std` builds the
+//! trampolines wrap each closure call in [`std::panic::catch_unwind`]
+//! and convert panics to a "failure" return; in `no_std` builds there
+//! is no `catch_unwind`, so consumers **must** build with
+//! `panic = "abort"`.  Aborting before unwind reaches the FFI edge is
+//! the only sound option there.
+//!
 //! # Quick Start
 //!
 //! ```no_run
