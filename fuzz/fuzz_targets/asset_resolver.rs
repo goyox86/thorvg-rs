@@ -75,7 +75,10 @@ fuzz_target!(|input: Input| {
         let Ok(mut pic) = engine.picture() else {
             return;
         };
-        let Input { payload, panic_in_resolver } = input;
+        let Input {
+            payload,
+            panic_in_resolver,
+        } = input;
         let _ = pic.set_asset_resolver(move |_src| {
             if panic_in_resolver {
                 // catch_unwind in the trampoline must absorb this;

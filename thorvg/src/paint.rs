@@ -392,13 +392,22 @@ pub trait Paint: sealed::Sealed {
 
     /// Clips the drawing region to the specified shape's paths.
     ///
-    /// Consumes the `clipper`: the C side stores its raw pointer in this
-    /// paint's state and refcount-manages its lifetime via the canvas's
-    /// destruction.  Taking ownership here lets us call `into_raw` so the
-    /// Rust wrapper's `Drop` never tries to delete a handle the C side
-    /// still references.
+    /// Consumes the `clipper` **on success**: the C side stores its raw
+    /// pointer in this paint's state and refcount-manages its lifetime via
+    /// the canvas's destruction, and we call `into_raw` to suppress the
+    /// Rust `Drop` that would otherwise double-free.
+    ///
+    /// On error the C side never touches `clipper` (the only error path
+    /// — `InsufficientCondition` when `clipper` already has a parent —
+    /// returns before any state change), so we let `clipper` `Drop`
+    /// normally to release the allocation rather than leaking it.
     fn set_clip(&mut self, clipper: Shape<'_>) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_paint_set_clip(self.raw(), clipper.into_raw()) })
+        let raw = clipper.raw();
+        let r = Error::from_raw(unsafe { sys::tvg_paint_set_clip(self.raw(), raw) });
+        if r.is_ok() {
+            let _ = clipper.into_raw();
+        }
+        r
     }
 
     /// Gets the clip shape, if any.
@@ -413,15 +422,26 @@ pub trait Paint: sealed::Sealed {
 
     /// Sets the masking target and method.
     ///
-    /// Consumes the `mask`: the C side stores its raw pointer in this
-    /// paint's state and refcount-manages its lifetime via the canvas's
-    /// destruction.  Taking ownership here lets us call `into_raw` so the
-    /// Rust wrapper's `Drop` never tries to delete a handle the C side
-    /// still references.
+    /// Consumes the `mask` **on success**: the C side stores its raw
+    /// pointer in this paint's state and refcount-manages its lifetime
+    /// via the canvas's destruction, and we call `into_raw` to suppress
+    /// the Rust `Drop` that would otherwise double-free.
+    ///
+    /// On error the C side does not take ownership of `mask` (the two
+    /// reachable error paths — `InsufficientCondition` when `mask` has
+    /// a parent, and `InvalidArguments` when `method == MaskMethod::None`
+    /// with a non-null target — both return before touching `mask`'s
+    /// refcount), so we let `mask` `Drop` normally to release the
+    /// allocation rather than leaking it.
     fn set_mask<P: Paint>(&mut self, mask: P, method: MaskMethod) -> Result<()> {
-        Error::from_raw(unsafe {
-            sys::tvg_paint_set_mask_method(self.raw(), mask.into_raw(), method.to_raw())
-        })
+        let raw = mask.raw();
+        let r = Error::from_raw(unsafe {
+            sys::tvg_paint_set_mask_method(self.raw(), raw, method.to_raw())
+        });
+        if r.is_ok() {
+            let _ = mask.into_raw();
+        }
+        r
     }
 
     /// Gets the mask target and method, if a mask is set.

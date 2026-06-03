@@ -57,3 +57,66 @@ path = "fuzz_targets/text_glyph_metrics.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "shape_primitives"
+path = "fuzz_targets/shape_primitives.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "paint_transforms"
+path = "fuzz_targets/paint_transforms.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "scene_effects"
+path = "fuzz_targets/scene_effects.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gradient_build"
+path = "fuzz_targets/gradient_build.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "canvas_set_target"
+path = "fuzz_targets/canvas_set_target.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "animation_picture_play"
+path = "fuzz_targets/animation_picture_play.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "accessor_for_each"
+path = "fuzz_targets/accessor_for_each.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lottie_slots_assign"
+path = "fuzz_targets/lottie_slots_assign.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "saver_save"
+path = "fuzz_targets/saver_save.rs"
+test = false
+doc = false
+bench = false
