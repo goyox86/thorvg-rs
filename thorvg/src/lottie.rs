@@ -72,7 +72,7 @@ impl LottieAnimation<'_> {
     /// directly via [`Animation::picture`].
     pub fn load_data(&mut self, data: &[u8]) -> Result<()> {
         let pic = self.picture_mut();
-        pic.load_data(data, crate::picture::MimeType::Lottie, None, true)
+        pic.load_data(data, crate::picture::MimeType::Lottie, None)
     }
 
     /// Load a Lottie animation from a file path string.

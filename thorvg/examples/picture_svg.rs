@@ -40,7 +40,7 @@ fn main() {
     );
 
     let mut pic = engine.picture();
-    pic.load_data(svg_data.as_bytes(), thorvg::MimeType::Svg, None, true)
+    pic.load_data(svg_data.as_bytes(), thorvg::MimeType::Svg, None)
         .unwrap();
     pic.set_size(w as f32, h as f32).unwrap();
     canvas.push(pic).unwrap();

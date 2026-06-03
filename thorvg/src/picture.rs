@@ -129,48 +129,73 @@ impl Picture<'_> {
         self.load_from_str(&path.as_ref().to_string_lossy())
     }
 
-    /// Loads a picture from memory.
+    /// Loads a picture from memory, copying `data` into thorvg.
     ///
-    /// `mime` selects the loader (see [`MimeType`]).  `resource_path`
+    /// `mime` selects the loader (see [`MimeType`]). `resource_path`
     /// is the base directory for SVG external assets; pass `None`
-    /// for self-contained content.  `copy=false` borrows the buffer
-    /// — caller must keep it alive for the picture's lifetime.
-    #[allow(clippy::cast_possible_truncation)]
+    /// for self-contained content.
+    ///
+    /// For zero-copy loading of `'static` buffers (e.g.
+    /// `include_bytes!(...)`), use [`load_data_static`](Self::load_data_static).
     pub fn load_data(
         &mut self,
         data: &[u8],
         mime: MimeType,
         resource_path: Option<&str>,
-        copy: bool,
     ) -> Result<()> {
-        let c_rpath = resource_path
-            .map(|p| CString::new(p).map_err(|_| Error::InvalidArguments))
-            .transpose()?;
-        let rpath_ptr = c_rpath.as_ref().map_or(core::ptr::null(), |c| c.as_ptr());
-        Error::from_raw(unsafe {
-            sys::tvg_picture_load_data(
-                self.raw,
-                data.as_ptr().cast::<core::ffi::c_char>(),
-                data.len() as u32,
-                mime.as_c_str().as_ptr(),
-                rpath_ptr,
-                copy,
-            )
-        })
+        load_data_inner(self.raw, data, mime, resource_path, /* copy = */ true)
     }
 
-    /// Loads raw image data (pixel buffer).
+    /// Loads a picture from `'static` memory without copying.
+    ///
+    /// thorvg borrows `data`; the `'static` bound enforces at the type
+    /// level that the buffer outlives the picture. Typical use:
+    /// `pic.load_data_static(include_bytes!("logo.svg"), MimeType::Svg, None)`.
+    ///
+    /// # Compile-time safety
+    ///
+    /// ```compile_fail,E0597
+    /// let engine = thorvg::Thorvg::init(0).unwrap();
+    /// let mut pic = engine.picture();
+    /// let local = vec![0u8; 32];
+    /// pic.load_data_static(&local, thorvg::MimeType::Svg, None).unwrap();
+    /// // error[E0597]: `local` does not live long enough
+    /// ```
+    pub fn load_data_static(
+        &mut self,
+        data: &'static [u8],
+        mime: MimeType,
+        resource_path: Option<&str>,
+    ) -> Result<()> {
+        load_data_inner(self.raw, data, mime, resource_path, /* copy = */ false)
+    }
+
+    /// Loads raw image data (pixel buffer), copying `data` into thorvg.
+    ///
+    /// For zero-copy loading of `'static` buffers, use
+    /// [`load_raw_static`](Self::load_raw_static).
     pub fn load_raw(
         &mut self,
         data: &[u32],
         w: u32,
         h: u32,
         cs: crate::ColorSpace,
-        copy: bool,
     ) -> Result<()> {
-        Error::from_raw(unsafe {
-            sys::tvg_picture_load_raw(self.raw, data.as_ptr(), w, h, cs.to_raw(), copy)
-        })
+        load_raw_inner(self.raw, data, w, h, cs, /* copy = */ true)
+    }
+
+    /// Loads raw image data from `'static` memory without copying.
+    ///
+    /// thorvg borrows `data`; the `'static` bound enforces at the type
+    /// level that the buffer outlives the picture.
+    pub fn load_raw_static(
+        &mut self,
+        data: &'static [u32],
+        w: u32,
+        h: u32,
+        cs: crate::ColorSpace,
+    ) -> Result<()> {
+        load_raw_inner(self.raw, data, w, h, cs, /* copy = */ false)
     }
 
     /// Resizes the picture content.
@@ -324,6 +349,41 @@ impl Drop for Picture<'_> {
             }
         }
     }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn load_data_inner(
+    raw: sys::Tvg_Paint,
+    data: &[u8],
+    mime: MimeType,
+    resource_path: Option<&str>,
+    copy: bool,
+) -> Result<()> {
+    let c_rpath = resource_path
+        .map(|p| CString::new(p).map_err(|_| Error::InvalidArguments))
+        .transpose()?;
+    let rpath_ptr = c_rpath.as_ref().map_or(core::ptr::null(), |c| c.as_ptr());
+    Error::from_raw(unsafe {
+        sys::tvg_picture_load_data(
+            raw,
+            data.as_ptr().cast::<core::ffi::c_char>(),
+            data.len() as u32,
+            mime.as_c_str().as_ptr(),
+            rpath_ptr,
+            copy,
+        )
+    })
+}
+
+fn load_raw_inner(
+    raw: sys::Tvg_Paint,
+    data: &[u32],
+    w: u32,
+    h: u32,
+    cs: crate::ColorSpace,
+    copy: bool,
+) -> Result<()> {
+    Error::from_raw(unsafe { sys::tvg_picture_load_raw(raw, data.as_ptr(), w, h, cs.to_raw(), copy) })
 }
 
 /// FFI trampoline that bridges thorvg's C callback to the boxed
