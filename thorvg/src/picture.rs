@@ -96,15 +96,17 @@ unsafe impl Send for Picture<'_> {}
 
 impl Picture<'_> {
     /// Creates a new Picture object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_picture_new() };
-        assert!(!raw.is_null(), "failed to create Picture");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             owned: true,
             resolver: None,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Wraps an existing raw paint pointer.
@@ -159,7 +161,7 @@ impl Picture<'_> {
     ///
     /// ```compile_fail,E0597
     /// let engine = thorvg::Thorvg::init(0).unwrap();
-    /// let mut pic = engine.picture();
+    /// let mut pic = engine.picture().unwrap();
     /// let local = vec![0u8; 32];
     /// pic.load_data_static(&local, thorvg::MimeType::Svg, None).unwrap();
     /// // error[E0597]: `local` does not live long enough

@@ -17,14 +17,14 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Background
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(15, 15, 25, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── 5-pointed star ─────────────────────────────────────────────
-    let mut star = engine.shape();
+    let mut star = engine.shape().unwrap();
     let (cx, cy) = (120.0f32, 140.0f32);
     let (outer, inner) = (80.0f32, 35.0f32);
     for i in 0..10 {
@@ -45,7 +45,7 @@ fn main() {
     canvas.push(star).unwrap();
 
     // ── Heart shape (cubic Béziers) ────────────────────────────────
-    let mut heart = engine.shape();
+    let mut heart = engine.shape().unwrap();
     let hx = 320.0f32;
     let hy = 160.0f32;
     heart.move_to(hx, hy).unwrap();
@@ -73,7 +73,7 @@ fn main() {
     canvas.push(heart).unwrap();
 
     // ── Spiral (stroked path) ──────────────────────────────────────
-    let mut spiral = engine.shape();
+    let mut spiral = engine.shape().unwrap();
     let (sx, sy) = (580.0f32, 140.0f32);
     spiral.move_to(sx, sy).unwrap();
     let turns = 4.0f32;
@@ -92,7 +92,7 @@ fn main() {
     canvas.push(spiral).unwrap();
 
     // ── Wavy line ──────────────────────────────────────────────────
-    let mut wave = engine.shape();
+    let mut wave = engine.shape().unwrap();
     wave.move_to(50.0, 420.0).unwrap();
     let segments = 12;
     let seg_w = 60.0f32;
@@ -116,7 +116,7 @@ fn main() {
     canvas.push(wave).unwrap();
 
     // ── Polygon (hexagon) ──────────────────────────────────────────
-    let mut hex = engine.shape();
+    let mut hex = engine.shape().unwrap();
     let (hcx, hcy, hr) = (150.0f32, 520.0f32, 50.0f32);
     for i in 0..6 {
         let angle = core::f32::consts::PI * i as f32 / 3.0 - core::f32::consts::FRAC_PI_2;
@@ -135,7 +135,7 @@ fn main() {
     canvas.push(hex).unwrap();
 
     // ── Arrow shape ────────────────────────────────────────────────
-    let mut arrow = engine.shape();
+    let mut arrow = engine.shape().unwrap();
     arrow.move_to(350.0, 500.0).unwrap();
     arrow.line_to(500.0, 530.0).unwrap();
     arrow.line_to(350.0, 560.0).unwrap();
@@ -145,7 +145,7 @@ fn main() {
     canvas.push(arrow).unwrap();
 
     // ── Infinity symbol (figure-8 with Béziers) ────────────────────
-    let mut inf = engine.shape();
+    let mut inf = engine.shape().unwrap();
     let ix = 620.0f32;
     let iy = 530.0f32;
     inf.move_to(ix, iy).unwrap();

@@ -44,7 +44,7 @@
 //! }
 //!
 //! // Draw a red rectangle
-//! let mut shape = engine.shape();
+//! let mut shape = engine.shape().unwrap();
 //! shape.append_rect(0.0, 0.0, 200.0, 200.0, 0.0, 0.0, true).unwrap();
 //! shape.set_fill_color(255, 0, 0, 255).unwrap();
 //! canvas.push(shape).unwrap();
@@ -131,7 +131,7 @@ mod tests_no_threads {
 /// // and takes no arguments when that feature is disabled.
 /// let engine = Thorvg::init(0).unwrap();
 /// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
-/// let mut shape = engine.shape();
+/// let mut shape = engine.shape().unwrap();
 /// shape.set_fill_color(255, 0, 0, 255).unwrap();
 /// canvas.push(shape).unwrap();
 /// ```
@@ -205,35 +205,37 @@ impl Thorvg {
 
     // ── Paint factories ────────────────────────────────────────────
 
-    /// Creates a new [`Shape`] tied to this engine.
-    pub fn shape(&self) -> Shape<'_> {
+    /// Creates a new [`Shape`] tied to this engine.  Returns
+    /// `Err(Error::FailedAllocation)` when the underlying C handle
+    /// allocation fails.
+    pub fn shape(&self) -> Result<Shape<'_>> {
         Shape::new()
     }
 
     /// Creates a new [`Scene`] tied to this engine.
-    pub fn scene(&self) -> Scene<'_> {
+    pub fn scene(&self) -> Result<Scene<'_>> {
         Scene::new()
     }
 
     /// Creates a new [`Picture`] tied to this engine.
-    pub fn picture(&self) -> Picture<'_> {
+    pub fn picture(&self) -> Result<Picture<'_>> {
         Picture::new()
     }
 
     /// Creates a new [`Text`] object tied to this engine.
-    pub fn text(&self) -> Text<'_> {
+    pub fn text(&self) -> Result<Text<'_>> {
         Text::new()
     }
 
     // ── Gradient factories ─────────────────────────────────────────
 
     /// Creates a new [`LinearGradient`] tied to this engine.
-    pub fn linear_gradient(&self) -> LinearGradient<'_> {
+    pub fn linear_gradient(&self) -> Result<LinearGradient<'_>> {
         LinearGradient::new()
     }
 
     /// Creates a new [`RadialGradient`] tied to this engine.
-    pub fn radial_gradient(&self) -> RadialGradient<'_> {
+    pub fn radial_gradient(&self) -> Result<RadialGradient<'_>> {
         RadialGradient::new()
     }
 
@@ -257,19 +259,19 @@ impl Thorvg {
     // ── Animation factories ────────────────────────────────────────
 
     /// Creates a new [`Animation`] controller tied to this engine.
-    pub fn animation(&self) -> Animation<'_> {
+    pub fn animation(&self) -> Result<Animation<'_>> {
         Animation::new()
     }
 
     /// Creates a new [`LottieAnimation`] controller tied to this engine.
-    pub fn lottie_animation(&self) -> LottieAnimation<'_> {
+    pub fn lottie_animation(&self) -> Result<LottieAnimation<'_>> {
         LottieAnimation::new()
     }
 
     // ── Utility factories ──────────────────────────────────────────
 
     /// Creates a new [`Saver`] tied to this engine.
-    pub fn saver(&self) -> Saver<'_> {
+    pub fn saver(&self) -> Result<Saver<'_>> {
         Saver::new()
     }
 
@@ -346,7 +348,7 @@ impl Thorvg {
     }
 
     /// Creates a new [`Accessor`] tied to this engine.
-    pub fn accessor(&self) -> Accessor<'_> {
+    pub fn accessor(&self) -> Result<Accessor<'_>> {
         Accessor::new()
     }
 }

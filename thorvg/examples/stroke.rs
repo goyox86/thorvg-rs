@@ -22,14 +22,14 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Dark background ────────────────────────────────────────────
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 30, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Butt cap, Miter join ───────────────────────────────────────
-    let mut shape1 = engine.shape();
+    let mut shape1 = engine.shape().unwrap();
     shape1.move_to(50.0, 50.0).unwrap();
     shape1.line_to(200.0, 50.0).unwrap();
     shape1.line_to(200.0, 150.0).unwrap();
@@ -40,7 +40,7 @@ fn main() {
     canvas.push(shape1).unwrap();
 
     // ── Round cap, Round join ──────────────────────────────────────
-    let mut shape2 = engine.shape();
+    let mut shape2 = engine.shape().unwrap();
     shape2.move_to(300.0, 50.0).unwrap();
     shape2.line_to(450.0, 50.0).unwrap();
     shape2.line_to(450.0, 150.0).unwrap();
@@ -51,7 +51,7 @@ fn main() {
     canvas.push(shape2).unwrap();
 
     // ── Square cap, Bevel join ─────────────────────────────────────
-    let mut shape3 = engine.shape();
+    let mut shape3 = engine.shape().unwrap();
     shape3.move_to(550.0, 50.0).unwrap();
     shape3.line_to(700.0, 50.0).unwrap();
     shape3.line_to(700.0, 150.0).unwrap();
@@ -62,7 +62,7 @@ fn main() {
     canvas.push(shape3).unwrap();
 
     // ── Dashed stroke ──────────────────────────────────────────────
-    let mut dashed = engine.shape();
+    let mut dashed = engine.shape().unwrap();
     dashed
         .append_rect(50.0, 250.0, 300.0, 100.0, 0.0, 0.0, true)
         .unwrap();
@@ -74,7 +74,7 @@ fn main() {
     canvas.push(dashed).unwrap();
 
     // ── Stroked circle with fill ───────────────────────────────────
-    let mut stroked_circle = engine.shape();
+    let mut stroked_circle = engine.shape().unwrap();
     stroked_circle
         .append_circle(600.0, 300.0, 60.0, 60.0, true)
         .unwrap();

@@ -21,14 +21,14 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Background
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 40, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Original (no transform) ────────────────────────────────────
-    let mut s1 = engine.shape();
+    let mut s1 = engine.shape().unwrap();
     s1.append_rect(0.0, 0.0, 60.0, 60.0, 5.0, 5.0, true)
         .unwrap();
     s1.set_fill_color(255, 80, 80, 255).unwrap();
@@ -36,7 +36,7 @@ fn main() {
     canvas.push(s1).unwrap();
 
     // ── Translated ─────────────────────────────────────────────────
-    let mut s2 = engine.shape();
+    let mut s2 = engine.shape().unwrap();
     s2.append_rect(0.0, 0.0, 60.0, 60.0, 5.0, 5.0, true)
         .unwrap();
     s2.set_fill_color(80, 255, 80, 255).unwrap();
@@ -44,7 +44,7 @@ fn main() {
     canvas.push(s2).unwrap();
 
     // ── Rotated 30° ────────────────────────────────────────────────
-    let mut s3 = engine.shape();
+    let mut s3 = engine.shape().unwrap();
     s3.append_rect(0.0, 0.0, 60.0, 60.0, 5.0, 5.0, true)
         .unwrap();
     s3.set_fill_color(80, 80, 255, 255).unwrap();
@@ -53,7 +53,7 @@ fn main() {
     canvas.push(s3).unwrap();
 
     // ── Scaled 1.5x ────────────────────────────────────────────────
-    let mut s4 = engine.shape();
+    let mut s4 = engine.shape().unwrap();
     s4.append_rect(0.0, 0.0, 60.0, 60.0, 5.0, 5.0, true)
         .unwrap();
     s4.set_fill_color(255, 255, 80, 255).unwrap();
@@ -62,7 +62,7 @@ fn main() {
     canvas.push(s4).unwrap();
 
     // ── Custom matrix: skew transform ──────────────────────────────
-    let mut s5 = engine.shape();
+    let mut s5 = engine.shape().unwrap();
     s5.append_rect(0.0, 0.0, 60.0, 60.0, 5.0, 5.0, true)
         .unwrap();
     s5.set_fill_color(255, 80, 255, 255).unwrap();
@@ -82,7 +82,7 @@ fn main() {
 
     // ── Row of rotated shapes ──────────────────────────────────────
     for i in 0..8 {
-        let mut s = engine.shape();
+        let mut s = engine.shape().unwrap();
         s.append_rect(0.0, 0.0, 30.0, 30.0, 3.0, 3.0, true).unwrap();
         let hue = (i * 32) as u8;
         s.set_fill_color(255, hue, 255 - hue, 200).unwrap();

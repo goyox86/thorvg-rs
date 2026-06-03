@@ -21,7 +21,7 @@ fn main() {
     // Checkerboard background
     for row in 0..(h / 15) {
         for col in 0..(w / 15) {
-            let mut sq = engine.shape();
+            let mut sq = engine.shape().unwrap();
             sq.append_rect(
                 col as f32 * 15.0,
                 row as f32 * 15.0,
@@ -39,14 +39,14 @@ fn main() {
     }
 
     // ── Alpha mask: gradient circle masks a rectangle ───────────────
-    let mut rect1 = engine.shape();
+    let mut rect1 = engine.shape().unwrap();
     rect1
         .append_rect(30.0, 50.0, 200.0, 200.0, 0.0, 0.0, true)
         .unwrap();
     rect1.set_fill_color(50, 50, 220, 255).unwrap();
 
     // Mask target: circle with gradient alpha
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(30.0, 50.0, 230.0, 250.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -66,7 +66,7 @@ fn main() {
     ])
     .unwrap();
 
-    let mut mask1 = engine.shape();
+    let mut mask1 = engine.shape().unwrap();
     mask1.append_circle(130.0, 150.0, 90.0, 90.0, true).unwrap();
     mask1.set_linear_gradient(grad).unwrap();
 
@@ -74,13 +74,13 @@ fn main() {
     canvas.push(rect1).unwrap();
 
     // ── InvAlpha mask ──────────────────────────────────────────────
-    let mut rect2 = engine.shape();
+    let mut rect2 = engine.shape().unwrap();
     rect2
         .append_rect(260.0, 50.0, 200.0, 200.0, 0.0, 0.0, true)
         .unwrap();
     rect2.set_fill_color(220, 50, 50, 255).unwrap();
 
-    let mut mask2 = engine.shape();
+    let mut mask2 = engine.shape().unwrap();
     mask2.append_circle(360.0, 150.0, 60.0, 60.0, true).unwrap();
     mask2.set_fill_color(255, 255, 255, 255).unwrap();
 
@@ -88,13 +88,13 @@ fn main() {
     canvas.push(rect2).unwrap();
 
     // ── Luma mask ──────────────────────────────────────────────────
-    let mut rect3 = engine.shape();
+    let mut rect3 = engine.shape().unwrap();
     rect3
         .append_rect(490.0, 50.0, 180.0, 200.0, 15.0, 15.0, true)
         .unwrap();
     rect3.set_fill_color(50, 200, 50, 255).unwrap();
 
-    let mut grad3 = engine.linear_gradient();
+    let mut grad3 = engine.linear_gradient().unwrap();
     grad3.set_bounds(490.0, 50.0, 670.0, 250.0).unwrap();
     grad3
         .set_color_stops(&[
@@ -115,7 +115,7 @@ fn main() {
         ])
         .unwrap();
 
-    let mut mask3 = engine.shape();
+    let mut mask3 = engine.shape().unwrap();
     mask3
         .append_rect(490.0, 50.0, 180.0, 200.0, 0.0, 0.0, true)
         .unwrap();

@@ -22,21 +22,21 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── White background ───────────────────────────────────────────
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Red rectangle ──────────────────────────────────────────────
-    let mut rect = engine.shape();
+    let mut rect = engine.shape().unwrap();
     rect.append_rect(50.0, 50.0, 200.0, 150.0, 0.0, 0.0, true)
         .unwrap();
     rect.set_fill_color(255, 0, 0, 255).unwrap();
     canvas.push(rect).unwrap();
 
     // ── Rounded green rectangle ────────────────────────────────────
-    let mut rounded = engine.shape();
+    let mut rounded = engine.shape().unwrap();
     rounded
         .append_rect(300.0, 50.0, 200.0, 150.0, 20.0, 20.0, true)
         .unwrap();
@@ -44,7 +44,7 @@ fn main() {
     canvas.push(rounded).unwrap();
 
     // ── Blue circle ────────────────────────────────────────────────
-    let mut circle = engine.shape();
+    let mut circle = engine.shape().unwrap();
     circle
         .append_circle(150.0, 400.0, 80.0, 80.0, true)
         .unwrap();
@@ -52,7 +52,7 @@ fn main() {
     canvas.push(circle).unwrap();
 
     // ── Yellow ellipse ─────────────────────────────────────────────
-    let mut ellipse = engine.shape();
+    let mut ellipse = engine.shape().unwrap();
     ellipse
         .append_circle(400.0, 400.0, 120.0, 60.0, true)
         .unwrap();
@@ -60,7 +60,7 @@ fn main() {
     canvas.push(ellipse).unwrap();
 
     // ── Orange triangle (custom path) ──────────────────────────────
-    let mut triangle = engine.shape();
+    let mut triangle = engine.shape().unwrap();
     triangle.move_to(650.0, 50.0).unwrap();
     triangle.line_to(750.0, 200.0).unwrap();
     triangle.line_to(550.0, 200.0).unwrap();
@@ -69,7 +69,7 @@ fn main() {
     canvas.push(triangle).unwrap();
 
     // ── Magenta cubic Bézier curve ─────────────────────────────────
-    let mut curve = engine.shape();
+    let mut curve = engine.shape().unwrap();
     curve.move_to(550.0, 350.0).unwrap();
     curve
         .cubic_to(600.0, 250.0, 700.0, 550.0, 750.0, 350.0)

@@ -17,13 +17,15 @@ pub struct Accessor<'eng> {
 
 impl Accessor<'_> {
     /// Creates a new Accessor object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_accessor_new() };
-        assert!(!raw.is_null(), "failed to create Accessor");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Iterates through every descendant of `paint`, invoking `func`

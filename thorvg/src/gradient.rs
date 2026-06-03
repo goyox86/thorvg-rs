@@ -147,13 +147,15 @@ pub struct LinearGradient<'eng> {
 
 impl LinearGradient<'_> {
     /// Creates a new linear gradient.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_linear_gradient_new() };
-        assert!(!raw.is_null(), "failed to create LinearGradient");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Sets the gradient bounds.
@@ -250,13 +252,15 @@ pub struct RadialGradient<'eng> {
 
 impl RadialGradient<'_> {
     /// Creates a new radial gradient.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_radial_gradient_new() };
-        assert!(!raw.is_null(), "failed to create RadialGradient");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Sets the radial gradient attributes.

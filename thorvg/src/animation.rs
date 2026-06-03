@@ -67,11 +67,13 @@ impl<'eng> Animation<'eng> {
     }
 
     /// Creates a new Animation object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_animation_new() };
-        assert!(!raw.is_null(), "failed to create Animation");
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
         // SAFETY: `raw` was just returned non-null by tvg_animation_new.
-        unsafe { Self::from_raw(raw) }
+        Ok(unsafe { Self::from_raw(raw) })
     }
 
     /// Returns a borrow of the picture managed by this animation.

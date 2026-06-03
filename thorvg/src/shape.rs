@@ -100,14 +100,16 @@ unsafe impl Send for Shape<'_> {}
 
 impl Shape<'_> {
     /// Creates a new Shape object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_shape_new() };
-        assert!(!raw.is_null(), "failed to create Shape");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             owned: true,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Wraps an existing raw paint pointer.

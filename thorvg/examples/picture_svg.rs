@@ -17,7 +17,7 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // White background
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
@@ -39,7 +39,7 @@ fn main() {
         r#"</svg>"#,
     );
 
-    let mut pic = engine.picture();
+    let mut pic = engine.picture().unwrap();
     pic.load_data(svg_data.as_bytes(), thorvg::MimeType::Svg, None)
         .unwrap();
     pic.set_size(w as f32, h as f32).unwrap();

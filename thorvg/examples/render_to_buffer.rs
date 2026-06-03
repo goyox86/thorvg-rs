@@ -22,14 +22,14 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Background: white rectangle ────────────────────────────────
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Gradient-filled rounded rect ───────────────────────────────
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(50.0, 50.0, 350.0, 250.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -56,14 +56,14 @@ fn main() {
     ])
     .unwrap();
 
-    let mut rect = engine.shape();
+    let mut rect = engine.shape().unwrap();
     rect.append_rect(50.0, 50.0, 300.0, 200.0, 25.0, 25.0, true)
         .unwrap();
     rect.set_linear_gradient(grad).unwrap();
     canvas.push(rect).unwrap();
 
     // ── Semi-transparent white circle on top ───────────────────────
-    let mut circle = engine.shape();
+    let mut circle = engine.shape().unwrap();
     circle
         .append_circle(200.0, 150.0, 50.0, 50.0, true)
         .unwrap();

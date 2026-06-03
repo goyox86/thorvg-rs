@@ -40,7 +40,7 @@ pub struct Marker {
 ///         .unwrap()
 /// };
 ///
-/// let mut lottie = engine.lottie_animation();
+/// let mut lottie = engine.lottie_animation().unwrap();
 /// let pic = lottie.picture_mut();
 /// pic.load_from_str("animation.json").ok();
 /// ```
@@ -54,12 +54,14 @@ pub struct LottieAnimation<'eng> {
 
 impl LottieAnimation<'_> {
     /// Creates a new Lottie animation object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_lottie_animation_new() };
-        assert!(!raw.is_null(), "failed to create LottieAnimation");
-        Self {
-            inner: unsafe { Animation::from_raw(raw) },
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
         }
+        Ok(Self {
+            inner: unsafe { Animation::from_raw(raw) },
+        })
     }
 
     // ── Convenience loaders ──────────────────────────────────────────

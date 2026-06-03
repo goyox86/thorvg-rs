@@ -47,7 +47,7 @@ fn test_canvas_draw_shape() {
 
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape
         .append_rect(10.0, 10.0, 50.0, 50.0, 0.0, 0.0, true)
         .unwrap();
@@ -72,7 +72,7 @@ fn test_canvas_clear_all() {
 
     // Push multiple shapes
     for _ in 0..5 {
-        let mut s = engine.shape();
+        let mut s = engine.shape().unwrap();
         s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
         s.set_fill_color(255, 0, 0, 255).unwrap();
         canvas.push(s).unwrap();
@@ -82,7 +82,7 @@ fn test_canvas_clear_all() {
     canvas.clear().unwrap();
 
     // Canvas should still be usable after clearing
-    let mut s = engine.shape();
+    let mut s = engine.shape().unwrap();
     s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
     s.set_fill_color(0, 255, 0, 255).unwrap();
     canvas.push(s).unwrap();
@@ -99,7 +99,7 @@ fn test_shape_ownership_transfer_to_canvas() {
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape
         .append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true)
         .unwrap();
@@ -113,14 +113,14 @@ fn test_shape_ownership_transfer_to_canvas() {
 #[test]
 fn test_shape_ownership_transfer_to_scene() {
     let engine = Thorvg::init(0).unwrap();
-    let mut scene = engine.scene();
+    let mut scene = engine.scene().unwrap();
 
-    let mut s1 = engine.shape();
+    let mut s1 = engine.shape().unwrap();
     s1.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true)
         .unwrap();
     s1.set_fill_color(255, 0, 0, 255).unwrap();
 
-    let mut s2 = engine.shape();
+    let mut s2 = engine.shape().unwrap();
     s2.append_circle(50.0, 50.0, 20.0, 20.0, true).unwrap();
     s2.set_fill_color(0, 0, 255, 255).unwrap();
 
@@ -134,7 +134,7 @@ fn test_shape_ownership_transfer_to_scene() {
 fn test_shape_not_transferred_is_freed() {
     let engine = Thorvg::init(0).unwrap();
     // Shape created but never pushed to canvas/scene — Rust must free it
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape
         .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
         .unwrap();
@@ -150,7 +150,7 @@ fn test_shape_not_transferred_is_freed() {
 fn test_gradient_ownership_transfer_to_shape() {
     let engine = Thorvg::init(0).unwrap();
 
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(0.0, 0.0, 100.0, 100.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -170,7 +170,7 @@ fn test_gradient_ownership_transfer_to_shape() {
     ])
     .unwrap();
 
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape
         .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
         .unwrap();
@@ -183,7 +183,7 @@ fn test_gradient_ownership_transfer_to_shape() {
 fn test_gradient_not_transferred_is_freed() {
     let engine = Thorvg::init(0).unwrap();
     // Gradient created but never given to a shape
-    let mut grad = engine.radial_gradient();
+    let mut grad = engine.radial_gradient().unwrap();
     grad.set_radial(50.0, 50.0, 30.0, 50.0, 50.0, 0.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -209,7 +209,7 @@ fn test_gradient_not_transferred_is_freed() {
 fn test_gradient_duplicate() {
     let engine = Thorvg::init(0).unwrap();
 
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(0.0, 0.0, 200.0, 200.0).unwrap();
     grad.set_color_stops(&[
         ColorStop {
@@ -260,9 +260,9 @@ fn test_scene_nested_drop() {
     unsafe { canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888) }.unwrap();
 
     // Scene containing shapes, pushed to canvas
-    let mut scene = engine.scene();
+    let mut scene = engine.scene().unwrap();
     for i in 0..10 {
-        let mut s = engine.shape();
+        let mut s = engine.shape().unwrap();
         s.append_circle(i as f32 * 20.0, 50.0, 10.0, 10.0, true)
             .unwrap();
         s.set_fill_color(255, 0, 0, 255).unwrap();
@@ -279,11 +279,11 @@ fn test_scene_nested_drop() {
 fn test_scene_clear_and_reuse() {
     let engine = Thorvg::init(0).unwrap();
 
-    let mut scene = engine.scene();
+    let mut scene = engine.scene().unwrap();
 
     // Add shapes
     for _ in 0..5 {
-        let mut s = engine.shape();
+        let mut s = engine.shape().unwrap();
         s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
         scene.push(s).unwrap();
     }
@@ -292,7 +292,7 @@ fn test_scene_clear_and_reuse() {
     scene.clear().unwrap();
 
     // Scene should still be usable
-    let mut s = engine.shape();
+    let mut s = engine.shape().unwrap();
     s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
     scene.push(s).unwrap();
 }
@@ -302,7 +302,7 @@ fn test_scene_clear_and_reuse() {
 #[test]
 fn test_shape_fill_color_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape.set_fill_color(100, 150, 200, 255).unwrap();
     let (r, g, b, a) = shape.fill_color().unwrap();
     assert_eq!((r, g, b, a), (100, 150, 200, 255));
@@ -311,7 +311,7 @@ fn test_shape_fill_color_roundtrip() {
 #[test]
 fn test_shape_stroke_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
     shape.set_stroke_width(3.0).unwrap();
     shape.set_stroke_color(0, 255, 0, 255).unwrap();
@@ -330,7 +330,7 @@ fn test_shape_stroke_roundtrip() {
 #[test]
 fn test_shape_fill_rule_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     assert_eq!(shape.fill_rule().unwrap(), FillRule::NonZero);
     shape.set_fill_rule(FillRule::EvenOdd).unwrap();
     assert_eq!(shape.fill_rule().unwrap(), FillRule::EvenOdd);
@@ -339,7 +339,7 @@ fn test_shape_fill_rule_roundtrip() {
 #[test]
 fn test_paint_opacity_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape.set_opacity(128).unwrap();
     assert_eq!(shape.opacity().unwrap(), 128);
 }
@@ -347,7 +347,7 @@ fn test_paint_opacity_roundtrip() {
 #[test]
 fn test_paint_visibility_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     assert!(shape.visible());
     shape.set_visible(false).unwrap();
     assert!(!shape.visible());
@@ -358,7 +358,7 @@ fn test_paint_visibility_roundtrip() {
 #[test]
 fn test_paint_transform_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     let m = Matrix {
         e11: 2.0,
         e12: 0.5,
@@ -382,7 +382,7 @@ fn test_paint_transform_roundtrip() {
 #[test]
 fn test_paint_id_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape.set_id(42).unwrap();
     assert_eq!(shape.id(), 42);
 }
@@ -390,16 +390,16 @@ fn test_paint_id_roundtrip() {
 #[test]
 fn test_paint_type() {
     let engine = Thorvg::init(0).unwrap();
-    let shape = engine.shape();
+    let shape = engine.shape().unwrap();
     assert_eq!(shape.paint_type().unwrap(), PaintType::Shape);
 
-    let scene = engine.scene();
+    let scene = engine.scene().unwrap();
     assert_eq!(scene.paint_type().unwrap(), PaintType::Scene);
 
-    let picture = engine.picture();
+    let picture = engine.picture().unwrap();
     assert_eq!(picture.paint_type().unwrap(), PaintType::Picture);
 
-    let text = engine.text();
+    let text = engine.text().unwrap();
     assert_eq!(text.paint_type().unwrap(), PaintType::Text);
 }
 
@@ -407,10 +407,10 @@ fn test_paint_type() {
 fn test_gradient_type_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
 
-    let linear = engine.linear_gradient();
+    let linear = engine.linear_gradient().unwrap();
     assert_eq!(linear.gradient_type().unwrap(), PaintType::LinearGradient);
 
-    let radial = engine.radial_gradient();
+    let radial = engine.radial_gradient().unwrap();
     assert_eq!(radial.gradient_type().unwrap(), PaintType::RadialGradient);
 }
 
@@ -419,7 +419,7 @@ fn test_gradient_type_roundtrip() {
 #[test]
 fn test_linear_gradient_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(10.0, 20.0, 300.0, 400.0).unwrap();
     let (x1, y1, x2, y2) = grad.bounds().unwrap();
     assert!((x1 - 10.0).abs() < f32::EPSILON);
@@ -431,7 +431,7 @@ fn test_linear_gradient_roundtrip() {
 #[test]
 fn test_radial_gradient_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut grad = engine.radial_gradient();
+    let mut grad = engine.radial_gradient().unwrap();
     grad.set_radial(100.0, 120.0, 50.0, 10.0, 20.0, 5.0)
         .unwrap();
     let (cx, cy, r, fx, fy, fr) = grad.radial().unwrap();
@@ -446,7 +446,7 @@ fn test_radial_gradient_roundtrip() {
 #[test]
 fn test_gradient_spread_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     assert_eq!(grad.spread().unwrap(), FillSpread::Pad);
     grad.set_spread(FillSpread::Reflect).unwrap();
     assert_eq!(grad.spread().unwrap(), FillSpread::Reflect);
@@ -457,7 +457,7 @@ fn test_gradient_spread_roundtrip() {
 #[test]
 fn test_gradient_color_stops_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut grad = engine.linear_gradient();
+    let mut grad = engine.linear_gradient().unwrap();
     let stops = [
         ColorStop {
             offset: 0.0,
@@ -497,7 +497,7 @@ fn test_gradient_color_stops_roundtrip() {
 #[test]
 fn test_stroke_dash_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape.set_stroke_width(2.0).unwrap();
     shape.set_stroke_dash(&[10.0, 5.0, 3.0], 2.5).unwrap();
 
@@ -514,7 +514,7 @@ fn test_stroke_dash_roundtrip() {
 #[test]
 fn test_picture_create_destroy() {
     let engine = Thorvg::init(0).unwrap();
-    let _pic = engine.picture();
+    let _pic = engine.picture().unwrap();
     // Dropped without loading — should not crash
 }
 
@@ -522,7 +522,7 @@ fn test_picture_create_destroy() {
 fn test_picture_load_svg_from_memory() {
     let engine = Thorvg::init(0).unwrap();
     let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><rect width=\"100\" height=\"100\" fill=\"red\"/></svg>";
-    let mut pic = engine.picture();
+    let mut pic = engine.picture().unwrap();
     pic.load_data(svg, MimeType::Svg, None).unwrap();
     let (w, h) = pic.size().unwrap();
     assert!(w > 0.0);
@@ -534,7 +534,7 @@ fn test_picture_load_svg_from_memory() {
 #[test]
 fn test_animation_create_destroy() {
     let engine = Thorvg::init(0).unwrap();
-    let _anim = engine.animation();
+    let _anim = engine.animation().unwrap();
     // Dropped without loading — should not crash
 }
 
@@ -543,7 +543,7 @@ fn test_animation_create_destroy() {
 #[test]
 fn test_saver_create_destroy() {
     let engine = Thorvg::init(0).unwrap();
-    let _saver = engine.saver();
+    let _saver = engine.saver().unwrap();
     // Dropped without saving — should not crash
 }
 
@@ -556,8 +556,8 @@ fn test_saver_save_animation_ownership_transfer() {
     // the now-freed C handle.  Under ASan, the pre-fix `&Animation`
     // signature triggered a heap-use-after-free here.
     let engine = Thorvg::init(0).unwrap();
-    let mut saver = engine.saver();
-    let anim = engine.animation();
+    let mut saver = engine.saver().unwrap();
+    let anim = engine.animation().unwrap();
     let r = saver.save_animation_to_str(anim, "/tmp/thorvg-rs-test.gif", 100, 30);
     assert!(r.is_err()); // InsufficientCondition — no frames loaded
     // `anim` was moved into the call; no Drop runs on freed memory.
@@ -595,7 +595,7 @@ fn test_load_font_data_static_zero_copy() {
 #[test]
 fn test_accessor_create_destroy() {
     let engine = Thorvg::init(0).unwrap();
-    let _acc = engine.accessor();
+    let _acc = engine.accessor().unwrap();
 }
 
 #[test]
@@ -618,11 +618,11 @@ fn test_accessor_for_each_borrowed_views() {
     // callable from inside the closure (the borrow that the old
     // `Accessor::get_name(&self)` API conflicted with).
     let engine = Thorvg::init(0).unwrap();
-    let mut acc = engine.accessor();
+    let mut acc = engine.accessor().unwrap();
 
     // Build a tiny scene: parent with one shape child.
-    let mut parent = engine.scene();
-    let mut child = engine.shape();
+    let mut parent = engine.scene().unwrap();
+    let mut child = engine.shape().unwrap();
     child.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
     parent.push(child).unwrap();
 
@@ -647,7 +647,7 @@ fn test_accessor_for_each_borrowed_views() {
 #[test]
 fn test_invalid_picture_load() {
     let engine = Thorvg::init(0).unwrap();
-    let mut pic = engine.picture();
+    let mut pic = engine.picture().unwrap();
     let result = pic.load_from_str("/nonexistent/path.svg");
     assert!(result.is_err());
     // Picture should still be droppable after error
@@ -656,7 +656,7 @@ fn test_invalid_picture_load() {
 #[test]
 fn test_shape_stroke_color_without_stroke() {
     let engine = Thorvg::init(0).unwrap();
-    let shape = engine.shape();
+    let shape = engine.shape().unwrap();
     // Getting stroke color without setting stroke should return error
     let result = shape.stroke_color();
     assert!(result.is_err());
@@ -672,13 +672,13 @@ fn test_clip_lifecycle() {
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
-    let mut shape = engine.shape();
+    let mut shape = engine.shape().unwrap();
     shape
         .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
         .unwrap();
     shape.set_fill_color(255, 0, 0, 255).unwrap();
 
-    let mut clipper = engine.shape();
+    let mut clipper = engine.shape().unwrap();
     clipper.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
     shape.set_clip(clipper).unwrap();
 
@@ -696,7 +696,7 @@ fn test_asset_resolver_install_replace_clear() {
     use alloc::sync::Arc;
 
     let engine = Thorvg::init(0).unwrap();
-    let mut pic = engine.picture();
+    let mut pic = engine.picture().unwrap();
 
     let calls = Arc::new(AtomicUsize::new(0));
 
@@ -741,14 +741,14 @@ fn test_mask_getter_round_trip() {
     // heap-buffer-overflow on the BorrowedPaint side.
     let engine = Thorvg::init(0).unwrap();
 
-    let mut paint = engine.shape();
+    let mut paint = engine.shape().unwrap();
     paint
         .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
         .unwrap();
 
     assert!(paint.mask().is_none(), "no mask before set_mask");
 
-    let mut mask_shape = engine.shape();
+    let mut mask_shape = engine.shape().unwrap();
     mask_shape
         .append_circle(50.0, 50.0, 30.0, 30.0, true)
         .unwrap();
@@ -769,15 +769,15 @@ fn test_full_pipeline_scene_with_effects() {
     let mut buffer = vec![0u32; 200 * 200];
     unsafe { canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888) }.unwrap();
 
-    let mut scene = engine.scene();
+    let mut scene = engine.scene().unwrap();
 
-    let mut s1 = engine.shape();
+    let mut s1 = engine.shape().unwrap();
     s1.append_rect(10.0, 10.0, 80.0, 80.0, 5.0, 5.0, true)
         .unwrap();
     s1.set_fill_color(255, 0, 0, 255).unwrap();
     scene.push(s1).unwrap();
 
-    let mut s2 = engine.shape();
+    let mut s2 = engine.shape().unwrap();
     s2.append_circle(120.0, 50.0, 30.0, 30.0, true).unwrap();
     s2.set_fill_color(0, 0, 255, 255).unwrap();
     scene.push(s2).unwrap();

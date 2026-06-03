@@ -17,7 +17,7 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Background
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
@@ -50,7 +50,7 @@ fn main() {
         let y = margin + row * (cell_h + margin);
 
         // Red circle (bottom layer)
-        let mut circle1 = engine.shape();
+        let mut circle1 = engine.shape().unwrap();
         circle1
             .append_circle(x + 70.0, y + 60.0, 45.0, 45.0, true)
             .unwrap();
@@ -58,7 +58,7 @@ fn main() {
         canvas.push(circle1).unwrap();
 
         // Blue circle (top layer with blend)
-        let mut circle2 = engine.shape();
+        let mut circle2 = engine.shape().unwrap();
         circle2
             .append_circle(x + 110.0, y + 60.0, 45.0, 45.0, true)
             .unwrap();

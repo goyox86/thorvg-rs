@@ -62,14 +62,16 @@ unsafe impl Send for Text<'_> {}
 
 impl Text<'_> {
     /// Creates a new Text object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_text_new() };
-        assert!(!raw.is_null(), "failed to create Text");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             owned: true,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Sets the font family name.

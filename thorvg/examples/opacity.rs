@@ -23,7 +23,7 @@ fn main() {
     // Checkerboard background to show transparency
     for row in 0..(h / 20) {
         for col in 0..(w / 20) {
-            let mut sq = engine.shape();
+            let mut sq = engine.shape().unwrap();
             sq.append_rect(
                 col as f32 * 20.0,
                 row as f32 * 20.0,
@@ -42,7 +42,7 @@ fn main() {
 
     // Row of circles with decreasing opacity
     for i in 0..10 {
-        let mut circle = engine.shape();
+        let mut circle = engine.shape().unwrap();
         circle
             .append_circle(60.0 + i as f32 * 75.0, 150.0, 30.0, 30.0, true)
             .unwrap();
@@ -56,7 +56,7 @@ fn main() {
     // Overlapping semi-transparent rectangles
     let colors: &[(u8, u8, u8)] = &[(255, 0, 0), (0, 255, 0), (0, 0, 255)];
     for (i, &(r, g, b)) in colors.iter().enumerate() {
-        let mut rect = engine.shape();
+        let mut rect = engine.shape().unwrap();
         rect.append_rect(150.0 + i as f32 * 60.0, 50.0, 120.0, 80.0, 10.0, 10.0, true)
             .unwrap();
         rect.set_fill_color(r, g, b, 150).unwrap();

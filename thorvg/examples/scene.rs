@@ -22,17 +22,17 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Background ─────────────────────────────────────────────────
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
     canvas.push(bg).unwrap();
 
     // ── Scene with grouped shapes ──────────────────────────────────
-    let mut scene = engine.scene();
+    let mut scene = engine.scene().unwrap();
 
     // Green circle
-    let mut circle = engine.shape();
+    let mut circle = engine.shape().unwrap();
     circle
         .append_circle(150.0, 150.0, 80.0, 80.0, true)
         .unwrap();
@@ -40,14 +40,14 @@ fn main() {
     scene.push(circle).unwrap();
 
     // Semi-transparent blue rectangle overlapping the circle
-    let mut rect = engine.shape();
+    let mut rect = engine.shape().unwrap();
     rect.append_rect(100.0, 100.0, 150.0, 100.0, 10.0, 10.0, true)
         .unwrap();
     rect.set_fill_color(0, 0, 200, 180).unwrap();
     scene.push(rect).unwrap();
 
     // Yellow star-like shape using paths
-    let mut star = engine.shape();
+    let mut star = engine.shape().unwrap();
     star.move_to(350.0, 80.0).unwrap();
     star.line_to(370.0, 140.0).unwrap();
     star.line_to(430.0, 140.0).unwrap();

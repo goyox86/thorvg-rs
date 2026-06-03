@@ -10,16 +10,16 @@ mod common;
 use thorvg::{ColorSpace, EngineOption, Paint, Scene, Thorvg};
 
 fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
-    let mut scene = engine.scene();
+    let mut scene = engine.scene().unwrap();
 
-    let mut circle = engine.shape();
+    let mut circle = engine.shape().unwrap();
     circle
         .append_circle(x + 60.0, y + 60.0, 40.0, 40.0, true)
         .unwrap();
     circle.set_fill_color(0, 180, 80, 255).unwrap();
     scene.push(circle).unwrap();
 
-    let mut rect = engine.shape();
+    let mut rect = engine.shape().unwrap();
     rect.append_rect(x + 30.0, y + 30.0, 80.0, 60.0, 8.0, 8.0, true)
         .unwrap();
     rect.set_fill_color(80, 80, 220, 200).unwrap();
@@ -36,7 +36,7 @@ fn main() {
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Background
-    let mut bg = engine.shape();
+    let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(245, 245, 245, 255).unwrap();

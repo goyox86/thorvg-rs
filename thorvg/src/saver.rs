@@ -20,13 +20,15 @@ unsafe impl Send for Saver<'_> {}
 
 impl Saver<'_> {
     /// Creates a new Saver object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_saver_new() };
-        assert!(!raw.is_null(), "failed to create Saver");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Saves a paint object to a file path string.

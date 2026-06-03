@@ -18,14 +18,16 @@ unsafe impl Send for Scene<'_> {}
 
 impl Scene<'_> {
     /// Creates a new Scene object.
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self> {
         let raw = unsafe { sys::tvg_scene_new() };
-        assert!(!raw.is_null(), "failed to create Scene");
-        Self {
+        if raw.is_null() {
+            return Err(Error::FailedAllocation);
+        }
+        Ok(Self {
             raw,
             owned: true,
             _engine: core::marker::PhantomData,
-        }
+        })
     }
 
     /// Adds a paint object to the scene (appended at the end).
