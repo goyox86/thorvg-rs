@@ -269,11 +269,25 @@ impl PaintType {
     }
 }
 
+/// Sealed-trait marker.
+///
+/// `Paint::raw`/`into_raw`/`from_raw_paint` move opaque ThorVG
+/// pointers across the FFI boundary without any further validation;
+/// allowing downstream crates to implement [`Paint`] would let safe
+/// code hand bogus pointers to `tvg_canvas_add` etc.  The supertrait
+/// bound on [`sealed::Sealed`] makes the trait closed.
+pub(crate) mod sealed {
+    pub trait Sealed {}
+}
+
 /// Common trait for all paint objects (Shape, Scene, Picture, Text).
 ///
 /// Paint represents a graphical element that can be added to a canvas
 /// with transformations, opacity, masking, and clipping.
-pub trait Paint {
+///
+/// This trait is **sealed**: only types defined in this crate may
+/// implement it.
+pub trait Paint: sealed::Sealed {
     /// Returns the raw `Tvg_Paint` pointer.
     fn raw(&self) -> sys::Tvg_Paint;
 

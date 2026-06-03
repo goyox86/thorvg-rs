@@ -318,6 +318,8 @@ impl Picture<'_> {
     }
 }
 
+impl crate::paint::sealed::Sealed for Picture<'_> {}
+
 impl Paint for Picture<'_> {
     fn raw(&self) -> sys::Tvg_Paint {
         self.raw

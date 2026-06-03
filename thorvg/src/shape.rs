@@ -385,6 +385,8 @@ impl Shape<'_> {
     }
 }
 
+impl crate::paint::sealed::Sealed for Shape<'_> {}
+
 impl Paint for Shape<'_> {
     fn raw(&self) -> sys::Tvg_Paint {
         self.raw

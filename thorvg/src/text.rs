@@ -185,6 +185,8 @@ impl Text<'_> {
     // Font loading is engine-global state — see [`Thorvg::load_font_data`].
 }
 
+impl crate::paint::sealed::Sealed for Text<'_> {}
+
 impl Paint for Text<'_> {
     fn raw(&self) -> sys::Tvg_Paint {
         self.raw

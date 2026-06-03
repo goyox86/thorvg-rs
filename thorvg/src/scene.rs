@@ -143,6 +143,8 @@ impl Scene<'_> {
     }
 }
 
+impl crate::paint::sealed::Sealed for Scene<'_> {}
+
 impl Paint for Scene<'_> {
     fn raw(&self) -> sys::Tvg_Paint {
         self.raw
