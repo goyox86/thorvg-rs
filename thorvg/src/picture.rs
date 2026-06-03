@@ -402,6 +402,20 @@ fn load_raw_inner(
     cs: crate::ColorSpace,
     copy: bool,
 ) -> Result<()> {
+    // thorvg's `RawLoader::open` does an unchecked `memcpy` of
+    // `w * h * sizeof(u32)` from the supplied pointer (see upstream
+    // `tvgRawLoader.cpp`).  Guarantee here that `data` actually has
+    // that many elements before crossing the FFI boundary.
+    //
+    // Same pattern as `SwCanvas::set_target`: compute in `u64` so the
+    // `u32 * u32` product cannot wrap and slip a too-small buffer past
+    // the check.
+    let Some(needed) = u64::from(w).checked_mul(u64::from(h)) else {
+        return Err(Error::InvalidArguments);
+    };
+    if (data.len() as u64) < needed {
+        return Err(Error::InvalidArguments);
+    }
     Error::from_raw(unsafe { sys::tvg_picture_load_raw(raw, data.as_ptr(), w, h, cs.to_raw(), copy) })
 }
 
