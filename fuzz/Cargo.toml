@@ -29,3 +29,10 @@ path = "fuzz_targets/picture_load_raw.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "shape_append_path"
+path = "fuzz_targets/shape_append_path.rs"
+test = false
+doc = false
+bench = false
