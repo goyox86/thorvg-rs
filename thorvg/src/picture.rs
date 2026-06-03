@@ -72,11 +72,14 @@ pub struct Picture<'eng> {
     raw: sys::Tvg_Paint,
     owned: bool,
     /// Boxed asset resolver, kept alive for the picture's lifetime.
-    /// The C side stores a stable address into this box that fires
-    /// during `load` / `load_data` whenever an external asset is
-    /// referenced.  `None` until [`Picture::set_asset_resolver`]
-    /// is called.
-    resolver: Option<alloc::boxed::Box<AssetResolverFn>>,
+    /// The outer `Box` is what `Picture` owns; the C side stores the
+    /// address of the *inner* `Box` value, which lives on the heap
+    /// (the outer `Box`'s allocation).  That address is stable
+    /// regardless of where the `Picture` itself lives — so moving the
+    /// `Picture` between [`set_asset_resolver`](Self::set_asset_resolver)
+    /// and a `load*` call does not invalidate the pointer thorvg holds.
+    /// `None` until [`set_asset_resolver`](Self::set_asset_resolver) is called.
+    resolver: Option<alloc::boxed::Box<alloc::boxed::Box<AssetResolverFn>>>,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
@@ -273,14 +276,19 @@ impl Picture<'_> {
             }
         }
         // Now safe to swap.  Box<dyn> is fat; we need a thin
-        // pointer for FFI, so we pass the address of the Box
-        // itself (not its pointee).  The trampoline reconstructs
-        // `&mut Box<...>` from this ptr.
-        self.resolver = Some(alloc::boxed::Box::new(resolver));
-        let data_ptr: *mut alloc::boxed::Box<AssetResolverFn> = self.resolver.as_mut().unwrap();
-        // SAFETY: `data_ptr` references a field we just installed;
-        // `Picture::Drop` unregisters the resolver before the Box
-        // is freed, so C never dereferences a dangling pointer.
+        // pointer for FFI, so we pass the address of the *inner*
+        // Box value, which lives on the heap inside the outer Box's
+        // allocation.  That heap address is stable across moves of
+        // `Picture`, so storing it in C is safe even if the wrapper
+        // is later moved.  The trampoline reconstructs
+        // `&mut Box<dyn ...>` from this ptr.
+        self.resolver = Some(alloc::boxed::Box::new(alloc::boxed::Box::new(resolver)));
+        let outer = self.resolver.as_mut().unwrap();
+        let data_ptr: *mut alloc::boxed::Box<AssetResolverFn> = &raw mut **outer;
+        // SAFETY: `data_ptr` references a heap allocation owned by
+        // `self.resolver`; `Picture::Drop` unregisters the resolver
+        // before that allocation is freed, so C never dereferences
+        // a dangling pointer.
         Error::from_raw(unsafe {
             sys::tvg_picture_set_asset_resolver(
                 self.raw,
