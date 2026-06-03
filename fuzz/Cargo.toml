@@ -36,3 +36,10 @@ path = "fuzz_targets/shape_append_path.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "asset_resolver"
+path = "fuzz_targets/asset_resolver.rs"
+test = false
+doc = false
+bench = false
