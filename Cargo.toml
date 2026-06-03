@@ -1,3 +1,4 @@
 [workspace]
 members = ["thorvg-sys", "thorvg"]
+exclude = ["fuzz"]
 resolver = "2"

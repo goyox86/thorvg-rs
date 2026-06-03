@@ -1,0 +1,31 @@
+[package]
+name = "thorvg-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+thorvg = { path = "../thorvg" }
+
+# Standalone manifest so cargo-fuzz can pick its own target-dir without
+# interfering with the parent workspace.
+[workspace]
+
+[[bin]]
+name = "picture_load_data"
+path = "fuzz_targets/picture_load_data.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "picture_load_raw"
+path = "fuzz_targets/picture_load_raw.rs"
+test = false
+doc = false
+bench = false
