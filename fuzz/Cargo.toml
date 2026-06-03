@@ -50,3 +50,10 @@ path = "fuzz_targets/lottie_load_and_play.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "text_glyph_metrics"
+path = "fuzz_targets/text_glyph_metrics.rs"
+test = false
+doc = false
+bench = false
