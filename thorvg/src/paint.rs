@@ -351,7 +351,7 @@ impl PaintType {
             sys::Tvg_Type::TVG_TYPE_TEXT => Self::Text,
             sys::Tvg_Type::TVG_TYPE_LINEAR_GRAD => Self::LinearGradient,
             sys::Tvg_Type::TVG_TYPE_RADIAL_GRAD => Self::RadialGradient,
-            _ => Self::Undefined,
+            sys::Tvg_Type::TVG_TYPE_UNDEF => Self::Undefined,
         }
     }
 }
