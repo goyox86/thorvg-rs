@@ -19,9 +19,17 @@
 //! trampolines invoked by the C++ engine.  In `std` builds the
 //! trampolines wrap each closure call in [`std::panic::catch_unwind`]
 //! and convert panics to a "failure" return; in `no_std` builds there
-//! is no `catch_unwind`, so consumers **must** build with
-//! `panic = "abort"`.  Aborting before unwind reaches the FFI edge is
-//! the only sound option there.
+//! is no `catch_unwind`.
+//!
+//! This is sound regardless: a panic in your closure reaches the
+//! mandatory `#[panic_handler]`, which diverges (`-> !`) and so cannot
+//! unwind back across the trampoline into the C++ frame.  As a second
+//! backstop, the `extern "C"` trampolines are `nounwind` (Rust ≥ 1.81),
+//! so any forced unwind out of them aborts rather than invoking UB.
+//! Building with `panic = "abort"` is nonetheless **recommended** for
+//! `no_std`: it makes a panic terminate deterministically instead of
+//! depending on `#[panic_handler]` behaviour, and bare-metal targets
+//! usually require it to link anyway (no `eh_personality`).
 //!
 //! # Quick Start
 //!
