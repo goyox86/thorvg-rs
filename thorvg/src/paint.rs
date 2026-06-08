@@ -4,6 +4,21 @@ use thorvg_sys as sys;
 
 /// A 3×3 affine transformation matrix.
 ///
+/// The layout is row-major and matches thorvg's `Tvg_Matrix`:
+///
+/// ```text
+/// | e11 e12 e13 |
+/// | e21 e22 e23 |
+/// | e31 e32 e33 |
+/// ```
+///
+/// It transforms a column vector `[x y 1]ᵀ`, so:
+/// - `e11`, `e12`, `e21`, `e22` form the rotation/scale block.
+/// - `e13`, `e23` hold the x and y **translation** (third column,
+///   not the bottom row).
+/// - `e31`, `e32` are `0` and `e33` is `1` for a well-formed affine
+///   transform; see [`IDENTITY`](Self::IDENTITY).
+///
 /// Note: `PartialEq` uses exact floating-point comparison.
 /// Use approximate comparison for transformed values.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -224,13 +239,7 @@ impl<'a> BorrowedPaint<'a> {
     pub fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
         let (mut x, mut y, mut w, mut h) = (0f32, 0f32, 0f32, 0f32);
         Error::from_raw(unsafe {
-            sys::tvg_paint_get_aabb(
-                self.raw,
-                &raw mut x,
-                &raw mut y,
-                &raw mut w,
-                &raw mut h,
-            )
+            sys::tvg_paint_get_aabb(self.raw, &raw mut x, &raw mut y, &raw mut w, &raw mut h)
         })?;
         Ok((x, y, w, h))
     }
@@ -480,7 +489,10 @@ pub trait Paint: sealed::Sealed {
         // SAFETY: target is non-null and refers to a paint owned by
         // `self` (the masking source); the BorrowedPaint's lifetime
         // is bounded by `&self`.
-        Some((unsafe { BorrowedPaint::from_raw(target) }, MaskMethod::from_raw(method)))
+        Some((
+            unsafe { BorrowedPaint::from_raw(target) },
+            MaskMethod::from_raw(method),
+        ))
     }
 
     /// Sets the blending method.
