@@ -155,6 +155,14 @@ pub struct Point {
 }
 
 /// Blending method for compositing paint objects.
+///
+/// Covers thorvg's user-facing blend modes (`Tvg_Blend_Method`
+/// `NORMAL`..=`ADD`). The C enum's `TVG_BLEND_METHOD_COMPOSITION`
+/// (= 255) is deliberately omitted: it is an internal value the engine
+/// uses for intermediate composition, not a mode callers select. Blend
+/// is write-only in the C API (there is no `tvg_paint_get_blend_method`),
+/// so the engine never hands a value back that would need mapping here —
+/// hence this enum has only `to_raw` and no `from_raw`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 #[non_exhaustive]
@@ -249,7 +257,7 @@ impl MaskMethod {
             sys::Tvg_Mask_Method::TVG_MASK_METHOD_DIFFERENCE => Self::Difference,
             sys::Tvg_Mask_Method::TVG_MASK_METHOD_LIGHTEN => Self::Lighten,
             sys::Tvg_Mask_Method::TVG_MASK_METHOD_DARKEN => Self::Darken,
-            _ => Self::None,
+            sys::Tvg_Mask_Method::TVG_MASK_METHOD_NONE => Self::None,
         }
     }
 }
