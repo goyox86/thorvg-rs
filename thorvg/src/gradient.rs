@@ -16,6 +16,17 @@ pub struct ColorStop {
 }
 
 /// How to fill the area outside the gradient bounds.
+///
+/// # Naming
+///
+/// This maps to thorvg's C enum `Tvg_Stroke_Fill`. The C name is
+/// generic because thorvg reuses one enum for both stroke dash/fill
+/// behavior and gradient spread; here it is only ever used for the
+/// latter, so the Rust binding is named `FillSpread` to reflect the
+/// gradient-spread role. The variants correspond one-to-one:
+/// [`Pad`](Self::Pad) → `TVG_STROKE_FILL_PAD`,
+/// [`Reflect`](Self::Reflect) → `TVG_STROKE_FILL_REFLECT`,
+/// [`Repeat`](Self::Repeat) → `TVG_STROKE_FILL_REPEAT`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FillSpread {
@@ -35,103 +46,11 @@ impl FillSpread {
 
     fn from_raw(s: sys::Tvg_Stroke_Fill) -> Self {
         match s {
+            sys::Tvg_Stroke_Fill::TVG_STROKE_FILL_PAD => FillSpread::Pad,
             sys::Tvg_Stroke_Fill::TVG_STROKE_FILL_REFLECT => FillSpread::Reflect,
             sys::Tvg_Stroke_Fill::TVG_STROKE_FILL_REPEAT => FillSpread::Repeat,
-            _ => FillSpread::Pad,
         }
     }
-}
-
-// ── Shared helpers ─────────────────────────────────────────────────
-
-#[allow(clippy::cast_possible_truncation)]
-fn set_color_stops_raw(raw: sys::Tvg_Gradient, stops: &[ColorStop]) -> Result<()> {
-    let raw_stops: Vec<sys::Tvg_Color_Stop> = stops
-        .iter()
-        .map(|s| sys::Tvg_Color_Stop {
-            offset: s.offset,
-            r: s.r,
-            g: s.g,
-            b: s.b,
-            a: s.a,
-        })
-        .collect();
-    Error::from_raw(unsafe {
-        sys::tvg_gradient_set_color_stops(raw, raw_stops.as_ptr(), raw_stops.len() as u32)
-    })
-}
-
-fn get_color_stops_raw(raw: sys::Tvg_Gradient) -> Result<Vec<ColorStop>> {
-    let mut ptr: *const sys::Tvg_Color_Stop = core::ptr::null();
-    let mut cnt: u32 = 0;
-    Error::from_raw(unsafe { sys::tvg_gradient_get_color_stops(raw, &raw mut ptr, &raw mut cnt) })?;
-    if ptr.is_null() || cnt == 0 {
-        return Ok(Vec::new());
-    }
-    let slice = unsafe { core::slice::from_raw_parts(ptr, cnt as usize) };
-    Ok(slice
-        .iter()
-        .map(|s| ColorStop {
-            offset: s.offset,
-            r: s.r,
-            g: s.g,
-            b: s.b,
-            a: s.a,
-        })
-        .collect())
-}
-
-fn get_spread_raw(raw: sys::Tvg_Gradient) -> Result<FillSpread> {
-    let mut spread = sys::Tvg_Stroke_Fill::TVG_STROKE_FILL_PAD;
-    Error::from_raw(unsafe { sys::tvg_gradient_get_spread(raw, &raw mut spread) })?;
-    Ok(FillSpread::from_raw(spread))
-}
-
-fn set_transform_raw(raw: sys::Tvg_Gradient, m: &Matrix) -> Result<()> {
-    let rm = sys::Tvg_Matrix {
-        e11: m.e11,
-        e12: m.e12,
-        e13: m.e13,
-        e21: m.e21,
-        e22: m.e22,
-        e23: m.e23,
-        e31: m.e31,
-        e32: m.e32,
-        e33: m.e33,
-    };
-    Error::from_raw(unsafe { sys::tvg_gradient_set_transform(raw, &raw const rm) })
-}
-
-fn get_type_raw(raw: sys::Tvg_Gradient) -> Result<PaintType> {
-    let mut t = sys::Tvg_Type::TVG_TYPE_UNDEF;
-    Error::from_raw(unsafe { sys::tvg_gradient_get_type(raw, &raw mut t) })?;
-    Ok(PaintType::from_raw(t))
-}
-
-fn get_transform_raw(raw: sys::Tvg_Gradient) -> Result<Matrix> {
-    let mut m = sys::Tvg_Matrix {
-        e11: 0.0,
-        e12: 0.0,
-        e13: 0.0,
-        e21: 0.0,
-        e22: 0.0,
-        e23: 0.0,
-        e31: 0.0,
-        e32: 0.0,
-        e33: 0.0,
-    };
-    Error::from_raw(unsafe { sys::tvg_gradient_get_transform(raw, &raw mut m) })?;
-    Ok(Matrix {
-        e11: m.e11,
-        e12: m.e12,
-        e13: m.e13,
-        e21: m.e21,
-        e22: m.e22,
-        e23: m.e23,
-        e31: m.e31,
-        e32: m.e32,
-        e33: m.e33,
-    })
 }
 
 // ── LinearGradient ─────────────────────────────────────────────────
@@ -204,8 +123,14 @@ impl LinearGradient<'_> {
     }
 
     /// Gets the affine transformation matrix.
-    pub fn get_transform(&self) -> Result<Matrix> {
+    pub fn transform(&self) -> Result<Matrix> {
         get_transform_raw(self.raw)
+    }
+
+    /// Gets the affine transformation matrix.
+    #[deprecated(since = "0.2.0", note = "renamed to `transform` for consistency with `Paint::transform`")]
+    pub fn get_transform(&self) -> Result<Matrix> {
+        self.transform()
     }
 
     /// Gets the gradient type.
@@ -320,8 +245,14 @@ impl RadialGradient<'_> {
     }
 
     /// Gets the affine transformation matrix.
-    pub fn get_transform(&self) -> Result<Matrix> {
+    pub fn transform(&self) -> Result<Matrix> {
         get_transform_raw(self.raw)
+    }
+
+    /// Gets the affine transformation matrix.
+    #[deprecated(since = "0.2.0", note = "renamed to `transform` for consistency with `Paint::transform`")]
+    pub fn get_transform(&self) -> Result<Matrix> {
+        self.transform()
     }
 
     /// Gets the gradient type.
@@ -356,4 +287,96 @@ impl Drop for RadialGradient<'_> {
             sys::tvg_gradient_del(self.raw);
         }
     }
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────
+
+#[allow(clippy::cast_possible_truncation)]
+fn set_color_stops_raw(raw: sys::Tvg_Gradient, stops: &[ColorStop]) -> Result<()> {
+    let raw_stops: Vec<sys::Tvg_Color_Stop> = stops
+        .iter()
+        .map(|s| sys::Tvg_Color_Stop {
+            offset: s.offset,
+            r: s.r,
+            g: s.g,
+            b: s.b,
+            a: s.a,
+        })
+        .collect();
+    Error::from_raw(unsafe {
+        sys::tvg_gradient_set_color_stops(raw, raw_stops.as_ptr(), raw_stops.len() as u32)
+    })
+}
+
+fn get_color_stops_raw(raw: sys::Tvg_Gradient) -> Result<Vec<ColorStop>> {
+    let mut ptr: *const sys::Tvg_Color_Stop = core::ptr::null();
+    let mut cnt: u32 = 0;
+    Error::from_raw(unsafe { sys::tvg_gradient_get_color_stops(raw, &raw mut ptr, &raw mut cnt) })?;
+    if ptr.is_null() || cnt == 0 {
+        return Ok(Vec::new());
+    }
+    let slice = unsafe { core::slice::from_raw_parts(ptr, cnt as usize) };
+    Ok(slice
+        .iter()
+        .map(|s| ColorStop {
+            offset: s.offset,
+            r: s.r,
+            g: s.g,
+            b: s.b,
+            a: s.a,
+        })
+        .collect())
+}
+
+fn get_spread_raw(raw: sys::Tvg_Gradient) -> Result<FillSpread> {
+    let mut spread = sys::Tvg_Stroke_Fill::TVG_STROKE_FILL_PAD;
+    Error::from_raw(unsafe { sys::tvg_gradient_get_spread(raw, &raw mut spread) })?;
+    Ok(FillSpread::from_raw(spread))
+}
+
+fn set_transform_raw(raw: sys::Tvg_Gradient, m: &Matrix) -> Result<()> {
+    let rm = sys::Tvg_Matrix {
+        e11: m.e11,
+        e12: m.e12,
+        e13: m.e13,
+        e21: m.e21,
+        e22: m.e22,
+        e23: m.e23,
+        e31: m.e31,
+        e32: m.e32,
+        e33: m.e33,
+    };
+    Error::from_raw(unsafe { sys::tvg_gradient_set_transform(raw, &raw const rm) })
+}
+
+fn get_type_raw(raw: sys::Tvg_Gradient) -> Result<PaintType> {
+    let mut t = sys::Tvg_Type::TVG_TYPE_UNDEF;
+    Error::from_raw(unsafe { sys::tvg_gradient_get_type(raw, &raw mut t) })?;
+    Ok(PaintType::from_raw(t))
+}
+
+fn get_transform_raw(raw: sys::Tvg_Gradient) -> Result<Matrix> {
+    let mut m = sys::Tvg_Matrix {
+        e11: 0.0,
+        e12: 0.0,
+        e13: 0.0,
+        e21: 0.0,
+        e22: 0.0,
+        e23: 0.0,
+        e31: 0.0,
+        e32: 0.0,
+        e33: 0.0,
+    };
+    Error::from_raw(unsafe { sys::tvg_gradient_get_transform(raw, &raw mut m) })?;
+    Ok(Matrix {
+        e11: m.e11,
+        e12: m.e12,
+        e13: m.e13,
+        e21: m.e21,
+        e22: m.e22,
+        e23: m.e23,
+        e31: m.e31,
+        e32: m.e32,
+        e33: m.e33,
+    })
 }

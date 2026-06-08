@@ -280,6 +280,14 @@ impl Thorvg {
     /// Loads a font from a file path string into the engine's font
     /// registry, keyed by the path.  Fonts persist for the engine's
     /// lifetime or until [`unload_font_from_str`](Self::unload_font_from_str).
+    ///
+    /// # Runtime requirements
+    ///
+    /// thorvg reads the file with the C runtime (`fopen`/`fread`), so
+    /// this requires a working filesystem at runtime even though it
+    /// compiles under `no_std`.  On bare-metal targets with no libc
+    /// filesystem it returns an error; embed the font and use
+    /// [`load_font_data_static`](Self::load_font_data_static) instead.
     pub fn load_font_from_str(&self, path: &str) -> Result<()> {
         let c_path = alloc::ffi::CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe { sys::tvg_font_load(c_path.as_ptr()) })
@@ -292,6 +300,10 @@ impl Thorvg {
     }
 
     /// Unloads a previously loaded font by path string.
+    ///
+    /// As with [`load_font_from_str`](Self::load_font_from_str), the
+    /// path keys into thorvg's registry; this needs the same working
+    /// filesystem at runtime under `no_std`.
     pub fn unload_font_from_str(&self, path: &str) -> Result<()> {
         let c_path = alloc::ffi::CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe { sys::tvg_font_unload(c_path.as_ptr()) })
@@ -311,12 +323,7 @@ impl Thorvg {
     /// non-`'static` buffers; for zero-copy registration of
     /// `'static` data (e.g. `include_bytes!(...)`), use
     /// [`load_font_data_static`](Self::load_font_data_static).
-    pub fn load_font_data(
-        &self,
-        name: &str,
-        data: &[u8],
-        mimetype: Option<&str>,
-    ) -> Result<()> {
+    pub fn load_font_data(&self, name: &str, data: &[u8], mimetype: Option<&str>) -> Result<()> {
         load_font_data_inner(name, data, mimetype, /* copy = */ true)
     }
 
@@ -362,12 +369,7 @@ impl Drop for Thorvg {
 }
 
 #[allow(clippy::cast_possible_truncation)]
-fn load_font_data_inner(
-    name: &str,
-    data: &[u8],
-    mimetype: Option<&str>,
-    copy: bool,
-) -> Result<()> {
+fn load_font_data_inner(name: &str, data: &[u8], mimetype: Option<&str>, copy: bool) -> Result<()> {
     let c_name = alloc::ffi::CString::new(name).map_err(|_| Error::InvalidArguments)?;
     let c_mime = mimetype
         .map(|m| alloc::ffi::CString::new(m).map_err(|_| Error::InvalidArguments))
