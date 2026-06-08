@@ -30,6 +30,11 @@ impl FilterMethod {
 /// depends on the `thorvg-sys` features enabled (e.g. `svg`,
 /// `png`, `lottie`); selecting a format whose loader isn't
 /// compiled returns `Error::NonSupport`.
+///
+/// GIF is intentionally not represented here: thorvg's loader
+/// manager has no mime string or extension for it (it is detected
+/// by content sniffing only), so there is no mime value a
+/// `MimeType::Gif` could carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum MimeType {
@@ -123,6 +128,14 @@ impl Picture<'_> {
     }
 
     /// Loads a picture from a file path string.
+    ///
+    /// # Runtime requirements
+    ///
+    /// thorvg reads the file with the C runtime (`fopen`/`fread`), so
+    /// this requires a working filesystem at runtime even though it
+    /// compiles under `no_std`. On bare-metal targets with no libc
+    /// filesystem it returns an error; embed the asset and use
+    /// [`load_data_static`](Self::load_data_static) instead.
     pub fn load_from_str(&mut self, path: &str) -> Result<()> {
         let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe { sys::tvg_picture_load(self.raw, c_path.as_ptr()) })
