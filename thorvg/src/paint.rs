@@ -48,6 +48,69 @@ impl Matrix {
         e33: 1.0,
     };
 
+    /// Row-major 3×3 multiply: `self × rhs`, matching thorvg's
+    /// `operator*` (tvgMath.cpp). The combinators build the new
+    /// operation as the left operand so it applies *after* `self`.
+    #[must_use]
+    fn multiply(self, rhs: Matrix) -> Matrix {
+        Matrix {
+            e11: self.e11 * rhs.e11 + self.e12 * rhs.e21 + self.e13 * rhs.e31,
+            e12: self.e11 * rhs.e12 + self.e12 * rhs.e22 + self.e13 * rhs.e32,
+            e13: self.e11 * rhs.e13 + self.e12 * rhs.e23 + self.e13 * rhs.e33,
+            e21: self.e21 * rhs.e11 + self.e22 * rhs.e21 + self.e23 * rhs.e31,
+            e22: self.e21 * rhs.e12 + self.e22 * rhs.e22 + self.e23 * rhs.e32,
+            e23: self.e21 * rhs.e13 + self.e22 * rhs.e23 + self.e23 * rhs.e33,
+            e31: self.e31 * rhs.e11 + self.e32 * rhs.e21 + self.e33 * rhs.e31,
+            e32: self.e31 * rhs.e12 + self.e32 * rhs.e22 + self.e33 * rhs.e32,
+            e33: self.e31 * rhs.e13 + self.e32 * rhs.e23 + self.e33 * rhs.e33,
+        }
+    }
+
+    /// Returns `self` with a translation applied after it.
+    ///
+    /// Combinators chain in reading order: `m.translate(..).rotate(..)`
+    /// translates first, then rotates. Note this is *true* matrix
+    /// composition — unlike thorvg's incremental [`Paint::translate`],
+    /// which always keeps the translation outermost. Build the matrix
+    /// here and hand it to `set_transform` for full control.
+    #[must_use]
+    pub fn translate(self, x: f32, y: f32) -> Matrix {
+        Matrix {
+            e13: x,
+            e23: y,
+            ..Matrix::IDENTITY
+        }
+        .multiply(self)
+    }
+
+    /// Returns `self` with a (possibly non-uniform) scale applied after
+    /// it. `Paint::scale` only does uniform scaling; this allows `sx != sy`.
+    #[must_use]
+    pub fn scale(self, sx: f32, sy: f32) -> Matrix {
+        Matrix {
+            e11: sx,
+            e22: sy,
+            ..Matrix::IDENTITY
+        }
+        .multiply(self)
+    }
+
+    /// Returns `self` with a rotation applied after it. `degrees`
+    /// matches the unit of [`Paint::rotate`].
+    #[must_use]
+    pub fn rotate(self, degrees: f32) -> Matrix {
+        let r = degrees.to_radians();
+        let (s, c) = (libm::sinf(r), libm::cosf(r));
+        Matrix {
+            e11: c,
+            e12: -s,
+            e21: s,
+            e22: c,
+            ..Matrix::IDENTITY
+        }
+        .multiply(self)
+    }
+
     fn to_raw(self) -> sys::Tvg_Matrix {
         sys::Tvg_Matrix {
             e11: self.e11,
@@ -74,6 +137,13 @@ impl Matrix {
             e32: m.e32,
             e33: m.e33,
         }
+    }
+}
+
+impl Default for Matrix {
+    /// The identity matrix; see [`Matrix::IDENTITY`].
+    fn default() -> Self {
+        Self::IDENTITY
     }
 }
 
@@ -199,7 +269,7 @@ pub struct BorrowedPaint<'a> {
     _life: core::marker::PhantomData<&'a ()>,
 }
 
-impl<'a> BorrowedPaint<'a> {
+impl BorrowedPaint<'_> {
     /// # Safety
     /// `raw` must be a valid paint handle whose owner outlives `'a`.
     pub(crate) unsafe fn from_raw(raw: sys::Tvg_Paint) -> Self {

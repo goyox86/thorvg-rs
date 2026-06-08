@@ -379,6 +379,128 @@ fn test_paint_transform_roundtrip() {
     assert!((got.e23 - 20.0).abs() < f32::EPSILON);
 }
 
+// ── Matrix combinators ─────────────────────────────────────────────
+//
+// These cross-check our pure-Rust `Matrix` builders against the matrix
+// thorvg itself composes from its incremental `Paint` ops, so the two
+// paths can never silently diverge (e.g. a flipped rotation sign).
+
+/// Asserts two matrices agree element-wise within an f32 tolerance.
+/// thorvg's trig (`cosf`/`sinf`) and ours (`libm`) may differ in the
+/// last bits, so exact equality is not appropriate for rotations.
+fn assert_matrix_close(got: &Matrix, want: &Matrix) {
+    const TOL: f32 = 1e-4;
+    for (g, w, name) in [
+        (got.e11, want.e11, "e11"),
+        (got.e12, want.e12, "e12"),
+        (got.e13, want.e13, "e13"),
+        (got.e21, want.e21, "e21"),
+        (got.e22, want.e22, "e22"),
+        (got.e23, want.e23, "e23"),
+        (got.e31, want.e31, "e31"),
+        (got.e32, want.e32, "e32"),
+        (got.e33, want.e33, "e33"),
+    ] {
+        assert!((g - w).abs() < TOL, "{name}: got {g}, want {w}");
+    }
+}
+
+#[test]
+fn test_matrix_default_is_identity() {
+    // What: `Default` returns the identity matrix.
+    // Why trustworthy: pure value check against the `IDENTITY` constant,
+    // no FFI involved. Guards the cheap-but-easy-to-break promise that
+    // `Matrix::default()` is a usable neutral element for the
+    // combinators below (they all start from it).
+    assert_eq!(Matrix::default(), Matrix::IDENTITY);
+}
+
+#[test]
+fn test_matrix_translate_matches_thorvg() {
+    // What: our `translate` builder equals the matrix thorvg composes
+    // for the same translation.
+    // Why trustworthy: the expected value is not hard-coded — it is read
+    // back from thorvg via `shape.transform()` after `shape.translate`,
+    // so the engine itself is the oracle. If our element placement
+    // (translation in e13/e23) ever disagreed with thorvg, this fails.
+    let engine = Thorvg::init(0).unwrap();
+    let mut shape = engine.shape().unwrap();
+    shape.translate(10.0, 20.0).unwrap();
+    let thorvg_m = shape.transform().unwrap();
+    assert_matrix_close(&Matrix::default().translate(10.0, 20.0), &thorvg_m);
+}
+
+#[test]
+fn test_matrix_scale_matches_thorvg() {
+    // What: our `scale` builder equals thorvg's scale matrix.
+    // Why trustworthy: oracle is `shape.transform()` after a real
+    // `shape.scale`, not a constant. Note `Paint::scale` is uniform, so
+    // we pass equal axes here; the non-uniform path is exercised by the
+    // composition/round-trip tests.
+    let engine = Thorvg::init(0).unwrap();
+    let mut shape = engine.shape().unwrap();
+    shape.scale(2.5).unwrap();
+    let thorvg_m = shape.transform().unwrap();
+    assert_matrix_close(&Matrix::default().scale(2.5, 2.5), &thorvg_m);
+}
+
+#[test]
+fn test_matrix_rotate_matches_thorvg() {
+    // What: our `rotate` builder equals thorvg's rotation matrix — the
+    // single most drift-prone op (sign, degrees-vs-radians, sin/cos
+    // placement).
+    // Why trustworthy: the oracle is thorvg's own `tvg::rotate` output,
+    // surfaced through `shape.transform()`. Because our trig comes from
+    // `libm` and thorvg's from system `cosf`/`sinf`, exact equality is
+    // wrong here — `assert_matrix_close` tolerates last-bit float
+    // differences while still failing on any convention mismatch (a
+    // flipped sign moves an element by ~2·sin, far above tolerance).
+    let engine = Thorvg::init(0).unwrap();
+    let mut shape = engine.shape().unwrap();
+    shape.rotate(30.0).unwrap();
+    let thorvg_m = shape.transform().unwrap();
+    assert_matrix_close(&Matrix::default().rotate(30.0), &thorvg_m);
+}
+
+#[test]
+fn test_matrix_scale_then_rotate_matches_thorvg() {
+    // What: our combinator composition `scale(..).rotate(..)` equals
+    // thorvg's composed result.
+    // Why trustworthy: this is the test that pins multiply *order*.
+    // Single-op tests pass even if `multiply` swapped its operands,
+    // because identity·X == X·identity hides the bug. Scale and rotate
+    // do not commute, so composing them is what actually distinguishes
+    // R·S from S·R. The oracle is thorvg's `update()`, which always
+    // applies scale then rotate to the 2×2 block (tvgPaint.h)
+    // regardless of call order — matching our `scale(..).rotate(..)`.
+    let engine = Thorvg::init(0).unwrap();
+    let mut shape = engine.shape().unwrap();
+    shape.scale(1.5).unwrap();
+    shape.rotate(40.0).unwrap();
+    let thorvg_m = shape.transform().unwrap();
+    assert_matrix_close(&Matrix::default().scale(1.5, 1.5).rotate(40.0), &thorvg_m);
+}
+
+#[test]
+fn test_matrix_combinator_roundtrips_through_thorvg() {
+    // What: a fully hand-composed matrix survives `set_transform` ->
+    // `transform` unchanged.
+    // Why trustworthy: this isolates the FFI marshalling from the math.
+    // `set_transform` marks the paint user-overridden, so thorvg's
+    // `update()` returns early and hands our matrix back verbatim — any
+    // transposed or mismapped field in `to_raw`/`from_raw` shows up as a
+    // mismatch. Uses a non-uniform scale and a non-trivial chain so all
+    // nine elements are non-default.
+    let engine = Thorvg::init(0).unwrap();
+    let mut shape = engine.shape().unwrap();
+    let m = Matrix::default()
+        .translate(5.0, -3.0)
+        .rotate(25.0)
+        .scale(2.0, 0.5);
+    shape.set_transform(&m).unwrap();
+    assert_matrix_close(&shape.transform().unwrap(), &m);
+}
+
 #[test]
 fn test_paint_id_roundtrip() {
     let engine = Thorvg::init(0).unwrap();

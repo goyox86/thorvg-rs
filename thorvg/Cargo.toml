@@ -38,6 +38,8 @@ file-io = ["thorvg-sys/file-io"]
 
 [dependencies]
 thorvg-sys = { path = "../thorvg-sys", version = "1.0.5", default-features = false }
+# no_std trig for Matrix::rotate (sinf/cosf are unavailable in core).
+libm = "0.2"
 
 [dev-dependencies]
 png = "0.17"
