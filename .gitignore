@@ -3,3 +3,6 @@ Cargo.lock
 *.png
 *.ppm
 .pi-lens/
+
+# Test fixtures (CC0) tracked despite the global *.png ignore above.
+!thorvg/tests/assets/*.png

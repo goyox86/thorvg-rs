@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Public-domain test fixture for the thorvg-rs asset-resolver tests.
+  Hand-authored; not affiliated with the official ThorVG brand assets.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#141e3c"/>
+  <polygon points="16,4 28,16 16,28 4,16" fill="#ff8c28"/>
+  <polygon points="16,10 22,16 16,22 10,16" fill="#ffffff"/>
+</svg>

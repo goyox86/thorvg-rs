@@ -76,23 +76,55 @@ impl MimeType {
 pub struct Picture<'eng> {
     raw: sys::Tvg_Paint,
     owned: bool,
-    /// Boxed asset resolver, kept alive for the picture's lifetime.
-    /// The outer `Box` is what `Picture` owns; the C side stores the
-    /// address of the *inner* `Box` value, which lives on the heap
-    /// (the outer `Box`'s allocation).  That address is stable
-    /// regardless of where the `Picture` itself lives — so moving the
-    /// `Picture` between [`set_asset_resolver`](Self::set_asset_resolver)
-    /// and a `load*` call does not invalidate the pointer thorvg holds.
+    /// Type-erased asset resolver, kept alive for the picture's
+    /// lifetime.  The closure lives in its own `Box<F>` on the
+    /// heap; `data` is a thin pointer to that allocation, which
+    /// thorvg stores verbatim and feeds back to the monomorphized
+    /// trampoline.  Moving the `Picture` does not invalidate the
+    /// pointer because the closure stays at its heap address.
     /// `None` until [`set_asset_resolver`](Self::set_asset_resolver) is called.
-    resolver: Option<alloc::boxed::Box<alloc::boxed::Box<AssetResolverFn>>>,
+    resolver: Option<ErasedResolver>,
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
-/// Boxed closure type behind the asset resolver registration.
-/// `Send + 'static` so `Picture` stays `Send` and the closure
-/// outlives any rendering thread that may invoke it.
-type AssetResolverFn =
-    dyn FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static;
+/// Owning, type-erased handle to a heap-allocated resolver closure.
+///
+/// Avoids the `Box<Box<dyn ...>>` double-indirection a `dyn` resolver
+/// would require: each `set_asset_resolver::<F>` call monomorphizes
+/// its own trampoline that casts the thin `data` pointer back to
+/// `*mut F` directly, and `drop_fn` reconstructs the original
+/// `Box<F>` so the right `Drop` runs.
+struct ErasedResolver {
+    /// Thin pointer to a heap-allocated `F` produced by
+    /// `Box::into_raw(Box::<F>::new(...))`.
+    data: core::ptr::NonNull<()>,
+    /// Reconstructs and drops the original `Box<F>`.  Set to the
+    /// monomorphized `drop_resolver::<F>` at construction so the
+    /// concrete type is preserved across erasure.
+    drop_fn: unsafe fn(core::ptr::NonNull<()>),
+}
+
+impl Drop for ErasedResolver {
+    fn drop(&mut self) {
+        // SAFETY: `data` was produced by `Box::<F>::into_raw` and
+        // `drop_fn` was set to `drop_resolver::<F>` for the same
+        // `F` at construction time, so the cast inside is sound.
+        unsafe { (self.drop_fn)(self.data) }
+    }
+}
+
+// SAFETY: `set_asset_resolver` requires `F: Send`, so the boxed
+// closure behind `data` is `Send`.  `drop_fn` is a plain function
+// pointer.
+unsafe impl Send for ErasedResolver {}
+
+/// Monomorphized destructor used by [`ErasedResolver`] to drop the
+/// original `Box<F>` behind the erased `data` pointer.
+unsafe fn drop_resolver<F>(data: core::ptr::NonNull<()>) {
+    // SAFETY: caller guarantees `data` originated from
+    // `Box::<F>::into_raw` for this same `F`.
+    drop(unsafe { alloc::boxed::Box::from_raw(data.as_ptr().cast::<F>()) });
+}
 
 // SAFETY: `Picture` exclusively owns (or borrows) a heap-allocated ThorVG
 // paint handle.  Shared global state is mutex-protected in C++.  Sole
@@ -289,26 +321,29 @@ impl Picture<'_> {
                     core::ptr::null_mut(),
                 );
             }
+            self.resolver = None;
         }
-        // Now safe to swap.  Box<dyn> is fat; we need a thin
-        // pointer for FFI, so we pass the address of the *inner*
-        // Box value, which lives on the heap inside the outer Box's
-        // allocation.  That heap address is stable across moves of
-        // `Picture`, so storing it in C is safe even if the wrapper
-        // is later moved.  The trampoline reconstructs
-        // `&mut Box<dyn ...>` from this ptr.
-        self.resolver = Some(alloc::boxed::Box::new(alloc::boxed::Box::new(resolver)));
-        let outer = self.resolver.as_mut().unwrap();
-        let data_ptr: *mut alloc::boxed::Box<AssetResolverFn> = &raw mut **outer;
-        // SAFETY: `data_ptr` references a heap allocation owned by
+        // Heap-allocate the concrete closure and hand thorvg a thin
+        // pointer to it.  No `dyn`, no double box: the monomorphized
+        // `resolver_trampoline::<F>` casts the pointer back to
+        // `*mut F` and calls `F` directly.
+        let boxed: alloc::boxed::Box<F> = alloc::boxed::Box::new(resolver);
+        let raw_f: *mut F = alloc::boxed::Box::into_raw(boxed);
+        // SAFETY: `Box::into_raw` never returns null.
+        let data = unsafe { core::ptr::NonNull::new_unchecked(raw_f.cast::<()>()) };
+        self.resolver = Some(ErasedResolver {
+            data,
+            drop_fn: drop_resolver::<F>,
+        });
+        // SAFETY: `data` references a heap allocation owned by
         // `self.resolver`; `Picture::Drop` unregisters the resolver
         // before that allocation is freed, so C never dereferences
         // a dangling pointer.
         Error::from_raw(unsafe {
             sys::tvg_picture_set_asset_resolver(
                 self.raw,
-                Some(resolver_trampoline),
-                data_ptr.cast::<core::ffi::c_void>(),
+                Some(resolver_trampoline::<F>),
+                data.as_ptr().cast::<core::ffi::c_void>(),
             )
         })
     }
@@ -433,19 +468,22 @@ fn load_raw_inner(
 }
 
 /// FFI trampoline that bridges thorvg's C callback to the boxed
-/// Rust closure stored in [`Picture::resolver`].  Looks up the
-/// closure via the supplied `data` pointer (a thin pointer to the
-/// Box), invokes it with the requested src path, and on success
-/// loads the resolved bytes into thorvg's target paint.
-unsafe extern "C" fn resolver_trampoline(
+/// Rust closure stored in [`Picture::resolver`].  Monomorphized on
+/// the concrete closure type `F`, so the call site dispatches
+/// directly (no `dyn` vtable, no double indirection): `data` is the
+/// thin `*mut F` produced by [`Picture::set_asset_resolver`].
+unsafe extern "C" fn resolver_trampoline<F>(
     paint: sys::Tvg_Paint,
     src: *const core::ffi::c_char,
     data: *mut core::ffi::c_void,
-) -> bool {
+) -> bool
+where
+    F: FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static,
+{
     if data.is_null() || src.is_null() {
         return false;
     }
-    let boxed = unsafe { &mut *data.cast::<alloc::boxed::Box<AssetResolverFn>>() };
+    let f = unsafe { &mut *data.cast::<F>() };
     let src_str = unsafe { core::ffi::CStr::from_ptr(src) }.to_string_lossy();
     // SAFETY: user closure runs in Rust context; a panic here would
     // unwind across the C++ caller above us, which is UB.  Catch and
@@ -453,7 +491,7 @@ unsafe extern "C" fn resolver_trampoline(
     // crate-level docs require `panic = "abort"`, which makes panic
     // termination strictly safer (the process is gone before unwinding
     // could reach the FFI boundary).
-    let resolved = invoke_resolver(boxed, &src_str);
+    let resolved = invoke_resolver::<F>(f, &src_str);
     let Some((bytes, mime)) = resolved else {
         return false;
     };
@@ -473,22 +511,22 @@ unsafe extern "C" fn resolver_trampoline(
 }
 
 #[cfg(feature = "std")]
-fn invoke_resolver(
-    boxed: &mut alloc::boxed::Box<AssetResolverFn>,
-    src: &str,
-) -> Option<(alloc::vec::Vec<u8>, MimeType)> {
-    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (boxed)(src))).unwrap_or(None)
+fn invoke_resolver<F>(f: &mut F, src: &str) -> Option<(alloc::vec::Vec<u8>, MimeType)>
+where
+    F: FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static,
+{
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(src))).unwrap_or(None)
 }
 
 #[cfg(not(feature = "std"))]
-fn invoke_resolver(
-    boxed: &mut alloc::boxed::Box<AssetResolverFn>,
-    src: &str,
-) -> Option<(alloc::vec::Vec<u8>, MimeType)> {
+fn invoke_resolver<F>(f: &mut F, src: &str) -> Option<(alloc::vec::Vec<u8>, MimeType)>
+where
+    F: FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static,
+{
     // `no_std` users are required to build with `panic = "abort"`
     // (see crate docs).  An aborting panic cannot cross the FFI
     // boundary, so no `catch_unwind` is needed.
-    (boxed)(src)
+    f(src)
 }
 
 impl core::fmt::Debug for Picture<'_> {
