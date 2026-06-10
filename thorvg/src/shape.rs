@@ -1,6 +1,6 @@
 use crate::color::Rgba;
 use crate::error::{Error, Result};
-use crate::gradient::{LinearGradient, RadialGradient};
+use crate::gradient::{BorrowedGradient, LinearGradient, RadialGradient};
 use crate::paint::{Paint, Point};
 use thorvg_sys as sys;
 
@@ -270,18 +270,27 @@ impl Shape<'_> {
         Error::from_raw(unsafe { sys::tvg_shape_set_gradient(self.raw, grad.into_raw()) })
     }
 
-    /// Gets the raw gradient fill handle (borrowed, not owned).
+    /// Returns a read-only view of the shape's fill gradient.
     ///
-    /// Returns `None` if no gradient is set. The returned handle is owned
-    /// by the shape and must not be freed.
-    pub fn gradient_raw(&self) -> Option<sys::Tvg_Gradient> {
+    /// * `Ok(None)`  — no gradient is set.
+    /// * `Ok(Some(view))`  — fill gradient present; the view
+    ///   discriminates linear vs radial at borrow time so subsequent
+    ///   reads are type-checked.
+    /// * `Err(_)`  — the C side rejected the read or returned an
+    ///   unrecognised gradient kind.
+    ///
+    /// The borrow lifetime is tied to `&self`; the shape owns the
+    /// underlying gradient and frees it on its own teardown.
+    pub fn gradient(&self) -> Result<Option<BorrowedGradient<'_>>> {
         let mut grad: sys::Tvg_Gradient = core::ptr::null_mut();
-        let r = unsafe { sys::tvg_shape_get_gradient(self.raw, &raw mut grad) };
-        if Error::from_raw(r).is_err() || grad.is_null() {
-            None
-        } else {
-            Some(grad)
+        Error::from_raw(unsafe { sys::tvg_shape_get_gradient(self.raw, &raw mut grad) })?;
+        if grad.is_null() {
+            return Ok(None);
         }
+        // SAFETY: `grad` was just returned non-null by
+        // `tvg_shape_get_gradient`, and the shape (which owns it)
+        // outlives `&self`.
+        Ok(Some(unsafe { BorrowedGradient::from_raw(grad) }?))
     }
 
     /// Sets the rendering order of stroke and fill.
@@ -380,17 +389,19 @@ impl Shape<'_> {
         Ok((pattern, offset))
     }
 
-    /// Gets the raw stroke gradient fill handle (borrowed, not owned).
+    /// Returns a read-only view of the shape's stroke gradient.
     ///
-    /// Returns `None` if no stroke gradient is set.
-    pub fn stroke_gradient_raw(&self) -> Option<sys::Tvg_Gradient> {
+    /// Same semantics as [`gradient`](Self::gradient), but for the
+    /// stroke gradient configured via
+    /// [`set_stroke_gradient`](Self::set_stroke_gradient).
+    pub fn stroke_gradient(&self) -> Result<Option<BorrowedGradient<'_>>> {
         let mut grad: sys::Tvg_Gradient = core::ptr::null_mut();
-        let r = unsafe { sys::tvg_shape_get_stroke_gradient(self.raw, &raw mut grad) };
-        if Error::from_raw(r).is_err() || grad.is_null() {
-            None
-        } else {
-            Some(grad)
+        Error::from_raw(unsafe { sys::tvg_shape_get_stroke_gradient(self.raw, &raw mut grad) })?;
+        if grad.is_null() {
+            return Ok(None);
         }
+        // SAFETY: see `gradient` above.
+        Ok(Some(unsafe { BorrowedGradient::from_raw(grad) }?))
     }
 
     /// Sets the stroke gradient fill.

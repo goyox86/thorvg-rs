@@ -153,7 +153,7 @@ fuzz_target!(|input: Input| {
             }
             Attach::None => {}
         }
-        let _ = shape.gradient_raw();
-        let _ = shape.stroke_gradient_raw();
+        let _ = shape.gradient();
+        let _ = shape.stroke_gradient();
     });
 });

@@ -289,6 +289,204 @@ impl Drop for RadialGradient<'_> {
     }
 }
 
+// ── Borrowed views ────────────────────────────────────────────
+//
+// Returned from [`Shape::gradient`] / [`Shape::stroke_gradient`].
+// The shape owns the underlying `Tvg_Gradient`; these views
+// borrow it for `'a`, exposing the read-only surface that does
+// not invalidate the owner.  No `Drop`: the shape frees the
+// gradient on its own teardown.
+//
+// Naming and lifetime structure mirror [`BorrowedPaint`] and
+// [`BorrowedAccessor`].
+
+/// Read-only view of a linear gradient owned by a [`Shape`](crate::Shape).
+///
+/// Acquired through [`Shape::gradient`](crate::Shape::gradient) /
+/// [`Shape::stroke_gradient`](crate::Shape::stroke_gradient) after
+/// matching on the [`BorrowedGradient::Linear`] variant.
+pub struct BorrowedLinearGradient<'a> {
+    raw: sys::Tvg_Gradient,
+    _life: core::marker::PhantomData<&'a ()>,
+}
+
+impl BorrowedLinearGradient<'_> {
+    /// # Safety
+    /// `raw` must be a valid linear gradient handle whose owner
+    /// outlives `'a`.
+    pub(crate) unsafe fn from_raw(raw: sys::Tvg_Gradient) -> Self {
+        Self {
+            raw,
+            _life: core::marker::PhantomData,
+        }
+    }
+
+    /// Returns the gradient bounds `(x1, y1, x2, y2)`.
+    pub fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
+        let (mut x1, mut y1, mut x2, mut y2) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+        Error::from_raw(unsafe {
+            sys::tvg_linear_gradient_get(
+                self.raw,
+                &raw mut x1,
+                &raw mut y1,
+                &raw mut x2,
+                &raw mut y2,
+            )
+        })?;
+        Ok((x1, y1, x2, y2))
+    }
+
+    /// Returns the color stops.
+    pub fn color_stops(&self) -> Result<Vec<ColorStop>> {
+        get_color_stops_raw(self.raw)
+    }
+
+    /// Returns the fill spread method.
+    pub fn spread(&self) -> Result<FillSpread> {
+        get_spread_raw(self.raw)
+    }
+
+    /// Returns the affine transformation matrix.
+    pub fn transform(&self) -> Result<Matrix> {
+        get_transform_raw(self.raw)
+    }
+}
+
+impl core::fmt::Debug for BorrowedLinearGradient<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BorrowedLinearGradient").finish_non_exhaustive()
+    }
+}
+
+/// Read-only view of a radial gradient owned by a [`Shape`](crate::Shape).
+///
+/// Acquired through [`Shape::gradient`](crate::Shape::gradient) /
+/// [`Shape::stroke_gradient`](crate::Shape::stroke_gradient) after
+/// matching on the [`BorrowedGradient::Radial`] variant.
+pub struct BorrowedRadialGradient<'a> {
+    raw: sys::Tvg_Gradient,
+    _life: core::marker::PhantomData<&'a ()>,
+}
+
+impl BorrowedRadialGradient<'_> {
+    /// # Safety
+    /// `raw` must be a valid radial gradient handle whose owner
+    /// outlives `'a`.
+    pub(crate) unsafe fn from_raw(raw: sys::Tvg_Gradient) -> Self {
+        Self {
+            raw,
+            _life: core::marker::PhantomData,
+        }
+    }
+
+    /// Returns the radial gradient attributes `(cx, cy, r, fx, fy, fr)`.
+    pub fn radial(&self) -> Result<(f32, f32, f32, f32, f32, f32)> {
+        let (mut cx, mut cy, mut r, mut fx, mut fy, mut fr) =
+            (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
+        Error::from_raw(unsafe {
+            sys::tvg_radial_gradient_get(
+                self.raw,
+                &raw mut cx,
+                &raw mut cy,
+                &raw mut r,
+                &raw mut fx,
+                &raw mut fy,
+                &raw mut fr,
+            )
+        })?;
+        Ok((cx, cy, r, fx, fy, fr))
+    }
+
+    /// Returns the color stops.
+    pub fn color_stops(&self) -> Result<Vec<ColorStop>> {
+        get_color_stops_raw(self.raw)
+    }
+
+    /// Returns the fill spread method.
+    pub fn spread(&self) -> Result<FillSpread> {
+        get_spread_raw(self.raw)
+    }
+
+    /// Returns the affine transformation matrix.
+    pub fn transform(&self) -> Result<Matrix> {
+        get_transform_raw(self.raw)
+    }
+}
+
+impl core::fmt::Debug for BorrowedRadialGradient<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BorrowedRadialGradient").finish_non_exhaustive()
+    }
+}
+
+/// Discriminated read-only view of a gradient owned by a
+/// [`Shape`](crate::Shape).
+///
+/// The variant is determined at borrow time via
+/// `tvg_gradient_get_type`; subsequent reads through the matching
+/// `BorrowedLinearGradient` / `BorrowedRadialGradient` are then
+/// type-checked at compile time (no "linear method called on a
+/// radial gradient" runtime errors).
+///
+/// Exhaustive: the C "gradient kind" set has only two members
+/// (`TVG_TYPE_LINEAR_GRAD`, `TVG_TYPE_RADIAL_GRAD`) and is closed
+/// in the same sense as [`BlurDirection`](crate::BlurDirection).
+#[derive(Debug)]
+pub enum BorrowedGradient<'a> {
+    /// Linear gradient view.
+    Linear(BorrowedLinearGradient<'a>),
+    /// Radial gradient view.
+    Radial(BorrowedRadialGradient<'a>),
+}
+
+impl BorrowedGradient<'_> {
+    /// Discriminates the kind of gradient behind `raw` and builds
+    /// the matching borrowed view.
+    ///
+    /// # Safety
+    /// `raw` must be a valid gradient handle whose owner outlives `'a`.
+    pub(crate) unsafe fn from_raw(raw: sys::Tvg_Gradient) -> Result<Self> {
+        let kind = get_type_raw(raw)?;
+        Ok(match kind {
+            PaintType::LinearGradient => {
+                Self::Linear(unsafe { BorrowedLinearGradient::from_raw(raw) })
+            }
+            PaintType::RadialGradient => {
+                Self::Radial(unsafe { BorrowedRadialGradient::from_raw(raw) })
+            }
+            // `tvg_gradient_get_type` only ever reports linear or
+            // radial on a valid gradient handle; any other answer
+            // means the C engine returned junk and we cannot trust
+            // further reads.
+            _ => return Err(Error::Unknown),
+        })
+    }
+
+    /// Returns the color stops (variant-independent).
+    pub fn color_stops(&self) -> Result<Vec<ColorStop>> {
+        match self {
+            Self::Linear(g) => g.color_stops(),
+            Self::Radial(g) => g.color_stops(),
+        }
+    }
+
+    /// Returns the fill spread method (variant-independent).
+    pub fn spread(&self) -> Result<FillSpread> {
+        match self {
+            Self::Linear(g) => g.spread(),
+            Self::Radial(g) => g.spread(),
+        }
+    }
+
+    /// Returns the affine transformation matrix (variant-independent).
+    pub fn transform(&self) -> Result<Matrix> {
+        match self {
+            Self::Linear(g) => g.transform(),
+            Self::Radial(g) => g.transform(),
+        }
+    }
+}
+
 // ── Shared helpers ─────────────────────────────────────────────────
 
 #[allow(clippy::cast_possible_truncation)]
