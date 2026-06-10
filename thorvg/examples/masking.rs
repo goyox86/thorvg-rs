@@ -7,9 +7,7 @@
 
 mod common;
 
-use thorvg::{
-    ColorSpace, ColorStop, EngineOption, MaskMethod, Paint, Thorvg,
-};
+use thorvg::{ColorSpace, ColorStop, EngineOption, MaskMethod, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -33,7 +31,7 @@ fn main() {
             )
             .unwrap();
             let gray = if (row + col) % 2 == 0 { 180 } else { 210 };
-            sq.set_fill_color(gray, gray, gray, 255).unwrap();
+            sq.set_fill_color(Rgba::new(gray, gray, gray, 255)).unwrap();
             canvas.add(sq).unwrap();
         }
     }
@@ -43,7 +41,7 @@ fn main() {
     rect1
         .append_rect(30.0, 50.0, 200.0, 200.0, 0.0, 0.0, true)
         .unwrap();
-    rect1.set_fill_color(50, 50, 220, 255).unwrap();
+    rect1.set_fill_color(Rgba::new(50, 50, 220, 255)).unwrap();
 
     // Mask target: circle with gradient alpha
     let mut grad = engine.linear_gradient().unwrap();
@@ -78,11 +76,11 @@ fn main() {
     rect2
         .append_rect(260.0, 50.0, 200.0, 200.0, 0.0, 0.0, true)
         .unwrap();
-    rect2.set_fill_color(220, 50, 50, 255).unwrap();
+    rect2.set_fill_color(Rgba::new(220, 50, 50, 255)).unwrap();
 
     let mut mask2 = engine.shape().unwrap();
     mask2.append_circle(360.0, 150.0, 60.0, 60.0, true).unwrap();
-    mask2.set_fill_color(255, 255, 255, 255).unwrap();
+    mask2.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
 
     rect2.set_mask(mask2, MaskMethod::InvAlpha).unwrap();
     canvas.add(rect2).unwrap();
@@ -92,7 +90,7 @@ fn main() {
     rect3
         .append_rect(490.0, 50.0, 180.0, 200.0, 15.0, 15.0, true)
         .unwrap();
-    rect3.set_fill_color(50, 200, 50, 255).unwrap();
+    rect3.set_fill_color(Rgba::new(50, 200, 50, 255)).unwrap();
 
     let mut grad3 = engine.linear_gradient().unwrap();
     grad3.set_bounds(490.0, 50.0, 670.0, 250.0).unwrap();

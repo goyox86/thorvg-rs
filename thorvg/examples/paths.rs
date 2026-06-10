@@ -7,7 +7,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, StrokeCap, StrokeJoin, Thorvg};
+use thorvg::{ColorSpace, EngineOption, StrokeCap, StrokeJoin, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -20,7 +20,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(15, 15, 25, 255).unwrap();
+    bg.set_fill_color(Rgba::new(15, 15, 25, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── 5-pointed star ─────────────────────────────────────────────
@@ -39,9 +39,9 @@ fn main() {
         }
     }
     star.close().unwrap();
-    star.set_fill_color(255, 200, 0, 255).unwrap();
+    star.set_fill_color(Rgba::new(255, 200, 0, 255)).unwrap();
     star.set_stroke_width(2.0).unwrap();
-    star.set_stroke_color(255, 255, 200, 255).unwrap();
+    star.set_stroke_color(Rgba::new(255, 255, 200, 255)).unwrap();
     canvas.add(star).unwrap();
 
     // ── Heart shape (cubic Béziers) ────────────────────────────────
@@ -69,7 +69,7 @@ fn main() {
         .cubic_to(hx + 100.0, hy - 60.0, hx + 5.0, hy - 60.0, hx, hy)
         .unwrap();
     heart.close().unwrap();
-    heart.set_fill_color(220, 30, 60, 255).unwrap();
+    heart.set_fill_color(Rgba::new(220, 30, 60, 255)).unwrap();
     canvas.add(heart).unwrap();
 
     // ── Spiral (stroked path) ──────────────────────────────────────
@@ -87,7 +87,7 @@ fn main() {
         spiral.line_to(px, py).unwrap();
     }
     spiral.set_stroke_width(2.5).unwrap();
-    spiral.set_stroke_color(100, 200, 255, 255).unwrap();
+    spiral.set_stroke_color(Rgba::new(100, 200, 255, 255)).unwrap();
     spiral.set_stroke_cap(StrokeCap::Round).unwrap();
     canvas.add(spiral).unwrap();
 
@@ -110,7 +110,7 @@ fn main() {
         .unwrap();
     }
     wave.set_stroke_width(4.0).unwrap();
-    wave.set_stroke_color(255, 150, 50, 255).unwrap();
+    wave.set_stroke_color(Rgba::new(255, 150, 50, 255)).unwrap();
     wave.set_stroke_cap(StrokeCap::Round).unwrap();
     wave.set_stroke_join(StrokeJoin::Round).unwrap();
     canvas.add(wave).unwrap();
@@ -129,9 +129,9 @@ fn main() {
         }
     }
     hex.close().unwrap();
-    hex.set_fill_color(60, 180, 120, 200).unwrap();
+    hex.set_fill_color(Rgba::new(60, 180, 120, 200)).unwrap();
     hex.set_stroke_width(3.0).unwrap();
-    hex.set_stroke_color(200, 255, 200, 255).unwrap();
+    hex.set_stroke_color(Rgba::new(200, 255, 200, 255)).unwrap();
     canvas.add(hex).unwrap();
 
     // ── Arrow shape ────────────────────────────────────────────────
@@ -141,7 +141,7 @@ fn main() {
     arrow.line_to(350.0, 560.0).unwrap();
     arrow.line_to(380.0, 530.0).unwrap();
     arrow.close().unwrap();
-    arrow.set_fill_color(255, 100, 200, 255).unwrap();
+    arrow.set_fill_color(Rgba::new(255, 100, 200, 255)).unwrap();
     canvas.add(arrow).unwrap();
 
     // ── Infinity symbol (figure-8 with Béziers) ────────────────────
@@ -154,7 +154,7 @@ fn main() {
     inf.cubic_to(ix + 10.0, iy - 70.0, ix - 60.0, iy + 70.0, ix, iy)
         .unwrap();
     inf.set_stroke_width(4.0).unwrap();
-    inf.set_stroke_color(200, 200, 255, 255).unwrap();
+    inf.set_stroke_color(Rgba::new(200, 200, 255, 255)).unwrap();
     inf.set_stroke_cap(StrokeCap::Round).unwrap();
     canvas.add(inf).unwrap();
 

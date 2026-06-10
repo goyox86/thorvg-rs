@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{BlurBorder, BlurDirection, ColorSpace, EngineOption, Paint, Thorvg};
+use thorvg::{BlurBorder, BlurDirection, ColorSpace, EngineOption, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -27,7 +27,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(240, 240, 240, 255).unwrap();
+    bg.set_fill_color(Rgba::new(240, 240, 240, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Scene with grouped shapes ──────────────────────────────────
@@ -38,14 +38,14 @@ fn main() {
     circle
         .append_circle(150.0, 150.0, 80.0, 80.0, true)
         .unwrap();
-    circle.set_fill_color(0, 200, 0, 255).unwrap();
+    circle.set_fill_color(Rgba::new(0, 200, 0, 255)).unwrap();
     scene.add(circle).unwrap();
 
     // Semi-transparent blue rectangle overlapping the circle
     let mut rect = engine.shape().unwrap();
     rect.append_rect(100.0, 100.0, 150.0, 100.0, 10.0, 10.0, true)
         .unwrap();
-    rect.set_fill_color(0, 0, 200, 180).unwrap();
+    rect.set_fill_color(Rgba::new(0, 0, 200, 180)).unwrap();
     scene.add(rect).unwrap();
 
     // Yellow star-like shape using paths
@@ -61,7 +61,7 @@ fn main() {
     star.line_to(270.0, 140.0).unwrap();
     star.line_to(330.0, 140.0).unwrap();
     star.close().unwrap();
-    star.set_fill_color(255, 220, 0, 255).unwrap();
+    star.set_fill_color(Rgba::new(255, 220, 0, 255)).unwrap();
     scene.add(star).unwrap();
 
     // Apply scene-level transform

@@ -13,7 +13,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{ColorSpace, Thorvg};
+use thorvg::{ColorSpace, Rgba, Thorvg};
 
 #[derive(Debug)]
 enum FuzzCs {
@@ -76,8 +76,10 @@ impl<'a> Arbitrary<'a> for Input {
             buffer_len: u.int_in_range(0..=64 * 1024)?,
             cs: FuzzCs::arbitrary(u)?,
             viewport: (
-                u.arbitrary()?, u.arbitrary()?,
-                u.arbitrary()?, u.arbitrary()?,
+                u.arbitrary()?,
+                u.arbitrary()?,
+                u.arbitrary()?,
+                u.arbitrary()?,
             ),
             children: u.int_in_range(0..=8)?,
         })
@@ -119,7 +121,7 @@ fuzz_target!(|input: Input| {
         for _ in 0..input.children {
             if let Ok(mut s) = engine.shape() {
                 let _ = s.append_rect(0.0, 0.0, 8.0, 8.0, 0.0, 0.0, true);
-                let _ = s.set_fill_color(255, 0, 0, 255);
+                let _ = s.set_fill_color(Rgba::new(255, 0, 0, 255));
                 let _ = canvas.add(s);
             }
         }

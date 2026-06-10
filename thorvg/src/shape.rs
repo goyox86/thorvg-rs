@@ -1,3 +1,4 @@
+use crate::color::Rgba;
 use crate::error::{Error, Result};
 use crate::gradient::{LinearGradient, RadialGradient};
 use crate::paint::{Paint, Point};
@@ -232,18 +233,19 @@ impl Shape<'_> {
 
     // ── Fill ───────────────────────────────────────────────────────
 
-    /// Sets the fill color (RGBA).
-    pub fn set_fill_color(&mut self, r: u8, g: u8, b: u8, a: u8) -> Result<()> {
+    /// Sets the fill color.
+    pub fn set_fill_color(&mut self, color: Rgba) -> Result<()> {
+        let Rgba { r, g, b, a } = color;
         Error::from_raw(unsafe { sys::tvg_shape_set_fill_color(self.raw, r, g, b, a) })
     }
 
-    /// Gets the fill color (RGBA).
-    pub fn fill_color(&self) -> Result<(u8, u8, u8, u8)> {
+    /// Gets the fill color.
+    pub fn fill_color(&self) -> Result<Rgba> {
         let (mut r, mut g, mut b, mut a) = (0u8, 0u8, 0u8, 0u8);
         Error::from_raw(unsafe {
             sys::tvg_shape_get_fill_color(self.raw, &raw mut r, &raw mut g, &raw mut b, &raw mut a)
         })?;
-        Ok((r, g, b, a))
+        Ok(Rgba { r, g, b, a })
     }
 
     /// Sets the fill rule.
@@ -301,20 +303,21 @@ impl Shape<'_> {
         Ok(width)
     }
 
-    /// Sets the stroke color (RGBA).
-    pub fn set_stroke_color(&mut self, r: u8, g: u8, b: u8, a: u8) -> Result<()> {
+    /// Sets the stroke color.
+    pub fn set_stroke_color(&mut self, color: Rgba) -> Result<()> {
+        let Rgba { r, g, b, a } = color;
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_color(self.raw, r, g, b, a) })
     }
 
-    /// Gets the stroke color (RGBA).
-    pub fn stroke_color(&self) -> Result<(u8, u8, u8, u8)> {
+    /// Gets the stroke color.
+    pub fn stroke_color(&self) -> Result<Rgba> {
         let (mut r, mut g, mut b, mut a) = (0u8, 0u8, 0u8, 0u8);
         Error::from_raw(unsafe {
             sys::tvg_shape_get_stroke_color(
                 self.raw, &raw mut r, &raw mut g, &raw mut b, &raw mut a,
             )
         })?;
-        Ok((r, g, b, a))
+        Ok(Rgba { r, g, b, a })
     }
 
     /// Sets the stroke line cap style.

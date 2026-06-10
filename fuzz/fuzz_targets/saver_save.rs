@@ -23,7 +23,7 @@
 use libfuzzer_sys::arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use std::sync::atomic::{AtomicU64, Ordering};
-use thorvg::Thorvg;
+use thorvg::{Rgba, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 struct Input<'a> {
@@ -73,9 +73,9 @@ fuzz_target!(|input: Input<'_>| {
                 return;
             };
             if input.load_anim_data {
-                let _ = anim
-                    .picture_mut()
-                    .load_data(input.anim_data, thorvg::MimeType::Lottie, None);
+                let _ =
+                    anim.picture_mut()
+                        .load_data(input.anim_data, thorvg::MimeType::Lottie, None);
             }
             let _ = saver.save_animation_to_str(anim, &path, input.quality, input.fps);
         } else {
@@ -83,7 +83,7 @@ fuzz_target!(|input: Input<'_>| {
                 return;
             };
             let _ = shape.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true);
-            let _ = shape.set_fill_color(255, 0, 0, 255);
+            let _ = shape.set_fill_color(Rgba::new(255, 0, 0, 255));
             let _ = saver.save_to_str(shape, &path, input.quality);
         }
         let _ = saver.sync();

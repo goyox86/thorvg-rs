@@ -7,7 +7,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Thorvg};
+use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -20,7 +20,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(30, 30, 50, 255).unwrap();
+    bg.set_fill_color(Rgba::new(30, 30, 50, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Left: gradient rectangle clipped by a circle ───────────────
@@ -76,7 +76,7 @@ fn main() {
         }
     }
     star.close().unwrap();
-    star.set_fill_color(255, 220, 0, 255).unwrap();
+    star.set_fill_color(Rgba::new(255, 220, 0, 255)).unwrap();
 
     // Rounded rectangle clip
     let mut clip2 = engine.shape().unwrap();

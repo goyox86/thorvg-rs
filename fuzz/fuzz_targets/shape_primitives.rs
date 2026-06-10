@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{FillRule, StrokeCap, StrokeJoin, Thorvg};
+use thorvg::{FillRule, Rgba, StrokeCap, StrokeJoin, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 enum Op {
@@ -93,22 +93,16 @@ fuzz_target!(|input: Input| {
                 Op::LineTo(x, y) => shape.line_to(x, y),
                 Op::CubicTo(a, b, c, d, e, f) => shape.cubic_to(a, b, c, d, e, f),
                 Op::Close => shape.close(),
-                Op::AppendRect(x, y, w, h, rx, ry, cw) => {
-                    shape.append_rect(x, y, w, h, rx, ry, cw)
-                }
-                Op::AppendCircle(cx, cy, rx, ry, cw) => {
-                    shape.append_circle(cx, cy, rx, ry, cw)
-                }
-                Op::SetFillColor(r, g, b, a) => shape.set_fill_color(r, g, b, a),
-                Op::SetStrokeColor(r, g, b, a) => shape.set_stroke_color(r, g, b, a),
+                Op::AppendRect(x, y, w, h, rx, ry, cw) => shape.append_rect(x, y, w, h, rx, ry, cw),
+                Op::AppendCircle(cx, cy, rx, ry, cw) => shape.append_circle(cx, cy, rx, ry, cw),
+                Op::SetFillColor(r, g, b, a) => shape.set_fill_color(Rgba::new(r, g, b, a)),
+                Op::SetStrokeColor(r, g, b, a) => shape.set_stroke_color(Rgba::new(r, g, b, a)),
                 Op::SetFillRule(b) => shape.set_fill_rule(to_fill_rule(b)),
                 Op::SetStrokeWidth(w) => shape.set_stroke_width(w),
                 Op::SetStrokeCap(b) => shape.set_stroke_cap(to_cap(b)),
                 Op::SetStrokeJoin(b) => shape.set_stroke_join(to_join(b)),
                 Op::SetStrokeMiterlimit(m) => shape.set_stroke_miterlimit(m),
-                Op::SetStrokeDash(pattern, offset) => {
-                    shape.set_stroke_dash(&pattern, offset)
-                }
+                Op::SetStrokeDash(pattern, offset) => shape.set_stroke_dash(&pattern, offset),
                 Op::SetTrimpath(b, e, sim) => shape.set_trimpath(b, e, sim),
                 Op::SetPaintOrder(stroke_first) => shape.set_paint_order(stroke_first),
                 Op::Reset => shape.reset(),

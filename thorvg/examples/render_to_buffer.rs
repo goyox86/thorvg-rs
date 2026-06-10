@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Thorvg};
+use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -25,7 +25,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(255, 255, 255, 255).unwrap();
+    bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Gradient-filled rounded rect ───────────────────────────────
@@ -67,7 +67,7 @@ fn main() {
     circle
         .append_circle(200.0, 150.0, 50.0, 50.0, true)
         .unwrap();
-    circle.set_fill_color(255, 255, 255, 200).unwrap();
+    circle.set_fill_color(Rgba::new(255, 255, 255, 200)).unwrap();
     circle.set_opacity(200).unwrap();
     canvas.add(circle).unwrap();
 

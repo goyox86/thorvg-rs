@@ -54,7 +54,7 @@
 //! // Draw a red rectangle
 //! let mut shape = engine.shape().unwrap();
 //! shape.append_rect(0.0, 0.0, 200.0, 200.0, 0.0, 0.0, true).unwrap();
-//! shape.set_fill_color(255, 0, 0, 255).unwrap();
+//! shape.set_fill_color(thorvg::Rgba::new(255, 0, 0, 255)).unwrap();
 //! canvas.add(shape).unwrap();
 //!
 //! // Render
@@ -79,6 +79,7 @@ extern crate std;
 mod accessor;
 mod animation;
 mod canvas;
+mod color;
 mod error;
 mod gradient;
 mod lottie;
@@ -98,7 +99,8 @@ pub use lottie::{LottieAnimation, Marker};
 pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType, Point};
 pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
-pub use scene::{BlurBorder, BlurDirection, DropShadow, Rgb, Rgba, Scene, Tint, Tritone};
+pub use color::{Rgb, Rgba};
+pub use scene::{BlurBorder, BlurDirection, DropShadow, Scene, Tint, Tritone};
 pub use shape::{FillRule, Shape, StrokeCap, StrokeJoin};
 pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 
@@ -140,7 +142,7 @@ mod tests_no_threads {
 /// let engine = Thorvg::init(0).unwrap();
 /// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
 /// let mut shape = engine.shape().unwrap();
-/// shape.set_fill_color(255, 0, 0, 255).unwrap();
+/// shape.set_fill_color(thorvg::Rgba::new(255, 0, 0, 255)).unwrap();
 /// canvas.add(shape).unwrap();
 /// ```
 pub struct Thorvg {

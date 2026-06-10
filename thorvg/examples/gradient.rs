@@ -9,10 +9,7 @@
 
 mod common;
 
-use thorvg::{
-    ColorSpace, ColorStop, EngineOption, FillSpread, Paint,
-    Thorvg,
-};
+use thorvg::{ColorSpace, ColorStop, EngineOption, FillSpread, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -21,14 +18,16 @@ fn main() {
     let height = 400u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine
+        .sw_canvas(EngineOption::Default)
+        .expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Dark background ────────────────────────────────────────────
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(20, 20, 20, 255).unwrap();
+    bg.set_fill_color(Rgba::new(20, 20, 20, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Linear gradient: red → blue ────────────────────────────────

@@ -11,7 +11,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Paint, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -35,7 +35,7 @@ fn main() {
             )
             .unwrap();
             let gray = if (row + col) % 2 == 0 { 200 } else { 230 };
-            sq.set_fill_color(gray, gray, gray, 255).unwrap();
+            sq.set_fill_color(Rgba::new(gray, gray, gray, 255)).unwrap();
             canvas.add(sq).unwrap();
         }
     }
@@ -46,7 +46,7 @@ fn main() {
         circle
             .append_circle(60.0 + i as f32 * 75.0, 150.0, 30.0, 30.0, true)
             .unwrap();
-        circle.set_fill_color(0, 100, 255, 255).unwrap();
+        circle.set_fill_color(Rgba::new(0, 100, 255, 255)).unwrap();
 
         let opacity = 255 - (i * 25) as u8;
         circle.set_opacity(opacity).unwrap();
@@ -59,7 +59,7 @@ fn main() {
         let mut rect = engine.shape().unwrap();
         rect.append_rect(150.0 + i as f32 * 60.0, 50.0, 120.0, 80.0, 10.0, 10.0, true)
             .unwrap();
-        rect.set_fill_color(r, g, b, 150).unwrap();
+        rect.set_fill_color(Rgba::new(r, g, b, 150)).unwrap();
         canvas.add(rect).unwrap();
     }
 

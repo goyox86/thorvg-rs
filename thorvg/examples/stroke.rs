@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, StrokeCap, StrokeJoin, Thorvg};
+use thorvg::{ColorSpace, EngineOption, StrokeCap, StrokeJoin, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -25,7 +25,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(30, 30, 30, 255).unwrap();
+    bg.set_fill_color(Rgba::new(30, 30, 30, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Butt cap, Miter join ───────────────────────────────────────
@@ -34,7 +34,7 @@ fn main() {
     shape1.line_to(200.0, 50.0).unwrap();
     shape1.line_to(200.0, 150.0).unwrap();
     shape1.set_stroke_width(8.0).unwrap();
-    shape1.set_stroke_color(255, 80, 80, 255).unwrap();
+    shape1.set_stroke_color(Rgba::new(255, 80, 80, 255)).unwrap();
     shape1.set_stroke_cap(StrokeCap::Butt).unwrap();
     shape1.set_stroke_join(StrokeJoin::Miter).unwrap();
     canvas.add(shape1).unwrap();
@@ -45,7 +45,7 @@ fn main() {
     shape2.line_to(450.0, 50.0).unwrap();
     shape2.line_to(450.0, 150.0).unwrap();
     shape2.set_stroke_width(8.0).unwrap();
-    shape2.set_stroke_color(80, 255, 80, 255).unwrap();
+    shape2.set_stroke_color(Rgba::new(80, 255, 80, 255)).unwrap();
     shape2.set_stroke_cap(StrokeCap::Round).unwrap();
     shape2.set_stroke_join(StrokeJoin::Round).unwrap();
     canvas.add(shape2).unwrap();
@@ -56,7 +56,7 @@ fn main() {
     shape3.line_to(700.0, 50.0).unwrap();
     shape3.line_to(700.0, 150.0).unwrap();
     shape3.set_stroke_width(8.0).unwrap();
-    shape3.set_stroke_color(80, 80, 255, 255).unwrap();
+    shape3.set_stroke_color(Rgba::new(80, 80, 255, 255)).unwrap();
     shape3.set_stroke_cap(StrokeCap::Square).unwrap();
     shape3.set_stroke_join(StrokeJoin::Bevel).unwrap();
     canvas.add(shape3).unwrap();
@@ -67,7 +67,7 @@ fn main() {
         .append_rect(50.0, 250.0, 300.0, 100.0, 0.0, 0.0, true)
         .unwrap();
     dashed.set_stroke_width(4.0).unwrap();
-    dashed.set_stroke_color(255, 255, 80, 255).unwrap();
+    dashed.set_stroke_color(Rgba::new(255, 255, 80, 255)).unwrap();
     dashed
         .set_stroke_dash(&[15.0, 10.0, 5.0, 10.0], 0.0)
         .unwrap();
@@ -78,9 +78,9 @@ fn main() {
     stroked_circle
         .append_circle(600.0, 300.0, 60.0, 60.0, true)
         .unwrap();
-    stroked_circle.set_fill_color(100, 100, 255, 128).unwrap();
+    stroked_circle.set_fill_color(Rgba::new(100, 100, 255, 128)).unwrap();
     stroked_circle.set_stroke_width(6.0).unwrap();
-    stroked_circle.set_stroke_color(255, 255, 255, 255).unwrap();
+    stroked_circle.set_stroke_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(stroked_circle).unwrap();
 
     // ── Render & save ──────────────────────────────────────────────

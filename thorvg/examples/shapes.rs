@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -25,14 +25,14 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(255, 255, 255, 255).unwrap();
+    bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Red rectangle ──────────────────────────────────────────────
     let mut rect = engine.shape().unwrap();
     rect.append_rect(50.0, 50.0, 200.0, 150.0, 0.0, 0.0, true)
         .unwrap();
-    rect.set_fill_color(255, 0, 0, 255).unwrap();
+    rect.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
     canvas.add(rect).unwrap();
 
     // ── Rounded green rectangle ────────────────────────────────────
@@ -40,7 +40,7 @@ fn main() {
     rounded
         .append_rect(300.0, 50.0, 200.0, 150.0, 20.0, 20.0, true)
         .unwrap();
-    rounded.set_fill_color(0, 200, 0, 255).unwrap();
+    rounded.set_fill_color(Rgba::new(0, 200, 0, 255)).unwrap();
     canvas.add(rounded).unwrap();
 
     // ── Blue circle ────────────────────────────────────────────────
@@ -48,7 +48,7 @@ fn main() {
     circle
         .append_circle(150.0, 400.0, 80.0, 80.0, true)
         .unwrap();
-    circle.set_fill_color(0, 0, 255, 255).unwrap();
+    circle.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
     canvas.add(circle).unwrap();
 
     // ── Yellow ellipse ─────────────────────────────────────────────
@@ -56,7 +56,7 @@ fn main() {
     ellipse
         .append_circle(400.0, 400.0, 120.0, 60.0, true)
         .unwrap();
-    ellipse.set_fill_color(255, 255, 0, 255).unwrap();
+    ellipse.set_fill_color(Rgba::new(255, 255, 0, 255)).unwrap();
     canvas.add(ellipse).unwrap();
 
     // ── Orange triangle (custom path) ──────────────────────────────
@@ -65,7 +65,7 @@ fn main() {
     triangle.line_to(750.0, 200.0).unwrap();
     triangle.line_to(550.0, 200.0).unwrap();
     triangle.close().unwrap();
-    triangle.set_fill_color(255, 128, 0, 255).unwrap();
+    triangle.set_fill_color(Rgba::new(255, 128, 0, 255)).unwrap();
     canvas.add(triangle).unwrap();
 
     // ── Magenta cubic Bézier curve ─────────────────────────────────
@@ -75,7 +75,7 @@ fn main() {
         .cubic_to(600.0, 250.0, 700.0, 550.0, 750.0, 350.0)
         .unwrap();
     curve.set_stroke_width(4.0).unwrap();
-    curve.set_stroke_color(255, 0, 255, 255).unwrap();
+    curve.set_stroke_color(Rgba::new(255, 0, 255, 255)).unwrap();
     canvas.add(curve).unwrap();
 
     // ── Render & save ──────────────────────────────────────────────

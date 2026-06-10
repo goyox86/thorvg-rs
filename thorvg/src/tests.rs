@@ -51,7 +51,7 @@ fn test_canvas_draw_shape() {
     shape
         .append_rect(10.0, 10.0, 50.0, 50.0, 0.0, 0.0, true)
         .unwrap();
-    shape.set_fill_color(255, 0, 0, 255).unwrap();
+    shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     canvas.add(shape).unwrap(); // ownership transferred
     canvas.draw(true).unwrap();
@@ -74,7 +74,7 @@ fn test_canvas_clear_all() {
     for _ in 0..5 {
         let mut s = engine.shape().unwrap();
         s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
-        s.set_fill_color(255, 0, 0, 255).unwrap();
+        s.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
         canvas.add(s).unwrap();
     }
 
@@ -84,7 +84,7 @@ fn test_canvas_clear_all() {
     // Canvas should still be usable after clearing
     let mut s = engine.shape().unwrap();
     s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
-    s.set_fill_color(0, 255, 0, 255).unwrap();
+    s.set_fill_color(Rgba::new(0, 255, 0, 255)).unwrap();
     canvas.add(s).unwrap();
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
@@ -103,7 +103,7 @@ fn test_shape_ownership_transfer_to_canvas() {
     shape
         .append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true)
         .unwrap();
-    shape.set_fill_color(255, 0, 0, 255).unwrap();
+    shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     // Transfer ownership — shape should NOT be freed by Rust
     canvas.add(shape).unwrap();
@@ -118,11 +118,11 @@ fn test_shape_ownership_transfer_to_scene() {
     let mut s1 = engine.shape().unwrap();
     s1.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true)
         .unwrap();
-    s1.set_fill_color(255, 0, 0, 255).unwrap();
+    s1.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     let mut s2 = engine.shape().unwrap();
     s2.append_circle(50.0, 50.0, 20.0, 20.0, true).unwrap();
-    s2.set_fill_color(0, 0, 255, 255).unwrap();
+    s2.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
 
     scene.add(s1).unwrap();
     scene.add(s2).unwrap();
@@ -138,9 +138,9 @@ fn test_shape_not_transferred_is_freed() {
     shape
         .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
         .unwrap();
-    shape.set_fill_color(255, 255, 0, 255).unwrap();
+    shape.set_fill_color(Rgba::new(255, 255, 0, 255)).unwrap();
     shape.set_stroke_width(3.0).unwrap();
-    shape.set_stroke_color(0, 0, 0, 255).unwrap();
+    shape.set_stroke_color(Rgba::new(0, 0, 0, 255)).unwrap();
     // Dropped here — must be freed by Paint::rel
 }
 
@@ -265,7 +265,7 @@ fn test_scene_nested_drop() {
         let mut s = engine.shape().unwrap();
         s.append_circle(i as f32 * 20.0, 50.0, 10.0, 10.0, true)
             .unwrap();
-        s.set_fill_color(255, 0, 0, 255).unwrap();
+        s.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
         scene.add(s).unwrap();
     }
     canvas.add(scene).unwrap();
@@ -303,9 +303,8 @@ fn test_scene_clear_and_reuse() {
 fn test_shape_fill_color_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
     let mut shape = engine.shape().unwrap();
-    shape.set_fill_color(100, 150, 200, 255).unwrap();
-    let (r, g, b, a) = shape.fill_color().unwrap();
-    assert_eq!((r, g, b, a), (100, 150, 200, 255));
+    shape.set_fill_color(Rgba::new(100, 150, 200, 255)).unwrap();
+    assert_eq!(shape.fill_color().unwrap(), Rgba::new(100, 150, 200, 255));
 }
 
 #[test]
@@ -314,14 +313,13 @@ fn test_shape_stroke_roundtrip() {
     let mut shape = engine.shape().unwrap();
     shape.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
     shape.set_stroke_width(3.0).unwrap();
-    shape.set_stroke_color(0, 255, 0, 255).unwrap();
+    shape.set_stroke_color(Rgba::new(0, 255, 0, 255)).unwrap();
     shape.set_stroke_cap(StrokeCap::Round).unwrap();
     shape.set_stroke_join(StrokeJoin::Bevel).unwrap();
     shape.set_stroke_miterlimit(8.0).unwrap();
 
     assert!((shape.stroke_width().unwrap() - 3.0).abs() < f32::EPSILON);
-    let (r, g, b, a) = shape.stroke_color().unwrap();
-    assert_eq!((r, g, b, a), (0, 255, 0, 255));
+    assert_eq!(shape.stroke_color().unwrap(), Rgba::new(0, 255, 0, 255));
     assert_eq!(shape.stroke_cap().unwrap(), StrokeCap::Round);
     assert_eq!(shape.stroke_join().unwrap(), StrokeJoin::Bevel);
     assert!((shape.stroke_miterlimit().unwrap() - 8.0).abs() < f32::EPSILON);
@@ -804,7 +802,7 @@ fn test_clip_lifecycle() {
     shape
         .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
         .unwrap();
-    shape.set_fill_color(255, 0, 0, 255).unwrap();
+    shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     let mut clipper = engine.shape().unwrap();
     clipper.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
@@ -1050,12 +1048,12 @@ fn test_full_pipeline_scene_with_effects() {
     let mut s1 = engine.shape().unwrap();
     s1.append_rect(10.0, 10.0, 80.0, 80.0, 5.0, 5.0, true)
         .unwrap();
-    s1.set_fill_color(255, 0, 0, 255).unwrap();
+    s1.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
     scene.add(s1).unwrap();
 
     let mut s2 = engine.shape().unwrap();
     s2.append_circle(120.0, 50.0, 30.0, 30.0, true).unwrap();
-    s2.set_fill_color(0, 0, 255, 255).unwrap();
+    s2.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
     scene.add(s2).unwrap();
 
     scene

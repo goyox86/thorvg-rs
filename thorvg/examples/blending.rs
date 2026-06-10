@@ -7,7 +7,7 @@
 
 mod common;
 
-use thorvg::{BlendMethod, ColorSpace, EngineOption, Paint, Thorvg};
+use thorvg::{BlendMethod, ColorSpace, EngineOption, Paint, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -20,7 +20,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(240, 240, 240, 255).unwrap();
+    bg.set_fill_color(Rgba::new(240, 240, 240, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     let modes: &[(BlendMethod, &str)] = &[
@@ -54,7 +54,7 @@ fn main() {
         circle1
             .append_circle(x + 70.0, y + 60.0, 45.0, 45.0, true)
             .unwrap();
-        circle1.set_fill_color(220, 40, 40, 255).unwrap();
+        circle1.set_fill_color(Rgba::new(220, 40, 40, 255)).unwrap();
         canvas.add(circle1).unwrap();
 
         // Blue circle (top layer with blend)
@@ -62,7 +62,7 @@ fn main() {
         circle2
             .append_circle(x + 110.0, y + 60.0, 45.0, 45.0, true)
             .unwrap();
-        circle2.set_fill_color(40, 40, 220, 255).unwrap();
+        circle2.set_fill_color(Rgba::new(40, 40, 220, 255)).unwrap();
         circle2.set_blend(*mode).unwrap();
         canvas.add(circle2).unwrap();
     }

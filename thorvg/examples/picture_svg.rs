@@ -7,7 +7,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -20,7 +20,7 @@ fn main() {
     let mut bg = engine.shape().unwrap();
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
-    bg.set_fill_color(255, 255, 255, 255).unwrap();
+    bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // Load SVG from embedded string

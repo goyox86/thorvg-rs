@@ -109,7 +109,7 @@ fuzz_target!(|input: Input| {
         for c in input.children {
             if let Ok(mut s) = engine.shape() {
                 let _ = s.append_rect(c.x, c.y, c.w, c.h, 0.0, 0.0, true);
-                let _ = s.set_fill_color(255, 0, 0, 255);
+                let _ = s.set_fill_color(Rgba::new(255, 0, 0, 255));
                 let _ = scene.add(s);
             }
         }
