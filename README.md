@@ -29,7 +29,7 @@ let mut shape = engine.shape();
 shape.append_rect(10.0, 10.0, 200.0, 150.0, 10.0, 10.0, true).unwrap();
 shape.set_fill_color(255, 0, 0, 255).unwrap();
 
-canvas.push(shape).unwrap();
+canvas.add(shape).unwrap();
 canvas.draw(true).unwrap();
 canvas.sync().unwrap();
 // buffer now contains rendered pixels

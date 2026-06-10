@@ -21,7 +21,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // Load SVG from embedded string
     let svg_data = concat!(
@@ -43,7 +43,7 @@ fn main() {
     pic.load_data(svg_data.as_bytes(), thorvg::MimeType::Svg, None)
         .unwrap();
     pic.set_size(w as f32, h as f32).unwrap();
-    canvas.push(pic).unwrap();
+    canvas.add(pic).unwrap();
 
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();

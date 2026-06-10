@@ -21,7 +21,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(15, 15, 25, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── 5-pointed star ─────────────────────────────────────────────
     let mut star = engine.shape().unwrap();
@@ -42,7 +42,7 @@ fn main() {
     star.set_fill_color(255, 200, 0, 255).unwrap();
     star.set_stroke_width(2.0).unwrap();
     star.set_stroke_color(255, 255, 200, 255).unwrap();
-    canvas.push(star).unwrap();
+    canvas.add(star).unwrap();
 
     // ── Heart shape (cubic Béziers) ────────────────────────────────
     let mut heart = engine.shape().unwrap();
@@ -70,7 +70,7 @@ fn main() {
         .unwrap();
     heart.close().unwrap();
     heart.set_fill_color(220, 30, 60, 255).unwrap();
-    canvas.push(heart).unwrap();
+    canvas.add(heart).unwrap();
 
     // ── Spiral (stroked path) ──────────────────────────────────────
     let mut spiral = engine.shape().unwrap();
@@ -89,7 +89,7 @@ fn main() {
     spiral.set_stroke_width(2.5).unwrap();
     spiral.set_stroke_color(100, 200, 255, 255).unwrap();
     spiral.set_stroke_cap(StrokeCap::Round).unwrap();
-    canvas.push(spiral).unwrap();
+    canvas.add(spiral).unwrap();
 
     // ── Wavy line ──────────────────────────────────────────────────
     let mut wave = engine.shape().unwrap();
@@ -113,7 +113,7 @@ fn main() {
     wave.set_stroke_color(255, 150, 50, 255).unwrap();
     wave.set_stroke_cap(StrokeCap::Round).unwrap();
     wave.set_stroke_join(StrokeJoin::Round).unwrap();
-    canvas.push(wave).unwrap();
+    canvas.add(wave).unwrap();
 
     // ── Polygon (hexagon) ──────────────────────────────────────────
     let mut hex = engine.shape().unwrap();
@@ -132,7 +132,7 @@ fn main() {
     hex.set_fill_color(60, 180, 120, 200).unwrap();
     hex.set_stroke_width(3.0).unwrap();
     hex.set_stroke_color(200, 255, 200, 255).unwrap();
-    canvas.push(hex).unwrap();
+    canvas.add(hex).unwrap();
 
     // ── Arrow shape ────────────────────────────────────────────────
     let mut arrow = engine.shape().unwrap();
@@ -142,7 +142,7 @@ fn main() {
     arrow.line_to(380.0, 530.0).unwrap();
     arrow.close().unwrap();
     arrow.set_fill_color(255, 100, 200, 255).unwrap();
-    canvas.push(arrow).unwrap();
+    canvas.add(arrow).unwrap();
 
     // ── Infinity symbol (figure-8 with Béziers) ────────────────────
     let mut inf = engine.shape().unwrap();
@@ -156,7 +156,7 @@ fn main() {
     inf.set_stroke_width(4.0).unwrap();
     inf.set_stroke_color(200, 200, 255, 255).unwrap();
     inf.set_stroke_cap(StrokeCap::Round).unwrap();
-    canvas.push(inf).unwrap();
+    canvas.add(inf).unwrap();
 
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();

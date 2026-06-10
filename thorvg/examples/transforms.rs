@@ -25,7 +25,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 40, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Original (no transform) ────────────────────────────────────
     let mut s1 = engine.shape().unwrap();
@@ -33,7 +33,7 @@ fn main() {
         .unwrap();
     s1.set_fill_color(255, 80, 80, 255).unwrap();
     s1.translate(50.0, 50.0).unwrap();
-    canvas.push(s1).unwrap();
+    canvas.add(s1).unwrap();
 
     // ── Translated ─────────────────────────────────────────────────
     let mut s2 = engine.shape().unwrap();
@@ -41,7 +41,7 @@ fn main() {
         .unwrap();
     s2.set_fill_color(80, 255, 80, 255).unwrap();
     s2.translate(200.0, 50.0).unwrap();
-    canvas.push(s2).unwrap();
+    canvas.add(s2).unwrap();
 
     // ── Rotated 30° ────────────────────────────────────────────────
     let mut s3 = engine.shape().unwrap();
@@ -50,7 +50,7 @@ fn main() {
     s3.set_fill_color(80, 80, 255, 255).unwrap();
     s3.translate(350.0, 80.0).unwrap();
     s3.rotate(30.0).unwrap();
-    canvas.push(s3).unwrap();
+    canvas.add(s3).unwrap();
 
     // ── Scaled 1.5x ────────────────────────────────────────────────
     let mut s4 = engine.shape().unwrap();
@@ -59,7 +59,7 @@ fn main() {
     s4.set_fill_color(255, 255, 80, 255).unwrap();
     s4.translate(500.0, 50.0).unwrap();
     s4.scale(1.5).unwrap();
-    canvas.push(s4).unwrap();
+    canvas.add(s4).unwrap();
 
     // ── Custom matrix: skew transform ──────────────────────────────
     let mut s5 = engine.shape().unwrap();
@@ -78,7 +78,7 @@ fn main() {
         e33: 1.0,
     })
     .unwrap();
-    canvas.push(s5).unwrap();
+    canvas.add(s5).unwrap();
 
     // ── Row of rotated shapes ──────────────────────────────────────
     for i in 0..8 {
@@ -88,7 +88,7 @@ fn main() {
         s.set_fill_color(255, hue, 255 - hue, 200).unwrap();
         s.translate(80.0 + i as f32 * 85.0, 280.0).unwrap();
         s.rotate(i as f32 * 15.0).unwrap();
-        canvas.push(s).unwrap();
+        canvas.add(s).unwrap();
     }
 
     canvas.draw(true).unwrap();

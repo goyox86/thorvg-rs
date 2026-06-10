@@ -29,7 +29,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(20, 20, 20, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Linear gradient: red → blue ────────────────────────────────
     let mut linear_grad = engine.linear_gradient().unwrap();
@@ -58,7 +58,7 @@ fn main() {
         .append_rect(50.0, 50.0, 300.0, 150.0, 0.0, 0.0, true)
         .unwrap();
     rect1.set_linear_gradient(linear_grad).unwrap();
-    canvas.push(rect1).unwrap();
+    canvas.add(rect1).unwrap();
 
     // ── Linear gradient with 4 color stops (rainbow) ───────────────
     let mut rainbow_grad = engine.linear_gradient().unwrap();
@@ -102,7 +102,7 @@ fn main() {
         .append_rect(50.0, 250.0, 300.0, 100.0, 0.0, 0.0, true)
         .unwrap();
     rect2.set_linear_gradient(rainbow_grad).unwrap();
-    canvas.push(rect2).unwrap();
+    canvas.add(rect2).unwrap();
 
     // ── Radial gradient on a circle ────────────────────────────────
     let mut radial_grad = engine.radial_gradient().unwrap();
@@ -140,7 +140,7 @@ fn main() {
         .append_circle(550.0, 130.0, 100.0, 100.0, true)
         .unwrap();
     circle.set_radial_gradient(radial_grad).unwrap();
-    canvas.push(circle).unwrap();
+    canvas.add(circle).unwrap();
 
     // ── Radial gradient with focal offset ──────────────────────────
     let mut focal_grad = engine.radial_gradient().unwrap();
@@ -172,7 +172,7 @@ fn main() {
         .unwrap();
     rect3.set_radial_gradient(focal_grad).unwrap();
     rect3.set_opacity(200).unwrap();
-    canvas.push(rect3).unwrap();
+    canvas.add(rect3).unwrap();
 
     // ── Render & save ──────────────────────────────────────────────
     canvas.draw(true).unwrap();

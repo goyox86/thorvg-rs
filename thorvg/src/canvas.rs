@@ -139,7 +139,7 @@ impl SwCanvas<'_> {
     /// Adds a paint object to the canvas for rendering.
     ///
     /// Ownership of the paint is transferred to the canvas.
-    pub fn push<P: Paint>(&mut self, paint: P) -> Result<()> {
+    pub fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
         let raw_paint = paint.into_raw();
         let result = unsafe { sys::tvg_canvas_add(self.raw, raw_paint) };
         Error::from_raw(result)
@@ -218,7 +218,7 @@ macro_rules! impl_canvas_ops {
             /// Adds a paint object to the canvas for rendering.
             ///
             /// Ownership of the paint is transferred to the canvas.
-            pub fn push<P: Paint>(&mut self, paint: P) -> Result<()> {
+            pub fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
                 let raw_paint = paint.into_raw();
                 Error::from_raw(unsafe { sys::tvg_canvas_add(self.raw, raw_paint) })
             }

@@ -34,7 +34,7 @@ fn main() {
             .unwrap();
             let gray = if (row + col) % 2 == 0 { 180 } else { 210 };
             sq.set_fill_color(gray, gray, gray, 255).unwrap();
-            canvas.push(sq).unwrap();
+            canvas.add(sq).unwrap();
         }
     }
 
@@ -71,7 +71,7 @@ fn main() {
     mask1.set_linear_gradient(grad).unwrap();
 
     rect1.set_mask(mask1, MaskMethod::Alpha).unwrap();
-    canvas.push(rect1).unwrap();
+    canvas.add(rect1).unwrap();
 
     // ── InvAlpha mask ──────────────────────────────────────────────
     let mut rect2 = engine.shape().unwrap();
@@ -85,7 +85,7 @@ fn main() {
     mask2.set_fill_color(255, 255, 255, 255).unwrap();
 
     rect2.set_mask(mask2, MaskMethod::InvAlpha).unwrap();
-    canvas.push(rect2).unwrap();
+    canvas.add(rect2).unwrap();
 
     // ── Luma mask ──────────────────────────────────────────────────
     let mut rect3 = engine.shape().unwrap();
@@ -122,7 +122,7 @@ fn main() {
     mask3.set_linear_gradient(grad3).unwrap();
 
     rect3.set_mask(mask3, MaskMethod::Luma).unwrap();
-    canvas.push(rect3).unwrap();
+    canvas.add(rect3).unwrap();
 
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();

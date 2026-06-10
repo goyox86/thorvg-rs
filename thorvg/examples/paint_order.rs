@@ -22,7 +22,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Default order: fill first, then stroke ─────────────────────
     let mut s1 = engine.shape().unwrap();
@@ -31,7 +31,7 @@ fn main() {
     s1.set_stroke_width(12.0).unwrap();
     s1.set_stroke_color(255, 80, 80, 255).unwrap();
     // Default: stroke on top of fill
-    canvas.push(s1).unwrap();
+    canvas.add(s1).unwrap();
 
     // ── Stroke first, then fill (fill covers stroke) ───────────────
     let mut s2 = engine.shape().unwrap();
@@ -40,7 +40,7 @@ fn main() {
     s2.set_stroke_width(12.0).unwrap();
     s2.set_stroke_color(255, 80, 80, 255).unwrap();
     s2.set_paint_order(true).unwrap(); // stroke first
-    canvas.push(s2).unwrap();
+    canvas.add(s2).unwrap();
 
     // ── Trim path: show partial path ───────────────────────────────
     let mut s3 = engine.shape().unwrap();
@@ -49,7 +49,7 @@ fn main() {
     s3.set_stroke_color(50, 50, 50, 255).unwrap();
     s3.set_stroke_cap(StrokeCap::Round).unwrap();
     s3.set_trimpath(0.0, 0.75, true).unwrap();
-    canvas.push(s3).unwrap();
+    canvas.add(s3).unwrap();
 
     // ── Multiple trim path values ──────────────────────────────────
     let trims = [0.25, 0.5, 0.75, 1.0];
@@ -62,7 +62,7 @@ fn main() {
         s.set_stroke_color(hue, 100, 255 - hue, 255).unwrap();
         s.set_stroke_cap(StrokeCap::Round).unwrap();
         s.set_trimpath(0.0, end, true).unwrap();
-        canvas.push(s).unwrap();
+        canvas.add(s).unwrap();
     }
 
     canvas.draw(true).unwrap();

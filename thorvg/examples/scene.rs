@@ -28,7 +28,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Scene with grouped shapes ──────────────────────────────────
     let mut scene = engine.scene().unwrap();
@@ -39,14 +39,14 @@ fn main() {
         .append_circle(150.0, 150.0, 80.0, 80.0, true)
         .unwrap();
     circle.set_fill_color(0, 200, 0, 255).unwrap();
-    scene.push(circle).unwrap();
+    scene.add(circle).unwrap();
 
     // Semi-transparent blue rectangle overlapping the circle
     let mut rect = engine.shape().unwrap();
     rect.append_rect(100.0, 100.0, 150.0, 100.0, 10.0, 10.0, true)
         .unwrap();
     rect.set_fill_color(0, 0, 200, 180).unwrap();
-    scene.push(rect).unwrap();
+    scene.add(rect).unwrap();
 
     // Yellow star-like shape using paths
     let mut star = engine.shape().unwrap();
@@ -62,7 +62,7 @@ fn main() {
     star.line_to(330.0, 140.0).unwrap();
     star.close().unwrap();
     star.set_fill_color(255, 220, 0, 255).unwrap();
-    scene.push(star).unwrap();
+    scene.add(star).unwrap();
 
     // Apply scene-level transform
     scene.translate(30.0, 40.0).unwrap();
@@ -72,7 +72,7 @@ fn main() {
         .add_gaussian_blur_effect(3.0, BlurDirection::Both, BlurBorder::Duplicate, 80)
         .unwrap();
 
-    canvas.push(scene).unwrap();
+    canvas.add(scene).unwrap();
 
     // ── Render & save ──────────────────────────────────────────────
     canvas.draw(true).unwrap();

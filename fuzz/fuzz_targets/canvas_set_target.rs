@@ -120,7 +120,7 @@ fuzz_target!(|input: Input| {
             if let Ok(mut s) = engine.shape() {
                 let _ = s.append_rect(0.0, 0.0, 8.0, 8.0, 0.0, 0.0, true);
                 let _ = s.set_fill_color(255, 0, 0, 255);
-                let _ = canvas.push(s);
+                let _ = canvas.add(s);
             }
         }
         let (vx, vy, vw, vh) = input.viewport;

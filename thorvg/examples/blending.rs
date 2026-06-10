@@ -21,7 +21,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(240, 240, 240, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     let modes: &[(BlendMethod, &str)] = &[
         (BlendMethod::Normal, "Normal"),
@@ -55,7 +55,7 @@ fn main() {
             .append_circle(x + 70.0, y + 60.0, 45.0, 45.0, true)
             .unwrap();
         circle1.set_fill_color(220, 40, 40, 255).unwrap();
-        canvas.push(circle1).unwrap();
+        canvas.add(circle1).unwrap();
 
         // Blue circle (top layer with blend)
         let mut circle2 = engine.shape().unwrap();
@@ -64,7 +64,7 @@ fn main() {
             .unwrap();
         circle2.set_fill_color(40, 40, 220, 255).unwrap();
         circle2.set_blend(*mode).unwrap();
-        canvas.push(circle2).unwrap();
+        canvas.add(circle2).unwrap();
     }
 
     canvas.draw(true).unwrap();

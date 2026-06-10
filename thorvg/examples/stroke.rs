@@ -26,7 +26,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 30, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Butt cap, Miter join ───────────────────────────────────────
     let mut shape1 = engine.shape().unwrap();
@@ -37,7 +37,7 @@ fn main() {
     shape1.set_stroke_color(255, 80, 80, 255).unwrap();
     shape1.set_stroke_cap(StrokeCap::Butt).unwrap();
     shape1.set_stroke_join(StrokeJoin::Miter).unwrap();
-    canvas.push(shape1).unwrap();
+    canvas.add(shape1).unwrap();
 
     // ── Round cap, Round join ──────────────────────────────────────
     let mut shape2 = engine.shape().unwrap();
@@ -48,7 +48,7 @@ fn main() {
     shape2.set_stroke_color(80, 255, 80, 255).unwrap();
     shape2.set_stroke_cap(StrokeCap::Round).unwrap();
     shape2.set_stroke_join(StrokeJoin::Round).unwrap();
-    canvas.push(shape2).unwrap();
+    canvas.add(shape2).unwrap();
 
     // ── Square cap, Bevel join ─────────────────────────────────────
     let mut shape3 = engine.shape().unwrap();
@@ -59,7 +59,7 @@ fn main() {
     shape3.set_stroke_color(80, 80, 255, 255).unwrap();
     shape3.set_stroke_cap(StrokeCap::Square).unwrap();
     shape3.set_stroke_join(StrokeJoin::Bevel).unwrap();
-    canvas.push(shape3).unwrap();
+    canvas.add(shape3).unwrap();
 
     // ── Dashed stroke ──────────────────────────────────────────────
     let mut dashed = engine.shape().unwrap();
@@ -71,7 +71,7 @@ fn main() {
     dashed
         .set_stroke_dash(&[15.0, 10.0, 5.0, 10.0], 0.0)
         .unwrap();
-    canvas.push(dashed).unwrap();
+    canvas.add(dashed).unwrap();
 
     // ── Stroked circle with fill ───────────────────────────────────
     let mut stroked_circle = engine.shape().unwrap();
@@ -81,7 +81,7 @@ fn main() {
     stroked_circle.set_fill_color(100, 100, 255, 128).unwrap();
     stroked_circle.set_stroke_width(6.0).unwrap();
     stroked_circle.set_stroke_color(255, 255, 255, 255).unwrap();
-    canvas.push(stroked_circle).unwrap();
+    canvas.add(stroked_circle).unwrap();
 
     // ── Render & save ──────────────────────────────────────────────
     canvas.draw(true).unwrap();

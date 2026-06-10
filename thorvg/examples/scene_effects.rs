@@ -20,13 +20,13 @@ fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
         .append_circle(x + 60.0, y + 60.0, 40.0, 40.0, true)
         .unwrap();
     circle.set_fill_color(0, 180, 80, 255).unwrap();
-    scene.push(circle).unwrap();
+    scene.add(circle).unwrap();
 
     let mut rect = engine.shape().unwrap();
     rect.append_rect(x + 30.0, y + 30.0, 80.0, 60.0, 8.0, 8.0, true)
         .unwrap();
     rect.set_fill_color(80, 80, 220, 200).unwrap();
-    scene.push(rect).unwrap();
+    scene.add(rect).unwrap();
 
     scene
 }
@@ -43,18 +43,18 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(245, 245, 245, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── No effect (reference) ──────────────────────────────────────
     let scene1 = make_shape_group(&engine, 30.0, 30.0);
-    canvas.push(scene1).unwrap();
+    canvas.add(scene1).unwrap();
 
     // ── Gaussian blur ──────────────────────────────────────────────
     let mut scene2 = make_shape_group(&engine, 220.0, 30.0);
     scene2
         .add_gaussian_blur_effect(5.0, BlurDirection::Both, BlurBorder::Duplicate, 80)
         .unwrap();
-    canvas.push(scene2).unwrap();
+    canvas.add(scene2).unwrap();
 
     // ── Drop shadow ────────────────────────────────────────────────
     let mut scene3 = make_shape_group(&engine, 410.0, 30.0);
@@ -67,12 +67,12 @@ fn main() {
             quality: 80,
         })
         .unwrap();
-    canvas.push(scene3).unwrap();
+    canvas.add(scene3).unwrap();
 
     // ── Fill effect (recolor) ──────────────────────────────────────
     let mut scene4 = make_shape_group(&engine, 600.0, 30.0);
     scene4.add_fill_effect(Rgba::new(255, 60, 60, 200)).unwrap();
-    canvas.push(scene4).unwrap();
+    canvas.add(scene4).unwrap();
 
     // ── Tint effect ────────────────────────────────────────────────
     let mut scene5 = make_shape_group(&engine, 30.0, 250.0);
@@ -85,7 +85,7 @@ fn main() {
                 .intensity(80.0),
         )
         .unwrap();
-    canvas.push(scene5).unwrap();
+    canvas.add(scene5).unwrap();
 
     // ── Tritone effect ─────────────────────────────────────────────
     let mut scene6 = make_shape_group(&engine, 220.0, 250.0);
@@ -97,7 +97,7 @@ fn main() {
             blend: 180,
         })
         .unwrap();
-    canvas.push(scene6).unwrap();
+    canvas.add(scene6).unwrap();
 
     // ── Blur + drop shadow (stacked) ───────────────────────────────
     let mut scene7 = make_shape_group(&engine, 410.0, 250.0);
@@ -116,7 +116,7 @@ fn main() {
                 .quality(80),
         )
         .unwrap();
-    canvas.push(scene7).unwrap();
+    canvas.add(scene7).unwrap();
 
     // ── Scene with transform + blur ────────────────────────────────
     let mut scene8 = make_shape_group(&engine, 600.0, 250.0);
@@ -125,7 +125,7 @@ fn main() {
     scene8
         .add_gaussian_blur_effect(3.0, BlurDirection::Horizontal, BlurBorder::Duplicate, 70)
         .unwrap();
-    canvas.push(scene8).unwrap();
+    canvas.add(scene8).unwrap();
 
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();

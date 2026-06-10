@@ -21,7 +21,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(30, 30, 50, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Left: gradient rectangle clipped by a circle ───────────────
     let mut grad = engine.linear_gradient().unwrap();
@@ -54,7 +54,7 @@ fn main() {
     clip1.append_circle(150.0, 200.0, 90.0, 90.0, true).unwrap();
     rect.set_clip(clip1).unwrap();
 
-    canvas.push(rect).unwrap();
+    canvas.add(rect).unwrap();
 
     // ── Right: star shape clipped by a rounded rectangle ───────────
     let mut star = engine.shape().unwrap();
@@ -85,7 +85,7 @@ fn main() {
         .unwrap();
     star.set_clip(clip2).unwrap();
 
-    canvas.push(star).unwrap();
+    canvas.add(star).unwrap();
 
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();

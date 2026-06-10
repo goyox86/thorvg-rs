@@ -55,7 +55,7 @@
 //! let mut shape = engine.shape().unwrap();
 //! shape.append_rect(0.0, 0.0, 200.0, 200.0, 0.0, 0.0, true).unwrap();
 //! shape.set_fill_color(255, 0, 0, 255).unwrap();
-//! canvas.push(shape).unwrap();
+//! canvas.add(shape).unwrap();
 //!
 //! // Render
 //! canvas.draw(true).unwrap();
@@ -141,7 +141,7 @@ mod tests_no_threads {
 /// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
 /// let mut shape = engine.shape().unwrap();
 /// shape.set_fill_color(255, 0, 0, 255).unwrap();
-/// canvas.push(shape).unwrap();
+/// canvas.add(shape).unwrap();
 /// ```
 pub struct Thorvg {
     _not_send_sync: core::marker::PhantomData<*const ()>,

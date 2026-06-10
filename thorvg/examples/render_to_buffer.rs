@@ -26,7 +26,7 @@ fn main() {
     bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
         .unwrap();
     bg.set_fill_color(255, 255, 255, 255).unwrap();
-    canvas.push(bg).unwrap();
+    canvas.add(bg).unwrap();
 
     // ── Gradient-filled rounded rect ───────────────────────────────
     let mut grad = engine.linear_gradient().unwrap();
@@ -60,7 +60,7 @@ fn main() {
     rect.append_rect(50.0, 50.0, 300.0, 200.0, 25.0, 25.0, true)
         .unwrap();
     rect.set_linear_gradient(grad).unwrap();
-    canvas.push(rect).unwrap();
+    canvas.add(rect).unwrap();
 
     // ── Semi-transparent white circle on top ───────────────────────
     let mut circle = engine.shape().unwrap();
@@ -69,7 +69,7 @@ fn main() {
         .unwrap();
     circle.set_fill_color(255, 255, 255, 200).unwrap();
     circle.set_opacity(200).unwrap();
-    canvas.push(circle).unwrap();
+    canvas.add(circle).unwrap();
 
     // ── Render & save ──────────────────────────────────────────────
     canvas.draw(true).unwrap();

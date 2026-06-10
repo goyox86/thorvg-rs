@@ -110,7 +110,7 @@ fuzz_target!(|input: Input| {
             if let Ok(mut s) = engine.shape() {
                 let _ = s.append_rect(c.x, c.y, c.w, c.h, 0.0, 0.0, true);
                 let _ = s.set_fill_color(255, 0, 0, 255);
-                let _ = scene.push(s);
+                let _ = scene.add(s);
             }
         }
         for e in input.effects {

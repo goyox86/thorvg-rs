@@ -381,7 +381,7 @@ impl Scene<'_> {
     }
 
     /// Adds a paint object to the scene (appended at the end).
-    pub fn push<P: Paint>(&mut self, paint: P) -> Result<()> {
+    pub fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_scene_add(self.raw, paint.into_raw()) })
     }
 

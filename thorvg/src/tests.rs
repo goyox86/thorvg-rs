@@ -53,7 +53,7 @@ fn test_canvas_draw_shape() {
         .unwrap();
     shape.set_fill_color(255, 0, 0, 255).unwrap();
 
-    canvas.push(shape).unwrap(); // ownership transferred
+    canvas.add(shape).unwrap(); // ownership transferred
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
 
@@ -75,7 +75,7 @@ fn test_canvas_clear_all() {
         let mut s = engine.shape().unwrap();
         s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
         s.set_fill_color(255, 0, 0, 255).unwrap();
-        canvas.push(s).unwrap();
+        canvas.add(s).unwrap();
     }
 
     // Clear all — should not double-free anything
@@ -85,7 +85,7 @@ fn test_canvas_clear_all() {
     let mut s = engine.shape().unwrap();
     s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
     s.set_fill_color(0, 255, 0, 255).unwrap();
-    canvas.push(s).unwrap();
+    canvas.add(s).unwrap();
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
 }
@@ -106,7 +106,7 @@ fn test_shape_ownership_transfer_to_canvas() {
     shape.set_fill_color(255, 0, 0, 255).unwrap();
 
     // Transfer ownership — shape should NOT be freed by Rust
-    canvas.push(shape).unwrap();
+    canvas.add(shape).unwrap();
     // shape is consumed, canvas owns it, drop of canvas frees it
 }
 
@@ -124,8 +124,8 @@ fn test_shape_ownership_transfer_to_scene() {
     s2.append_circle(50.0, 50.0, 20.0, 20.0, true).unwrap();
     s2.set_fill_color(0, 0, 255, 255).unwrap();
 
-    scene.push(s1).unwrap();
-    scene.push(s2).unwrap();
+    scene.add(s1).unwrap();
+    scene.add(s2).unwrap();
 
     // Scene dropped here — must free both shapes without double-free
 }
@@ -266,9 +266,9 @@ fn test_scene_nested_drop() {
         s.append_circle(i as f32 * 20.0, 50.0, 10.0, 10.0, true)
             .unwrap();
         s.set_fill_color(255, 0, 0, 255).unwrap();
-        scene.push(s).unwrap();
+        scene.add(s).unwrap();
     }
-    canvas.push(scene).unwrap();
+    canvas.add(scene).unwrap();
 
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
@@ -285,7 +285,7 @@ fn test_scene_clear_and_reuse() {
     for _ in 0..5 {
         let mut s = engine.shape().unwrap();
         s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
-        scene.push(s).unwrap();
+        scene.add(s).unwrap();
     }
 
     // Clear all shapes
@@ -294,7 +294,7 @@ fn test_scene_clear_and_reuse() {
     // Scene should still be usable
     let mut s = engine.shape().unwrap();
     s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
-    scene.push(s).unwrap();
+    scene.add(s).unwrap();
 }
 
 // ── Paint Properties ───────────────────────────────────────────────
@@ -752,7 +752,7 @@ fn test_accessor_for_each_borrowed_views() {
     child
         .append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true)
         .unwrap();
-    parent.push(child).unwrap();
+    parent.add(child).unwrap();
 
     let mut visited: alloc::vec::Vec<PaintType> = alloc::vec::Vec::new();
     acc.for_each(&parent, |view, paint| {
@@ -810,7 +810,7 @@ fn test_clip_lifecycle() {
     clipper.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
     shape.set_clip(clipper).unwrap();
 
-    canvas.push(shape).unwrap();
+    canvas.add(shape).unwrap();
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
     // Clipper and shape are cleaned up properly
@@ -1051,19 +1051,19 @@ fn test_full_pipeline_scene_with_effects() {
     s1.append_rect(10.0, 10.0, 80.0, 80.0, 5.0, 5.0, true)
         .unwrap();
     s1.set_fill_color(255, 0, 0, 255).unwrap();
-    scene.push(s1).unwrap();
+    scene.add(s1).unwrap();
 
     let mut s2 = engine.shape().unwrap();
     s2.append_circle(120.0, 50.0, 30.0, 30.0, true).unwrap();
     s2.set_fill_color(0, 0, 255, 255).unwrap();
-    scene.push(s2).unwrap();
+    scene.add(s2).unwrap();
 
     scene
         .add_gaussian_blur_effect(2.0, BlurDirection::Both, BlurBorder::Duplicate, 50)
         .unwrap();
     scene.translate(10.0, 10.0).unwrap();
 
-    canvas.push(scene).unwrap();
+    canvas.add(scene).unwrap();
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
 

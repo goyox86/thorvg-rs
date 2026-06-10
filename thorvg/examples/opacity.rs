@@ -36,7 +36,7 @@ fn main() {
             .unwrap();
             let gray = if (row + col) % 2 == 0 { 200 } else { 230 };
             sq.set_fill_color(gray, gray, gray, 255).unwrap();
-            canvas.push(sq).unwrap();
+            canvas.add(sq).unwrap();
         }
     }
 
@@ -50,7 +50,7 @@ fn main() {
 
         let opacity = 255 - (i * 25) as u8;
         circle.set_opacity(opacity).unwrap();
-        canvas.push(circle).unwrap();
+        canvas.add(circle).unwrap();
     }
 
     // Overlapping semi-transparent rectangles
@@ -60,7 +60,7 @@ fn main() {
         rect.append_rect(150.0 + i as f32 * 60.0, 50.0, 120.0, 80.0, 10.0, 10.0, true)
             .unwrap();
         rect.set_fill_color(r, g, b, 150).unwrap();
-        canvas.push(rect).unwrap();
+        canvas.add(rect).unwrap();
     }
 
     canvas.draw(true).unwrap();
