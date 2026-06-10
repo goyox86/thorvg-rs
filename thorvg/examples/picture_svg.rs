@@ -7,7 +7,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Rgba, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Rgba, Rect, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -18,7 +18,7 @@ fn main() {
 
     // White background
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(0.0, 0.0, w as f32, h as f32, 0.0, 0.0, true)
+    bg.append_rect(Rect { x: 0.0, y: 0.0, width: w as f32, height: h as f32, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();

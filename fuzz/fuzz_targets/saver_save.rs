@@ -23,7 +23,7 @@
 use libfuzzer_sys::arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use std::sync::atomic::{AtomicU64, Ordering};
-use thorvg::{Rgba, Thorvg};
+use thorvg::{Rect, Rgba, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 struct Input<'a> {
@@ -82,7 +82,7 @@ fuzz_target!(|input: Input<'_>| {
             let Ok(mut shape) = engine.shape() else {
                 return;
             };
-            let _ = shape.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true);
+            let _ = shape.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0));
             let _ = shape.set_fill_color(Rgba::new(255, 0, 0, 255));
             let _ = saver.save_to_str(shape, &path, input.quality);
         }

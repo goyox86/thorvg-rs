@@ -53,7 +53,7 @@
 //!
 //! // Draw a red rectangle
 //! let mut shape = engine.shape().unwrap();
-//! shape.append_rect(0.0, 0.0, 200.0, 200.0, 0.0, 0.0, true).unwrap();
+//! shape.append_rect(thorvg::Rect::new(0.0, 0.0, 200.0, 200.0)).unwrap();
 //! shape.set_fill_color(thorvg::Rgba::new(255, 0, 0, 255)).unwrap();
 //! canvas.add(shape).unwrap();
 //!
@@ -104,7 +104,7 @@ pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
 pub use color::{Rgb, Rgba};
 pub use scene::{BlurBorder, BlurDirection, DropShadow, Scene, Tint, Tritone};
-pub use shape::{FillRule, Shape, StrokeCap, StrokeJoin};
+pub use shape::{Circle, FillRule, Rect, Shape, StrokeCap, StrokeJoin};
 pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 
 use thorvg_sys as sys;

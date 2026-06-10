@@ -13,7 +13,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{BlurBorder, BlurDirection, DropShadow, Rgb, Rgba, Thorvg, Tint, Tritone};
+use thorvg::{BlurBorder, BlurDirection, DropShadow, Rect, Rgb, Rgba, Thorvg, Tint, Tritone};
 
 #[derive(Arbitrary, Debug)]
 enum Effect {
@@ -108,7 +108,7 @@ fuzz_target!(|input: Input| {
         };
         for c in input.children {
             if let Ok(mut s) = engine.shape() {
-                let _ = s.append_rect(c.x, c.y, c.w, c.h, 0.0, 0.0, true);
+                let _ = s.append_rect(Rect::new(c.x, c.y, c.w, c.h));
                 let _ = s.set_fill_color(Rgba::new(255, 0, 0, 255));
                 let _ = scene.add(s);
             }

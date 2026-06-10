@@ -11,7 +11,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Paint, Rgba, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Paint, Rgba, Circle, Rect, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -24,15 +24,7 @@ fn main() {
     for row in 0..(h / 20) {
         for col in 0..(w / 20) {
             let mut sq = engine.shape().unwrap();
-            sq.append_rect(
-                col as f32 * 20.0,
-                row as f32 * 20.0,
-                20.0,
-                20.0,
-                0.0,
-                0.0,
-                true,
-            )
+            sq.append_rect(Rect { x: col as f32 * 20.0, y: row as f32 * 20.0, width: 20.0, height: 20.0, rx: 0.0, ry: 0.0, cw: true })
             .unwrap();
             let gray = if (row + col) % 2 == 0 { 200 } else { 230 };
             sq.set_fill_color(Rgba::new(gray, gray, gray, 255)).unwrap();
@@ -43,8 +35,7 @@ fn main() {
     // Row of circles with decreasing opacity
     for i in 0..10 {
         let mut circle = engine.shape().unwrap();
-        circle
-            .append_circle(60.0 + i as f32 * 75.0, 150.0, 30.0, 30.0, true)
+        circle.append_circle(Circle { cx: 60.0 + i as f32 * 75.0, cy: 150.0, rx: 30.0, ry: 30.0, cw: true })
             .unwrap();
         circle.set_fill_color(Rgba::new(0, 100, 255, 255)).unwrap();
 
@@ -57,7 +48,7 @@ fn main() {
     let colors: &[(u8, u8, u8)] = &[(255, 0, 0), (0, 255, 0), (0, 0, 255)];
     for (i, &(r, g, b)) in colors.iter().enumerate() {
         let mut rect = engine.shape().unwrap();
-        rect.append_rect(150.0 + i as f32 * 60.0, 50.0, 120.0, 80.0, 10.0, 10.0, true)
+        rect.append_rect(Rect { x: 150.0 + i as f32 * 60.0, y: 50.0, width: 120.0, height: 80.0, rx: 10.0, ry: 10.0, cw: true })
             .unwrap();
         rect.set_fill_color(Rgba::new(r, g, b, 150)).unwrap();
         canvas.add(rect).unwrap();

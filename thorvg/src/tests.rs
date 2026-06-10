@@ -48,8 +48,7 @@ fn test_canvas_draw_shape() {
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape
-        .append_rect(10.0, 10.0, 50.0, 50.0, 0.0, 0.0, true)
+    shape.append_rect(Rect { x: 10.0, y: 10.0, width: 50.0, height: 50.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
@@ -73,7 +72,7 @@ fn test_canvas_clear_all() {
     // Push multiple shapes
     for _ in 0..5 {
         let mut s = engine.shape().unwrap();
-        s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
+        s.append_rect(Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0, rx: 0.0, ry: 0.0, cw: true }).unwrap();
         s.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
         canvas.add(s).unwrap();
     }
@@ -83,7 +82,7 @@ fn test_canvas_clear_all() {
 
     // Canvas should still be usable after clearing
     let mut s = engine.shape().unwrap();
-    s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
+    s.append_rect(Rect { x: 0.0, y: 0.0, width: 50.0, height: 50.0, rx: 0.0, ry: 0.0, cw: true }).unwrap();
     s.set_fill_color(Rgba::new(0, 255, 0, 255)).unwrap();
     canvas.add(s).unwrap();
     canvas.draw(true).unwrap();
@@ -100,8 +99,7 @@ fn test_shape_ownership_transfer_to_canvas() {
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape
-        .append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true)
+    shape.append_rect(Rect { x: 0.0, y: 0.0, width: 50.0, height: 50.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
@@ -116,12 +114,12 @@ fn test_shape_ownership_transfer_to_scene() {
     let mut scene = engine.scene().unwrap();
 
     let mut s1 = engine.shape().unwrap();
-    s1.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true)
+    s1.append_rect(Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     s1.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     let mut s2 = engine.shape().unwrap();
-    s2.append_circle(50.0, 50.0, 20.0, 20.0, true).unwrap();
+    s2.append_circle(Circle { cx: 50.0, cy: 50.0, rx: 20.0, ry: 20.0, cw: true }).unwrap();
     s2.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
 
     scene.add(s1).unwrap();
@@ -135,8 +133,7 @@ fn test_shape_not_transferred_is_freed() {
     let engine = Thorvg::init(0).unwrap();
     // Shape created but never pushed to canvas/scene — Rust must free it
     let mut shape = engine.shape().unwrap();
-    shape
-        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+    shape.append_rect(Rect { x: 0.0, y: 0.0, width: 100.0, height: 100.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 255, 0, 255)).unwrap();
     shape.set_stroke_width(3.0).unwrap();
@@ -171,8 +168,7 @@ fn test_gradient_ownership_transfer_to_shape() {
     .unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape
-        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+    shape.append_rect(Rect { x: 0.0, y: 0.0, width: 100.0, height: 100.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     // Gradient ownership transferred to shape
     shape.set_linear_gradient(grad).unwrap();
@@ -263,7 +259,7 @@ fn test_scene_nested_drop() {
     let mut scene = engine.scene().unwrap();
     for i in 0..10 {
         let mut s = engine.shape().unwrap();
-        s.append_circle(i as f32 * 20.0, 50.0, 10.0, 10.0, true)
+        s.append_circle(Circle { cx: i as f32 * 20.0, cy: 50.0, rx: 10.0, ry: 10.0, cw: true })
             .unwrap();
         s.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
         scene.add(s).unwrap();
@@ -284,7 +280,7 @@ fn test_scene_clear_and_reuse() {
     // Add shapes
     for _ in 0..5 {
         let mut s = engine.shape().unwrap();
-        s.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true).unwrap();
+        s.append_rect(Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0, rx: 0.0, ry: 0.0, cw: true }).unwrap();
         scene.add(s).unwrap();
     }
 
@@ -293,7 +289,7 @@ fn test_scene_clear_and_reuse() {
 
     // Scene should still be usable
     let mut s = engine.shape().unwrap();
-    s.append_rect(0.0, 0.0, 50.0, 50.0, 0.0, 0.0, true).unwrap();
+    s.append_rect(Rect { x: 0.0, y: 0.0, width: 50.0, height: 50.0, rx: 0.0, ry: 0.0, cw: true }).unwrap();
     scene.add(s).unwrap();
 }
 
@@ -311,7 +307,7 @@ fn test_shape_fill_color_roundtrip() {
 fn test_shape_stroke_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
     let mut shape = engine.shape().unwrap();
-    shape.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
+    shape.append_circle(Circle { cx: 50.0, cy: 50.0, rx: 30.0, ry: 30.0, cw: true }).unwrap();
     shape.set_stroke_width(3.0).unwrap();
     shape.set_stroke_color(Rgba::new(0, 255, 0, 255)).unwrap();
     shape.set_stroke_cap(StrokeCap::Round).unwrap();
@@ -747,8 +743,7 @@ fn test_accessor_for_each_borrowed_views() {
     // Build a tiny scene: parent with one shape child.
     let mut parent = engine.scene().unwrap();
     let mut child = engine.shape().unwrap();
-    child
-        .append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true)
+    child.append_rect(Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     parent.add(child).unwrap();
 
@@ -799,13 +794,12 @@ fn test_clip_lifecycle() {
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape
-        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+    shape.append_rect(Rect { x: 0.0, y: 0.0, width: 100.0, height: 100.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     let mut clipper = engine.shape().unwrap();
-    clipper.append_circle(50.0, 50.0, 30.0, 30.0, true).unwrap();
+    clipper.append_circle(Circle { cx: 50.0, cy: 50.0, rx: 30.0, ry: 30.0, cw: true }).unwrap();
     shape.set_clip(clipper).unwrap();
 
     canvas.add(shape).unwrap();
@@ -1016,15 +1010,13 @@ fn test_mask_getter_round_trip() {
     let engine = Thorvg::init(0).unwrap();
 
     let mut paint = engine.shape().unwrap();
-    paint
-        .append_rect(0.0, 0.0, 100.0, 100.0, 0.0, 0.0, true)
+    paint.append_rect(Rect { x: 0.0, y: 0.0, width: 100.0, height: 100.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
 
     assert!(paint.mask().is_none(), "no mask before set_mask");
 
     let mut mask_shape = engine.shape().unwrap();
-    mask_shape
-        .append_circle(50.0, 50.0, 30.0, 30.0, true)
+    mask_shape.append_circle(Circle { cx: 50.0, cy: 50.0, rx: 30.0, ry: 30.0, cw: true })
         .unwrap();
     paint.set_mask(mask_shape, MaskMethod::Alpha).unwrap();
 
@@ -1046,13 +1038,13 @@ fn test_full_pipeline_scene_with_effects() {
     let mut scene = engine.scene().unwrap();
 
     let mut s1 = engine.shape().unwrap();
-    s1.append_rect(10.0, 10.0, 80.0, 80.0, 5.0, 5.0, true)
+    s1.append_rect(Rect { x: 10.0, y: 10.0, width: 80.0, height: 80.0, rx: 5.0, ry: 5.0, cw: true })
         .unwrap();
     s1.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
     scene.add(s1).unwrap();
 
     let mut s2 = engine.shape().unwrap();
-    s2.append_circle(120.0, 50.0, 30.0, 30.0, true).unwrap();
+    s2.append_circle(Circle { cx: 120.0, cy: 50.0, rx: 30.0, ry: 30.0, cw: true }).unwrap();
     s2.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
     scene.add(s2).unwrap();
 

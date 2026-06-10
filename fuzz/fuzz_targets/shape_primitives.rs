@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{FillRule, Rgba, StrokeCap, StrokeJoin, Thorvg};
+use thorvg::{Circle, FillRule, Rect, Rgba, StrokeCap, StrokeJoin, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 enum Op {
@@ -93,8 +93,18 @@ fuzz_target!(|input: Input| {
                 Op::LineTo(x, y) => shape.line_to(x, y),
                 Op::CubicTo(a, b, c, d, e, f) => shape.cubic_to(a, b, c, d, e, f),
                 Op::Close => shape.close(),
-                Op::AppendRect(x, y, w, h, rx, ry, cw) => shape.append_rect(x, y, w, h, rx, ry, cw),
-                Op::AppendCircle(cx, cy, rx, ry, cw) => shape.append_circle(cx, cy, rx, ry, cw),
+                Op::AppendRect(x, y, w, h, rx, ry, cw) => shape.append_rect(Rect {
+                    x,
+                    y,
+                    width: w,
+                    height: h,
+                    rx,
+                    ry,
+                    cw,
+                }),
+                Op::AppendCircle(cx, cy, rx, ry, cw) => {
+                    shape.append_circle(Circle { cx, cy, rx, ry, cw })
+                }
                 Op::SetFillColor(r, g, b, a) => shape.set_fill_color(Rgba::new(r, g, b, a)),
                 Op::SetStrokeColor(r, g, b, a) => shape.set_stroke_color(Rgba::new(r, g, b, a)),
                 Op::SetFillRule(b) => shape.set_fill_rule(to_fill_rule(b)),

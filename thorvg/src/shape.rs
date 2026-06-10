@@ -4,6 +4,146 @@ use crate::gradient::{BorrowedGradient, LinearGradient, RadialGradient};
 use crate::paint::{Paint, Point};
 use thorvg_sys as sys;
 
+/// An axis-aligned rectangle, optionally rounded.
+///
+/// Parameter bundle for [`Shape::append_rect`], mirroring the C call
+/// `tvg_shape_append_rect(x, y, w, h, rx, ry, cw)`.
+///
+/// Three construction styles are supported:
+///
+/// ```ignore
+/// // 1. Struct literal:
+/// Rect { x: 0.0, y: 0.0, width: 100.0, height: 50.0,
+///        rx: 0.0, ry: 0.0, cw: true }
+///
+/// // 2. Default + field override:
+/// Rect { width: 100.0, height: 50.0, ..Default::default() }
+///
+/// // 3. Builder:
+/// Rect::new(0.0, 0.0, 100.0, 50.0).corner_radius(8.0)
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Rect {
+    /// Top-left X coordinate.
+    pub x: f32,
+    /// Top-left Y coordinate.
+    pub y: f32,
+    /// Width along the X axis.
+    pub width: f32,
+    /// Height along the Y axis.
+    pub height: f32,
+    /// Corner radius on the X axis.  `0.0` for sharp corners.
+    pub rx: f32,
+    /// Corner radius on the Y axis.  `0.0` for sharp corners.
+    pub ry: f32,
+    /// Winding direction.  `true` = clockwise (the C-side default),
+    /// `false` = counter-clockwise.
+    pub cw: bool,
+}
+
+impl Rect {
+    /// Sharp-cornered rectangle, clockwise winding.
+    #[must_use]
+    pub const fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            rx: 0.0,
+            ry: 0.0,
+            cw: true,
+        }
+    }
+
+    /// Sets the X-axis corner radius.
+    #[must_use]
+    pub const fn rx(mut self, rx: f32) -> Self {
+        self.rx = rx;
+        self
+    }
+
+    /// Sets the Y-axis corner radius.
+    #[must_use]
+    pub const fn ry(mut self, ry: f32) -> Self {
+        self.ry = ry;
+        self
+    }
+
+    /// Sets both `rx` and `ry` to the same value (uniform rounded
+    /// corners).
+    #[must_use]
+    pub const fn corner_radius(mut self, r: f32) -> Self {
+        self.rx = r;
+        self.ry = r;
+        self
+    }
+
+    /// Switches winding to counter-clockwise.
+    #[must_use]
+    pub const fn ccw(mut self) -> Self {
+        self.cw = false;
+        self
+    }
+}
+
+/// An ellipse (or circle, when `rx == ry`).
+///
+/// Named `Circle` to match the C function name
+/// `tvg_shape_append_circle`, but the underlying primitive is a
+/// **general axis-aligned ellipse** — use [`Circle::new`] for the
+/// circular case and [`Circle::ellipse`] when the radii differ.
+///
+/// Same three construction styles as [`Rect`] are supported.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Circle {
+    /// Center X coordinate.
+    pub cx: f32,
+    /// Center Y coordinate.
+    pub cy: f32,
+    /// Radius on the X axis.
+    pub rx: f32,
+    /// Radius on the Y axis.
+    pub ry: f32,
+    /// Winding direction.  `true` = clockwise (the C-side default),
+    /// `false` = counter-clockwise.
+    pub cw: bool,
+}
+
+impl Circle {
+    /// True circle centred at `(cx, cy)` with radius `r`.
+    #[must_use]
+    pub const fn new(cx: f32, cy: f32, r: f32) -> Self {
+        Self {
+            cx,
+            cy,
+            rx: r,
+            ry: r,
+            cw: true,
+        }
+    }
+
+    /// Axis-aligned ellipse centred at `(cx, cy)` with separate
+    /// horizontal and vertical radii.
+    #[must_use]
+    pub const fn ellipse(cx: f32, cy: f32, rx: f32, ry: f32) -> Self {
+        Self {
+            cx,
+            cy,
+            rx,
+            ry,
+            cw: true,
+        }
+    }
+
+    /// Switches winding to counter-clockwise.
+    #[must_use]
+    pub const fn ccw(mut self) -> Self {
+        self.cw = false;
+        self
+    }
+}
+
 /// Fill rule for determining the interior of a shape.
 ///
 /// Exhaustive: the C header documents both values
@@ -211,23 +351,29 @@ impl Shape<'_> {
 
     // ── Shape primitives ───────────────────────────────────────────
 
-    /// Appends a rectangle to the path.
-    #[allow(clippy::too_many_arguments)]
-    pub fn append_rect(
-        &mut self,
-        x: f32,
-        y: f32,
-        w: f32,
-        h: f32,
-        rx: f32,
-        ry: f32,
-        cw: bool,
-    ) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_shape_append_rect(self.raw, x, y, w, h, rx, ry, cw) })
+    /// Appends a rectangle (optionally rounded) to the path.
+    ///
+    /// See [`Rect`] for the parameter layout.
+    pub fn append_rect(&mut self, rect: Rect) -> Result<()> {
+        let Rect {
+            x,
+            y,
+            width,
+            height,
+            rx,
+            ry,
+            cw,
+        } = rect;
+        Error::from_raw(unsafe {
+            sys::tvg_shape_append_rect(self.raw, x, y, width, height, rx, ry, cw)
+        })
     }
 
-    /// Appends an ellipse (or circle) to the path.
-    pub fn append_circle(&mut self, cx: f32, cy: f32, rx: f32, ry: f32, cw: bool) -> Result<()> {
+    /// Appends an ellipse to the path.  See [`Circle`] for the
+    /// parameter layout — `Circle::new` for true circles,
+    /// `Circle::ellipse` for elliptical shapes.
+    pub fn append_circle(&mut self, circle: Circle) -> Result<()> {
+        let Circle { cx, cy, rx, ry, cw } = circle;
         Error::from_raw(unsafe { sys::tvg_shape_append_circle(self.raw, cx, cy, rx, ry, cw) })
     }
 

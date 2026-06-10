@@ -13,7 +13,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{ColorStop, FillSpread, LinearGradient, Matrix, RadialGradient, Thorvg};
+use thorvg::{ColorStop, FillSpread, LinearGradient, Matrix, RadialGradient, Rect, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 struct ArbStop {
@@ -26,8 +26,20 @@ struct ArbStop {
 
 #[derive(Arbitrary, Debug)]
 enum Kind {
-    Linear { x1: f32, y1: f32, x2: f32, y2: f32 },
-    Radial { cx: f32, cy: f32, r: f32, fx: f32, fy: f32, fr: f32 },
+    Linear {
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+    },
+    Radial {
+        cx: f32,
+        cy: f32,
+        r: f32,
+        fx: f32,
+        fy: f32,
+        fr: f32,
+    },
 }
 
 #[derive(Arbitrary, Debug)]
@@ -74,15 +86,27 @@ fn to_spread(b: u8) -> FillSpread {
 
 fn to_matrix(m: [f32; 9]) -> Matrix {
     Matrix {
-        e11: m[0], e12: m[1], e13: m[2],
-        e21: m[3], e22: m[4], e23: m[5],
-        e31: m[6], e32: m[7], e33: m[8],
+        e11: m[0],
+        e12: m[1],
+        e13: m[2],
+        e21: m[3],
+        e22: m[4],
+        e23: m[5],
+        e31: m[6],
+        e32: m[7],
+        e33: m[8],
     }
 }
 
 fn stops_vec(arb: &[ArbStop]) -> Vec<ColorStop> {
     arb.iter()
-        .map(|s| ColorStop { offset: s.offset, r: s.r, g: s.g, b: s.b, a: s.a })
+        .map(|s| ColorStop {
+            offset: s.offset,
+            r: s.r,
+            g: s.g,
+            b: s.b,
+            a: s.a,
+        })
         .collect()
 }
 
@@ -108,7 +132,15 @@ fn run_linear<'a>(engine: &'a Thorvg, input: &Input) -> Option<LinearGradient<'a
 
 fn run_radial<'a>(engine: &'a Thorvg, input: &Input) -> Option<RadialGradient<'a>> {
     let mut g = engine.radial_gradient().ok()?;
-    if let Kind::Radial { cx, cy, r, fx, fy, fr } = input.kind {
+    if let Kind::Radial {
+        cx,
+        cy,
+        r,
+        fx,
+        fy,
+        fr,
+    } = input.kind
+    {
         let _ = g.set_radial(cx, cy, r, fx, fy, fr);
     }
     let _ = g.set_color_stops(&stops_vec(&input.stops));
@@ -134,7 +166,7 @@ fuzz_target!(|input: Input| {
         let Ok(mut shape) = engine.shape() else {
             return;
         };
-        let _ = shape.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true);
+        let _ = shape.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0));
         match input.attach {
             Attach::Linear => {
                 if let Some(g) = lin {

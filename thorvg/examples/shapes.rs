@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Rgba, Thorvg};
+use thorvg::{ColorSpace, EngineOption, Rgba, Circle, Rect, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -23,38 +23,35 @@ fn main() {
 
     // ── White background ───────────────────────────────────────────
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
+    bg.append_rect(Rect { x: 0.0, y: 0.0, width: width as f32, height: height as f32, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Red rectangle ──────────────────────────────────────────────
     let mut rect = engine.shape().unwrap();
-    rect.append_rect(50.0, 50.0, 200.0, 150.0, 0.0, 0.0, true)
+    rect.append_rect(Rect { x: 50.0, y: 50.0, width: 200.0, height: 150.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     rect.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
     canvas.add(rect).unwrap();
 
     // ── Rounded green rectangle ────────────────────────────────────
     let mut rounded = engine.shape().unwrap();
-    rounded
-        .append_rect(300.0, 50.0, 200.0, 150.0, 20.0, 20.0, true)
+    rounded.append_rect(Rect { x: 300.0, y: 50.0, width: 200.0, height: 150.0, rx: 20.0, ry: 20.0, cw: true })
         .unwrap();
     rounded.set_fill_color(Rgba::new(0, 200, 0, 255)).unwrap();
     canvas.add(rounded).unwrap();
 
     // ── Blue circle ────────────────────────────────────────────────
     let mut circle = engine.shape().unwrap();
-    circle
-        .append_circle(150.0, 400.0, 80.0, 80.0, true)
+    circle.append_circle(Circle { cx: 150.0, cy: 400.0, rx: 80.0, ry: 80.0, cw: true })
         .unwrap();
     circle.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
     canvas.add(circle).unwrap();
 
     // ── Yellow ellipse ─────────────────────────────────────────────
     let mut ellipse = engine.shape().unwrap();
-    ellipse
-        .append_circle(400.0, 400.0, 120.0, 60.0, true)
+    ellipse.append_circle(Circle { cx: 400.0, cy: 400.0, rx: 120.0, ry: 60.0, cw: true })
         .unwrap();
     ellipse.set_fill_color(Rgba::new(255, 255, 0, 255)).unwrap();
     canvas.add(ellipse).unwrap();

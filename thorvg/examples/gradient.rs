@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, ColorStop, EngineOption, FillSpread, Paint, Rgba, Thorvg};
+use thorvg::{Circle, ColorSpace, ColorStop, EngineOption, FillSpread, Paint, Rect, Rgba, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -25,7 +25,7 @@ fn main() {
 
     // ── Dark background ────────────────────────────────────────────
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
+    bg.append_rect(Rect { x: 0.0, y: 0.0, width: width as f32, height: height as f32, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     bg.set_fill_color(Rgba::new(20, 20, 20, 255)).unwrap();
     canvas.add(bg).unwrap();
@@ -53,8 +53,7 @@ fn main() {
         .unwrap();
 
     let mut rect1 = engine.shape().unwrap();
-    rect1
-        .append_rect(50.0, 50.0, 300.0, 150.0, 0.0, 0.0, true)
+    rect1.append_rect(Rect { x: 50.0, y: 50.0, width: 300.0, height: 150.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     rect1.set_linear_gradient(linear_grad).unwrap();
     canvas.add(rect1).unwrap();
@@ -97,8 +96,7 @@ fn main() {
     rainbow_grad.set_spread(FillSpread::Pad).unwrap();
 
     let mut rect2 = engine.shape().unwrap();
-    rect2
-        .append_rect(50.0, 250.0, 300.0, 100.0, 0.0, 0.0, true)
+    rect2.append_rect(Rect { x: 50.0, y: 250.0, width: 300.0, height: 100.0, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     rect2.set_linear_gradient(rainbow_grad).unwrap();
     canvas.add(rect2).unwrap();
@@ -135,8 +133,7 @@ fn main() {
         .unwrap();
 
     let mut circle = engine.shape().unwrap();
-    circle
-        .append_circle(550.0, 130.0, 100.0, 100.0, true)
+    circle.append_circle(Circle { cx: 550.0, cy: 130.0, rx: 100.0, ry: 100.0, cw: true })
         .unwrap();
     circle.set_radial_gradient(radial_grad).unwrap();
     canvas.add(circle).unwrap();
@@ -166,8 +163,7 @@ fn main() {
         .unwrap();
 
     let mut rect3 = engine.shape().unwrap();
-    rect3
-        .append_rect(500.0, 250.0, 200.0, 120.0, 15.0, 15.0, true)
+    rect3.append_rect(Rect { x: 500.0, y: 250.0, width: 200.0, height: 120.0, rx: 15.0, ry: 15.0, cw: true })
         .unwrap();
     rect3.set_radial_gradient(focal_grad).unwrap();
     rect3.set_opacity(200).unwrap();

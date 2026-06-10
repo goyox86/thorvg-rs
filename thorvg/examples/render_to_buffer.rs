@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Rgba, Thorvg};
+use thorvg::{ColorSpace, ColorStop, EngineOption, Paint, Rgba, Circle, Rect, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -23,7 +23,7 @@ fn main() {
 
     // ── Background: white rectangle ────────────────────────────────
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(0.0, 0.0, width as f32, height as f32, 0.0, 0.0, true)
+    bg.append_rect(Rect { x: 0.0, y: 0.0, width: width as f32, height: height as f32, rx: 0.0, ry: 0.0, cw: true })
         .unwrap();
     bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();
@@ -57,15 +57,14 @@ fn main() {
     .unwrap();
 
     let mut rect = engine.shape().unwrap();
-    rect.append_rect(50.0, 50.0, 300.0, 200.0, 25.0, 25.0, true)
+    rect.append_rect(Rect { x: 50.0, y: 50.0, width: 300.0, height: 200.0, rx: 25.0, ry: 25.0, cw: true })
         .unwrap();
     rect.set_linear_gradient(grad).unwrap();
     canvas.add(rect).unwrap();
 
     // ── Semi-transparent white circle on top ───────────────────────
     let mut circle = engine.shape().unwrap();
-    circle
-        .append_circle(200.0, 150.0, 50.0, 50.0, true)
+    circle.append_circle(Circle { cx: 200.0, cy: 150.0, rx: 50.0, ry: 50.0, cw: true })
         .unwrap();
     circle.set_fill_color(Rgba::new(255, 255, 255, 200)).unwrap();
     circle.set_opacity(200).unwrap();

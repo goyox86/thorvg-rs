@@ -12,7 +12,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{BlendMethod, MaskMethod, Matrix, Paint, Thorvg};
+use thorvg::{BlendMethod, MaskMethod, Matrix, Paint, Rect, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 enum Op {
@@ -101,7 +101,7 @@ fuzz_target!(|input: Input| {
         };
         // Give the shape a non-empty path so AABB/OBB queries have
         // a meaningful interior to operate on.
-        let _ = shape.append_rect(0.0, 0.0, 10.0, 10.0, 0.0, 0.0, true);
+        let _ = shape.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0));
 
         for op in input.ops {
             match op {
@@ -116,9 +116,15 @@ fuzz_target!(|input: Input| {
                 }
                 Op::SetTransform(m) => {
                     let mtx = Matrix {
-                        e11: m[0], e12: m[1], e13: m[2],
-                        e21: m[3], e22: m[4], e23: m[5],
-                        e31: m[6], e32: m[7], e33: m[8],
+                        e11: m[0],
+                        e12: m[1],
+                        e13: m[2],
+                        e21: m[3],
+                        e22: m[4],
+                        e23: m[5],
+                        e31: m[6],
+                        e32: m[7],
+                        e33: m[8],
                     };
                     let _ = shape.set_transform(&mtx);
                 }
@@ -134,13 +140,13 @@ fuzz_target!(|input: Input| {
                 Op::SetMask(b) => {
                     // set_mask consumes a fresh paint each call.
                     if let Ok(mut m) = engine.shape() {
-                        let _ = m.append_rect(0.0, 0.0, 5.0, 5.0, 0.0, 0.0, true);
+                        let _ = m.append_rect(Rect::new(0.0, 0.0, 5.0, 5.0));
                         let _ = shape.set_mask(m, to_mask(b));
                     }
                 }
                 Op::SetClipRect(x, y, w, h) => {
                     if let Ok(mut c) = engine.shape() {
-                        let _ = c.append_rect(x, y, w, h, 0.0, 0.0, true);
+                        let _ = c.append_rect(Rect::new(x, y, w, h));
                         let _ = shape.set_clip(c);
                     }
                 }

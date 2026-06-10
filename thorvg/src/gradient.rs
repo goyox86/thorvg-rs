@@ -128,7 +128,10 @@ impl LinearGradient<'_> {
     }
 
     /// Gets the affine transformation matrix.
-    #[deprecated(since = "0.2.0", note = "renamed to `transform` for consistency with `Paint::transform`")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "renamed to `transform` for consistency with `Paint::transform`"
+    )]
     pub fn get_transform(&self) -> Result<Matrix> {
         self.transform()
     }
@@ -250,7 +253,10 @@ impl RadialGradient<'_> {
     }
 
     /// Gets the affine transformation matrix.
-    #[deprecated(since = "0.2.0", note = "renamed to `transform` for consistency with `Paint::transform`")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "renamed to `transform` for consistency with `Paint::transform`"
+    )]
     pub fn get_transform(&self) -> Result<Matrix> {
         self.transform()
     }
@@ -354,7 +360,8 @@ impl BorrowedLinearGradient<'_> {
 
 impl core::fmt::Debug for BorrowedLinearGradient<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("BorrowedLinearGradient").finish_non_exhaustive()
+        f.debug_struct("BorrowedLinearGradient")
+            .finish_non_exhaustive()
     }
 }
 
@@ -415,7 +422,8 @@ impl BorrowedRadialGradient<'_> {
 
 impl core::fmt::Debug for BorrowedRadialGradient<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("BorrowedRadialGradient").finish_non_exhaustive()
+        f.debug_struct("BorrowedRadialGradient")
+            .finish_non_exhaustive()
     }
 }
 
