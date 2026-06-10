@@ -9,7 +9,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Paint, Thorvg};
+use thorvg::{BlurBorder, BlurDirection, ColorSpace, EngineOption, Paint, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -18,7 +18,9 @@ fn main() {
     let height = 400u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine
+        .sw_canvas(EngineOption::Default)
+        .expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Background ─────────────────────────────────────────────────
@@ -66,7 +68,9 @@ fn main() {
     scene.translate(30.0, 40.0).unwrap();
 
     // Apply Gaussian blur to the entire scene
-    scene.add_gaussian_blur_effect(3.0, 0, 0, 80).unwrap();
+    scene
+        .add_gaussian_blur_effect(3.0, BlurDirection::Both, BlurBorder::Duplicate, 80)
+        .unwrap();
 
     canvas.push(scene).unwrap();
 

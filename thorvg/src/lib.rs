@@ -98,7 +98,7 @@ pub use lottie::{LottieAnimation, Marker};
 pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType, Point};
 pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
-pub use scene::Scene;
+pub use scene::{BlurBorder, BlurDirection, Scene};
 pub use shape::{FillRule, Shape, StrokeCap, StrokeJoin};
 pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 

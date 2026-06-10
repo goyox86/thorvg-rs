@@ -2,6 +2,68 @@ use crate::error::{Error, Result};
 use crate::paint::Paint;
 use thorvg_sys as sys;
 
+/// Axis along which a [`Scene::add_gaussian_blur_effect`] blur is applied.
+///
+/// Maps to the raw `int direction` parameter of the underlying C call
+/// `tvg_scene_add_effect_gaussian_blur`, whose documented values are:
+///
+/// | C value | Variant           |
+/// |---------|-------------------|
+/// | `0`     | [`Both`](Self::Both)             |
+/// | `1`     | [`Horizontal`](Self::Horizontal) |
+/// | `2`     | [`Vertical`](Self::Vertical)     |
+///
+/// thorvg's C API takes a bare `int` here — there is no `Tvg_*`
+/// typedef — so the wrapper carries the encoding rather than
+/// re-exporting a C enum.
+///
+/// Exhaustive: the C header documents the full set
+/// (`tvg_scene_add_effect_gaussian_blur`'s `direction` parameter) and
+/// has not grown since the function was introduced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum BlurDirection {
+    /// Blur on both axes (the default in upstream).
+    Both = 0,
+    /// Blur along the horizontal axis only.
+    Horizontal = 1,
+    /// Blur along the vertical axis only.
+    Vertical = 2,
+}
+
+impl BlurDirection {
+    fn to_raw(self) -> core::ffi::c_int {
+        self as core::ffi::c_int
+    }
+}
+
+/// Edge-sampling behaviour for [`Scene::add_gaussian_blur_effect`].
+///
+/// Maps to the raw `int border` parameter of the underlying C call
+/// `tvg_scene_add_effect_gaussian_blur`:
+///
+/// | C value | Variant                          |
+/// |---------|----------------------------------|
+/// | `0`     | [`Duplicate`](Self::Duplicate)   |
+/// | `1`     | [`Wrap`](Self::Wrap)             |
+///
+/// Exhaustive: the C header documents both values and has not grown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum BlurBorder {
+    /// Replicate the edge pixel when the kernel reaches outside the
+    /// scene bounds.
+    Duplicate = 0,
+    /// Wrap the sampling window around to the opposite edge.
+    Wrap = 1,
+}
+
+impl BlurBorder {
+    fn to_raw(self) -> core::ffi::c_int {
+        self as core::ffi::c_int
+    }
+}
+
 /// A scene that groups multiple paint objects.
 ///
 /// The lifetime `'eng` ties this scene to a [`Thorvg`](crate::Thorvg) engine
@@ -56,15 +118,26 @@ impl Scene<'_> {
     }
 
     /// Adds a Gaussian blur effect.
+    ///
+    /// `sigma` is the blur radius (must be `> 0`); `direction`
+    /// selects which axis (or both) the kernel sweeps; `border`
+    /// controls how samples outside the scene bounds are handled;
+    /// `quality` is in `[0, 100]` (clamped by the engine).
     pub fn add_gaussian_blur_effect(
         &mut self,
         sigma: f64,
-        direction: i32,
-        border: i32,
+        direction: BlurDirection,
+        border: BlurBorder,
         quality: i32,
     ) -> Result<()> {
         Error::from_raw(unsafe {
-            sys::tvg_scene_add_effect_gaussian_blur(self.raw, sigma, direction, border, quality)
+            sys::tvg_scene_add_effect_gaussian_blur(
+                self.raw,
+                sigma,
+                direction.to_raw(),
+                border.to_raw(),
+                quality,
+            )
         })
     }
 

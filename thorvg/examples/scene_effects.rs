@@ -7,7 +7,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, Paint, Scene, Thorvg};
+use thorvg::{BlurBorder, BlurDirection, ColorSpace, EngineOption, Paint, Scene, Thorvg};
 
 fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
     let mut scene = engine.scene().unwrap();
@@ -48,7 +48,9 @@ fn main() {
 
     // ── Gaussian blur ──────────────────────────────────────────────
     let mut scene2 = make_shape_group(&engine, 220.0, 30.0);
-    scene2.add_gaussian_blur_effect(5.0, 0, 0, 80).unwrap();
+    scene2
+        .add_gaussian_blur_effect(5.0, BlurDirection::Both, BlurBorder::Duplicate, 80)
+        .unwrap();
     canvas.push(scene2).unwrap();
 
     // ── Drop shadow ────────────────────────────────────────────────
@@ -84,7 +86,9 @@ fn main() {
 
     // ── Blur + drop shadow (stacked) ───────────────────────────────
     let mut scene7 = make_shape_group(&engine, 410.0, 250.0);
-    scene7.add_gaussian_blur_effect(2.0, 0, 0, 60).unwrap();
+    scene7
+        .add_gaussian_blur_effect(2.0, BlurDirection::Both, BlurBorder::Duplicate, 60)
+        .unwrap();
     scene7
         .add_drop_shadow_effect(0, 0, 0, 100, 45.0, 12.0, 6.0, 80)
         .unwrap();
@@ -94,7 +98,9 @@ fn main() {
     let mut scene8 = make_shape_group(&engine, 600.0, 250.0);
     scene8.scale(0.8).unwrap();
     scene8.translate(720.0, 310.0).unwrap();
-    scene8.add_gaussian_blur_effect(3.0, 1, 0, 70).unwrap();
+    scene8
+        .add_gaussian_blur_effect(3.0, BlurDirection::Horizontal, BlurBorder::Duplicate, 70)
+        .unwrap();
     canvas.push(scene8).unwrap();
 
     canvas.draw(true).unwrap();

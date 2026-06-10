@@ -13,32 +13,55 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::Thorvg;
+use thorvg::{BlurBorder, BlurDirection, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 enum Effect {
     GaussianBlur {
         sigma: f64,
-        direction: i32,
-        border: i32,
+        /// Mapped into [`BlurDirection`] via `% 3` so the enum's
+        /// closed set still receives full coverage from the
+        /// fuzzer's `u8` stream.
+        direction: u8,
+        /// Mapped into [`BlurBorder`] via `% 2`.
+        border: u8,
         quality: i32,
     },
     DropShadow {
-        r: i32, g: i32, b: i32, a: i32,
-        angle: f64, distance: f64, sigma: f64, quality: i32,
+        r: i32,
+        g: i32,
+        b: i32,
+        a: i32,
+        angle: f64,
+        distance: f64,
+        sigma: f64,
+        quality: i32,
     },
     Fill {
-        r: i32, g: i32, b: i32, a: i32,
+        r: i32,
+        g: i32,
+        b: i32,
+        a: i32,
     },
     Tint {
-        r0: i32, g0: i32, b0: i32,
-        r1: i32, g1: i32, b1: i32,
+        r0: i32,
+        g0: i32,
+        b0: i32,
+        r1: i32,
+        g1: i32,
+        b1: i32,
         intensity: f64,
     },
     Tritone {
-        sr: i32, sg: i32, sb: i32,
-        mr: i32, mg: i32, mb: i32,
-        hr: i32, hg: i32, hb: i32,
+        sr: i32,
+        sg: i32,
+        sb: i32,
+        mr: i32,
+        mg: i32,
+        mb: i32,
+        hr: i32,
+        hg: i32,
+        hb: i32,
         blend: i32,
     },
     Clear,
@@ -92,19 +115,56 @@ fuzz_target!(|input: Input| {
         }
         for e in input.effects {
             let _ = match e {
-                Effect::GaussianBlur { sigma, direction, border, quality } => {
+                Effect::GaussianBlur {
+                    sigma,
+                    direction,
+                    border,
+                    quality,
+                } => {
+                    let direction = match direction % 3 {
+                        0 => BlurDirection::Both,
+                        1 => BlurDirection::Horizontal,
+                        _ => BlurDirection::Vertical,
+                    };
+                    let border = if border % 2 == 0 {
+                        BlurBorder::Duplicate
+                    } else {
+                        BlurBorder::Wrap
+                    };
                     scene.add_gaussian_blur_effect(sigma, direction, border, quality)
                 }
-                Effect::DropShadow { r, g, b, a, angle, distance, sigma, quality } => {
-                    scene.add_drop_shadow_effect(r, g, b, a, angle, distance, sigma, quality)
-                }
+                Effect::DropShadow {
+                    r,
+                    g,
+                    b,
+                    a,
+                    angle,
+                    distance,
+                    sigma,
+                    quality,
+                } => scene.add_drop_shadow_effect(r, g, b, a, angle, distance, sigma, quality),
                 Effect::Fill { r, g, b, a } => scene.add_fill_effect(r, g, b, a),
-                Effect::Tint { r0, g0, b0, r1, g1, b1, intensity } => {
-                    scene.add_tint_effect(r0, g0, b0, r1, g1, b1, intensity)
-                }
-                Effect::Tritone { sr, sg, sb, mr, mg, mb, hr, hg, hb, blend } => {
-                    scene.add_tritone_effect(sr, sg, sb, mr, mg, mb, hr, hg, hb, blend)
-                }
+                Effect::Tint {
+                    r0,
+                    g0,
+                    b0,
+                    r1,
+                    g1,
+                    b1,
+                    intensity,
+                } => scene.add_tint_effect(r0, g0, b0, r1, g1, b1, intensity),
+                Effect::Tritone {
+                    sr,
+                    sg,
+                    sb,
+                    mr,
+                    mg,
+                    mb,
+                    hr,
+                    hg,
+                    hb,
+                    blend,
+                } => scene.add_tritone_effect(sr, sg, sb, mr, mg, mb, hr, hg, hb, blend),
                 Effect::Clear => scene.clear_effects(),
             };
         }
