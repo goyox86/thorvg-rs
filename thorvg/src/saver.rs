@@ -32,6 +32,20 @@ impl Saver<'_> {
     }
 
     /// Saves a paint object to a file path string.
+    ///
+    /// # Runtime requirements
+    ///
+    /// thorvg writes the file with the C runtime (`fopen`/`fwrite`),
+    /// so this requires a working filesystem at runtime even though
+    /// it compiles under `no_std`.  On bare-metal targets with no
+    /// libc filesystem it returns an error.  There is no in-memory
+    /// alternative on the C API side; embedded targets that need
+    /// serialised output must provide a libc-style file backend
+    /// (newlib / picolibc / a custom syscall layer).
+    ///
+    /// Requires the `file-io` feature on `thorvg-sys` (enabled by
+    /// default; pulled in transitively by the `std` feature on this
+    /// crate).
     pub fn save_to_str<P: Paint>(&mut self, paint: P, path: &str, quality: u32) -> Result<()> {
         let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
@@ -59,6 +73,16 @@ impl Saver<'_> {
     /// failure, and handed off to the save module on success.
     /// Keeping the Rust `Drop` active would double-free.  Same
     /// shape as `Paint::set_mask` / `Paint::set_clip`.
+    ///
+    /// # Runtime requirements
+    ///
+    /// Same filesystem caveat as
+    /// [`save_to_str`](Self::save_to_str): thorvg serialises through
+    /// the C runtime (`fopen`/`fwrite`), so a libc-backed filesystem
+    /// must exist at runtime even though the function compiles under
+    /// `no_std`.  On bare-metal targets without one this returns an
+    /// error.  Requires the `file-io` feature on `thorvg-sys`
+    /// (enabled by default; pulled in transitively by `std`).
     pub fn save_animation_to_str(
         &mut self,
         animation: Animation<'_>,
