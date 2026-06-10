@@ -4,8 +4,11 @@ use crate::paint::{Paint, Point};
 use thorvg_sys as sys;
 
 /// Fill rule for determining the interior of a shape.
+///
+/// Exhaustive: the C header documents both values
+/// (`Tvg_Fill_Rule`) and has not grown since the enum was
+/// introduced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
 pub enum FillRule {
     /// Non-zero winding rule.
     NonZero,
@@ -23,18 +26,23 @@ impl FillRule {
 
     fn from_raw(r: sys::Tvg_Fill_Rule) -> Self {
         match r {
+            sys::Tvg_Fill_Rule::TVG_FILL_RULE_NON_ZERO => FillRule::NonZero,
             sys::Tvg_Fill_Rule::TVG_FILL_RULE_EVEN_ODD => FillRule::EvenOdd,
-            _ => FillRule::NonZero,
         }
     }
 }
 
 /// Stroke line cap style.
+///
+/// Exhaustive: the C header documents all three values
+/// (`Tvg_Stroke_Cap`) and has not grown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
 pub enum StrokeCap {
+    /// Butted cap — the stroke ends exactly at the endpoint.
     Butt,
+    /// Rounded cap — a semicircle drawn at the endpoint.
     Round,
+    /// Square cap — a half-square drawn past the endpoint.
     Square,
 }
 
@@ -49,19 +57,25 @@ impl StrokeCap {
 
     fn from_raw(c: sys::Tvg_Stroke_Cap) -> Self {
         match c {
+            sys::Tvg_Stroke_Cap::TVG_STROKE_CAP_BUTT => StrokeCap::Butt,
             sys::Tvg_Stroke_Cap::TVG_STROKE_CAP_ROUND => StrokeCap::Round,
             sys::Tvg_Stroke_Cap::TVG_STROKE_CAP_SQUARE => StrokeCap::Square,
-            _ => StrokeCap::Butt,
         }
     }
 }
 
 /// Stroke line join style.
+///
+/// Exhaustive: the C header documents all three values
+/// (`Tvg_Stroke_Join`) and has not grown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
 pub enum StrokeJoin {
+    /// Mitered join — sharp corner, extending out to the miter
+    /// limit.
     Miter,
+    /// Rounded join — a circular arc smooths the corner.
     Round,
+    /// Bevelled join — the corner is cut off with a straight edge.
     Bevel,
 }
 
@@ -76,9 +90,9 @@ impl StrokeJoin {
 
     fn from_raw(j: sys::Tvg_Stroke_Join) -> Self {
         match j {
+            sys::Tvg_Stroke_Join::TVG_STROKE_JOIN_MITER => StrokeJoin::Miter,
             sys::Tvg_Stroke_Join::TVG_STROKE_JOIN_ROUND => StrokeJoin::Round,
             sys::Tvg_Stroke_Join::TVG_STROKE_JOIN_BEVEL => StrokeJoin::Bevel,
-            _ => StrokeJoin::Miter,
         }
     }
 }
