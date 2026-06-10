@@ -7,7 +7,10 @@
 
 mod common;
 
-use thorvg::{BlurBorder, BlurDirection, ColorSpace, EngineOption, Paint, Scene, Thorvg};
+use thorvg::{
+    BlurBorder, BlurDirection, ColorSpace, DropShadow, EngineOption, Paint, Rgb, Rgba, Scene,
+    Thorvg, Tritone,
+};
 
 fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
     let mut scene = engine.scene().unwrap();
@@ -56,7 +59,13 @@ fn main() {
     // ── Drop shadow ────────────────────────────────────────────────
     let mut scene3 = make_shape_group(&engine, 410.0, 30.0);
     scene3
-        .add_drop_shadow_effect(0, 0, 0, 150, 135.0, 8.0, 4.0, 80)
+        .add_drop_shadow_effect(DropShadow {
+            color: Rgba::new(0, 0, 0, 150),
+            angle: 135.0,
+            distance: 8.0,
+            sigma: 4.0,
+            quality: 80,
+        })
         .unwrap();
     canvas.push(scene3).unwrap();
 
@@ -75,12 +84,12 @@ fn main() {
     // ── Tritone effect ─────────────────────────────────────────────
     let mut scene6 = make_shape_group(&engine, 220.0, 250.0);
     scene6
-        .add_tritone_effect(
-            10, 10, 40, // shadow
-            200, 100, 50, // midtone
-            255, 240, 200, // highlight
-            180, // blend
-        )
+        .add_tritone_effect(Tritone {
+            shadow: Rgb::new(10, 10, 40),
+            midtone: Rgb::new(200, 100, 50),
+            highlight: Rgb::new(255, 240, 200),
+            blend: 180,
+        })
         .unwrap();
     canvas.push(scene6).unwrap();
 
@@ -89,8 +98,17 @@ fn main() {
     scene7
         .add_gaussian_blur_effect(2.0, BlurDirection::Both, BlurBorder::Duplicate, 60)
         .unwrap();
+    // Same effect, expressed via the chainable builder — fields
+    // not mentioned inherit `DropShadow::new()`'s sensible defaults.
     scene7
-        .add_drop_shadow_effect(0, 0, 0, 100, 45.0, 12.0, 6.0, 80)
+        .add_drop_shadow_effect(
+            DropShadow::new()
+                .color(Rgba::new(0, 0, 0, 100))
+                .angle(45.0)
+                .distance(12.0)
+                .sigma(6.0)
+                .quality(80),
+        )
         .unwrap();
     canvas.push(scene7).unwrap();
 

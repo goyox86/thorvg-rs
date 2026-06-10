@@ -13,7 +13,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{BlurBorder, BlurDirection, Thorvg};
+use thorvg::{BlurBorder, BlurDirection, DropShadow, Rgb, Rgba, Thorvg, Tritone};
 
 #[derive(Arbitrary, Debug)]
 enum Effect {
@@ -28,14 +28,14 @@ enum Effect {
         quality: i32,
     },
     DropShadow {
-        r: i32,
-        g: i32,
-        b: i32,
-        a: i32,
+        r: u8,
+        g: u8,
+        b: u8,
+        a: u8,
         angle: f64,
         distance: f64,
         sigma: f64,
-        quality: i32,
+        quality: u8,
     },
     Fill {
         r: i32,
@@ -53,16 +53,16 @@ enum Effect {
         intensity: f64,
     },
     Tritone {
-        sr: i32,
-        sg: i32,
-        sb: i32,
-        mr: i32,
-        mg: i32,
-        mb: i32,
-        hr: i32,
-        hg: i32,
-        hb: i32,
-        blend: i32,
+        sr: u8,
+        sg: u8,
+        sb: u8,
+        mr: u8,
+        mg: u8,
+        mb: u8,
+        hr: u8,
+        hg: u8,
+        hb: u8,
+        blend: u8,
     },
     Clear,
 }
@@ -142,7 +142,13 @@ fuzz_target!(|input: Input| {
                     distance,
                     sigma,
                     quality,
-                } => scene.add_drop_shadow_effect(r, g, b, a, angle, distance, sigma, quality),
+                } => scene.add_drop_shadow_effect(DropShadow {
+                    color: Rgba::new(r, g, b, a),
+                    angle,
+                    distance,
+                    sigma,
+                    quality,
+                }),
                 Effect::Fill { r, g, b, a } => scene.add_fill_effect(r, g, b, a),
                 Effect::Tint {
                     r0,
@@ -164,7 +170,12 @@ fuzz_target!(|input: Input| {
                     hg,
                     hb,
                     blend,
-                } => scene.add_tritone_effect(sr, sg, sb, mr, mg, mb, hr, hg, hb, blend),
+                } => scene.add_tritone_effect(Tritone {
+                    shadow: Rgb::new(sr, sg, sb),
+                    midtone: Rgb::new(mr, mg, mb),
+                    highlight: Rgb::new(hr, hg, hb),
+                    blend,
+                }),
                 Effect::Clear => scene.clear_effects(),
             };
         }

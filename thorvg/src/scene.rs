@@ -64,6 +64,230 @@ impl BlurBorder {
     }
 }
 
+/// 8-bit RGB color.  Field set is closed; literal construction
+/// (`Rgb { r, g, b }`) is supported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct Rgb {
+    /// Red channel.
+    pub r: u8,
+    /// Green channel.
+    pub g: u8,
+    /// Blue channel.
+    pub b: u8,
+}
+
+impl Rgb {
+    /// Builds an [`Rgb`] from its three channels.
+    #[must_use]
+    pub const fn new(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b }
+    }
+}
+
+/// 8-bit RGB color with an alpha channel.  Field set is closed;
+/// literal construction (`Rgba { r, g, b, a }`) is supported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct Rgba {
+    /// Red channel.
+    pub r: u8,
+    /// Green channel.
+    pub g: u8,
+    /// Blue channel.
+    pub b: u8,
+    /// Alpha (opacity) channel.
+    pub a: u8,
+}
+
+impl Rgba {
+    /// Builds an [`Rgba`] from its four channels.
+    #[must_use]
+    pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self { r, g, b, a }
+    }
+}
+
+/// Parameters for [`Scene::add_drop_shadow_effect`].
+///
+/// Mirrors the layout of
+/// `tvg_scene_add_effect_drop_shadow(scene, r, g, b, a, angle, distance, sigma, quality)`,
+/// grouping the four RGBA ints into a single [`Rgba`] so the call
+/// site no longer needs eight positional arguments.
+///
+/// Three construction styles are supported:
+///
+/// ```ignore
+/// // 1. Struct literal (all fields explicit):
+/// DropShadow {
+///     color: Rgba::new(0, 0, 0, 150),
+///     angle: 135.0,
+///     distance: 8.0,
+///     sigma: 4.0,
+///     quality: 80,
+/// }
+///
+/// // 2. Default + field override:
+/// DropShadow { angle: 135.0, ..Default::default() }
+///
+/// // 3. Builder:
+/// DropShadow::new().angle(135.0).distance(8.0)
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DropShadow {
+    /// Shadow color (RGBA, 0..=255 per channel).
+    pub color: Rgba,
+    /// Shadow direction in degrees, `[0, 360]`.
+    pub angle: f64,
+    /// Distance of the shadow from the original object.
+    pub distance: f64,
+    /// Gaussian blur sigma for the shadow.  Must be `> 0`.
+    pub sigma: f64,
+    /// Blur quality level, `[0, 100]`.
+    pub quality: u8,
+}
+
+impl DropShadow {
+    /// Returns a shadow with sensible defaults that the engine
+    /// accepts (opaque black, angled downward, modest blur).
+    ///
+    /// | Field      | Value                  |
+    /// |------------|------------------------|
+    /// | `color`    | `Rgba::new(0, 0, 0, 255)` (opaque black) |
+    /// | `angle`    | `0.0` (downward)       |
+    /// | `distance` | `4.0`                  |
+    /// | `sigma`    | `2.0`                  |
+    /// | `quality`  | `50`                   |
+    ///
+    /// All defaults are non-zero so the effect actually renders
+    /// (the engine rejects `sigma <= 0`).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            color: Rgba::new(0, 0, 0, 255),
+            angle: 0.0,
+            distance: 4.0,
+            sigma: 2.0,
+            quality: 50,
+        }
+    }
+
+    /// Sets the shadow color.
+    #[must_use]
+    pub const fn color(mut self, color: Rgba) -> Self {
+        self.color = color;
+        self
+    }
+
+    /// Sets the shadow direction in degrees, `[0, 360]`.
+    #[must_use]
+    pub const fn angle(mut self, angle: f64) -> Self {
+        self.angle = angle;
+        self
+    }
+
+    /// Sets the distance of the shadow from the source object.
+    #[must_use]
+    pub const fn distance(mut self, distance: f64) -> Self {
+        self.distance = distance;
+        self
+    }
+
+    /// Sets the Gaussian blur sigma (must be `> 0`).
+    #[must_use]
+    pub const fn sigma(mut self, sigma: f64) -> Self {
+        self.sigma = sigma;
+        self
+    }
+
+    /// Sets the blur quality level, `[0, 100]`.
+    #[must_use]
+    pub const fn quality(mut self, quality: u8) -> Self {
+        self.quality = quality;
+        self
+    }
+}
+
+impl Default for DropShadow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parameters for [`Scene::add_tritone_effect`].
+///
+/// Mirrors the layout of
+/// `tvg_scene_add_effect_tritone(scene, shadow_r, shadow_g, shadow_b, midtone_r, midtone_g, midtone_b, highlight_r, highlight_g, highlight_b, blend)`,
+/// grouping the three RGB triplets into named [`Rgb`] fields.
+///
+/// Same three construction styles as [`DropShadow`] are supported
+/// (struct literal, `..Default::default()`, builder).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Tritone {
+    /// Shadow color.
+    pub shadow: Rgb,
+    /// Midtone color.
+    pub midtone: Rgb,
+    /// Highlight color.
+    pub highlight: Rgb,
+    /// Blend factor between the original color and the tritone
+    /// palette, `[0, 255]`.
+    pub blend: u8,
+}
+
+impl Tritone {
+    /// Returns a neutral tritone palette:
+    ///
+    /// | Field       | Value                            |
+    /// |-------------|----------------------------------|
+    /// | `shadow`    | `Rgb::new(0, 0, 0)` (black)      |
+    /// | `midtone`   | `Rgb::new(128, 128, 128)` (gray) |
+    /// | `highlight` | `Rgb::new(255, 255, 255)` (white)|
+    /// | `blend`     | `128`                            |
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            shadow: Rgb::new(0, 0, 0),
+            midtone: Rgb::new(128, 128, 128),
+            highlight: Rgb::new(255, 255, 255),
+            blend: 128,
+        }
+    }
+
+    /// Sets the shadow tone.
+    #[must_use]
+    pub const fn shadow(mut self, shadow: Rgb) -> Self {
+        self.shadow = shadow;
+        self
+    }
+
+    /// Sets the midtone.
+    #[must_use]
+    pub const fn midtone(mut self, midtone: Rgb) -> Self {
+        self.midtone = midtone;
+        self
+    }
+
+    /// Sets the highlight tone.
+    #[must_use]
+    pub const fn highlight(mut self, highlight: Rgb) -> Self {
+        self.highlight = highlight;
+        self
+    }
+
+    /// Sets the blend factor between the original color and the
+    /// tritone palette, `[0, 255]`.
+    #[must_use]
+    pub const fn blend(mut self, blend: u8) -> Self {
+        self.blend = blend;
+        self
+    }
+}
+
+impl Default for Tritone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A scene that groups multiple paint objects.
 ///
 /// The lifetime `'eng` ties this scene to a [`Thorvg`](crate::Thorvg) engine
@@ -142,21 +366,27 @@ impl Scene<'_> {
     }
 
     /// Adds a drop shadow effect.
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_drop_shadow_effect(
-        &mut self,
-        r: i32,
-        g: i32,
-        b: i32,
-        a: i32,
-        angle: f64,
-        distance: f64,
-        sigma: f64,
-        quality: i32,
-    ) -> Result<()> {
+    ///
+    /// See [`DropShadow`] for the parameter layout.
+    pub fn add_drop_shadow_effect(&mut self, params: DropShadow) -> Result<()> {
+        let DropShadow {
+            color: Rgba { r, g, b, a },
+            angle,
+            distance,
+            sigma,
+            quality,
+        } = params;
         Error::from_raw(unsafe {
             sys::tvg_scene_add_effect_drop_shadow(
-                self.raw, r, g, b, a, angle, distance, sigma, quality,
+                self.raw,
+                i32::from(r),
+                i32::from(g),
+                i32::from(b),
+                i32::from(a),
+                angle,
+                distance,
+                sigma,
+                i32::from(quality),
             )
         })
     }
@@ -186,33 +416,28 @@ impl Scene<'_> {
     }
 
     /// Adds a tritone color effect.
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_tritone_effect(
-        &mut self,
-        shadow_r: i32,
-        shadow_g: i32,
-        shadow_b: i32,
-        midtone_r: i32,
-        midtone_g: i32,
-        midtone_b: i32,
-        highlight_r: i32,
-        highlight_g: i32,
-        highlight_b: i32,
-        blend: i32,
-    ) -> Result<()> {
+    ///
+    /// See [`Tritone`] for the parameter layout.
+    pub fn add_tritone_effect(&mut self, params: Tritone) -> Result<()> {
+        let Tritone {
+            shadow,
+            midtone,
+            highlight,
+            blend,
+        } = params;
         Error::from_raw(unsafe {
             sys::tvg_scene_add_effect_tritone(
                 self.raw,
-                shadow_r,
-                shadow_g,
-                shadow_b,
-                midtone_r,
-                midtone_g,
-                midtone_b,
-                highlight_r,
-                highlight_g,
-                highlight_b,
-                blend,
+                i32::from(shadow.r),
+                i32::from(shadow.g),
+                i32::from(shadow.b),
+                i32::from(midtone.r),
+                i32::from(midtone.g),
+                i32::from(midtone.b),
+                i32::from(highlight.r),
+                i32::from(highlight.g),
+                i32::from(highlight.b),
+                i32::from(blend),
             )
         })
     }
