@@ -7,7 +7,8 @@
 //! casts `len` to `u32`), arbitrary bounds / radial parameters,
 //! spread mode, and transform matrix.  Optionally attaches it to a
 //! shape via `set_linear_gradient`, `set_radial_gradient`, or
-//! `set_stroke_gradient` to also exercise the ownership-transfer
+//! `set_stroke_linear_gradient` / `set_stroke_radial_gradient` to
+//! also exercise the ownership-transfer
 //! path.  Read-side getters are queried at the end to catch any
 //! mis-deserialisation of stops/bounds/transform.
 
@@ -46,7 +47,8 @@ enum Kind {
 enum Attach {
     Linear,
     Radial,
-    Stroke,
+    StrokeLinear,
+    StrokeRadial,
     None,
 }
 
@@ -178,9 +180,14 @@ fuzz_target!(|input: Input| {
                     let _ = shape.set_radial_gradient(g);
                 }
             }
-            Attach::Stroke => {
+            Attach::StrokeLinear => {
                 if let Some(g) = lin {
-                    let _ = shape.set_stroke_gradient(g);
+                    let _ = shape.set_stroke_linear_gradient(g);
+                }
+            }
+            Attach::StrokeRadial => {
+                if let Some(g) = rad {
+                    let _ = shape.set_stroke_radial_gradient(g);
                 }
             }
             Attach::None => {}

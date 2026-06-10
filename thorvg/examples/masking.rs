@@ -20,7 +20,15 @@ fn main() {
     for row in 0..(h / 15) {
         for col in 0..(w / 15) {
             let mut sq = engine.shape().unwrap();
-            sq.append_rect(Rect { x: col as f32 * 15.0, y: row as f32 * 15.0, width: 15.0, height: 15.0, rx: 0.0, ry: 0.0, cw: true })
+            sq.append_rect(Rect {
+                x: col as f32 * 15.0,
+                y: row as f32 * 15.0,
+                width: 15.0,
+                height: 15.0,
+                rx: 0.0,
+                ry: 0.0,
+                cw: true,
+            })
             .unwrap();
             let gray = if (row + col) % 2 == 0 { 180 } else { 210 };
             sq.set_fill_color(Rgba::new(gray, gray, gray, 255)).unwrap();
@@ -30,7 +38,16 @@ fn main() {
 
     // ── Alpha mask: gradient circle masks a rectangle ───────────────
     let mut rect1 = engine.shape().unwrap();
-    rect1.append_rect(Rect { x: 30.0, y: 50.0, width: 200.0, height: 200.0, rx: 0.0, ry: 0.0, cw: true })
+    rect1
+        .append_rect(Rect {
+            x: 30.0,
+            y: 50.0,
+            width: 200.0,
+            height: 200.0,
+            rx: 0.0,
+            ry: 0.0,
+            cw: true,
+        })
         .unwrap();
     rect1.set_fill_color(Rgba::new(50, 50, 220, 255)).unwrap();
 
@@ -56,7 +73,15 @@ fn main() {
     .unwrap();
 
     let mut mask1 = engine.shape().unwrap();
-    mask1.append_circle(Circle { cx: 130.0, cy: 150.0, rx: 90.0, ry: 90.0, cw: true }).unwrap();
+    mask1
+        .append_circle(Circle {
+            cx: 130.0,
+            cy: 150.0,
+            rx: 90.0,
+            ry: 90.0,
+            cw: true,
+        })
+        .unwrap();
     mask1.set_linear_gradient(grad).unwrap();
 
     rect1.set_mask(mask1, MaskMethod::Alpha).unwrap();
@@ -64,12 +89,29 @@ fn main() {
 
     // ── InvAlpha mask ──────────────────────────────────────────────
     let mut rect2 = engine.shape().unwrap();
-    rect2.append_rect(Rect { x: 260.0, y: 50.0, width: 200.0, height: 200.0, rx: 0.0, ry: 0.0, cw: true })
+    rect2
+        .append_rect(Rect {
+            x: 260.0,
+            y: 50.0,
+            width: 200.0,
+            height: 200.0,
+            rx: 0.0,
+            ry: 0.0,
+            cw: true,
+        })
         .unwrap();
     rect2.set_fill_color(Rgba::new(220, 50, 50, 255)).unwrap();
 
     let mut mask2 = engine.shape().unwrap();
-    mask2.append_circle(Circle { cx: 360.0, cy: 150.0, rx: 60.0, ry: 60.0, cw: true }).unwrap();
+    mask2
+        .append_circle(Circle {
+            cx: 360.0,
+            cy: 150.0,
+            rx: 60.0,
+            ry: 60.0,
+            cw: true,
+        })
+        .unwrap();
     mask2.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
 
     rect2.set_mask(mask2, MaskMethod::InvAlpha).unwrap();
@@ -77,7 +119,16 @@ fn main() {
 
     // ── Luma mask ──────────────────────────────────────────────────
     let mut rect3 = engine.shape().unwrap();
-    rect3.append_rect(Rect { x: 490.0, y: 50.0, width: 180.0, height: 200.0, rx: 15.0, ry: 15.0, cw: true })
+    rect3
+        .append_rect(Rect {
+            x: 490.0,
+            y: 50.0,
+            width: 180.0,
+            height: 200.0,
+            rx: 15.0,
+            ry: 15.0,
+            cw: true,
+        })
         .unwrap();
     rect3.set_fill_color(Rgba::new(50, 200, 50, 255)).unwrap();
 
@@ -103,7 +154,16 @@ fn main() {
         .unwrap();
 
     let mut mask3 = engine.shape().unwrap();
-    mask3.append_rect(Rect { x: 490.0, y: 50.0, width: 180.0, height: 200.0, rx: 0.0, ry: 0.0, cw: true })
+    mask3
+        .append_rect(Rect {
+            x: 490.0,
+            y: 50.0,
+            width: 180.0,
+            height: 200.0,
+            rx: 0.0,
+            ry: 0.0,
+            cw: true,
+        })
         .unwrap();
     mask3.set_linear_gradient(grad3).unwrap();
 

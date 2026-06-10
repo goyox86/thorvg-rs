@@ -539,7 +539,8 @@ impl Shape<'_> {
     ///
     /// Same semantics as [`gradient`](Self::gradient), but for the
     /// stroke gradient configured via
-    /// [`set_stroke_gradient`](Self::set_stroke_gradient).
+    /// [`set_stroke_linear_gradient`](Self::set_stroke_linear_gradient) /
+    /// [`set_stroke_radial_gradient`](Self::set_stroke_radial_gradient).
     pub fn stroke_gradient(&self) -> Result<Option<BorrowedGradient<'_>>> {
         let mut grad: sys::Tvg_Gradient = core::ptr::null_mut();
         Error::from_raw(unsafe { sys::tvg_shape_get_stroke_gradient(self.raw, &raw mut grad) })?;
@@ -550,8 +551,24 @@ impl Shape<'_> {
         Ok(Some(unsafe { BorrowedGradient::from_raw(grad) }?))
     }
 
-    /// Sets the stroke gradient fill.
-    pub fn set_stroke_gradient(&mut self, grad: LinearGradient<'_>) -> Result<()> {
+    /// Sets a linear gradient as the stroke fill.
+    ///
+    /// Companion to [`set_linear_gradient`](Self::set_linear_gradient)
+    /// on the fill side.
+    pub fn set_stroke_linear_gradient(&mut self, grad: LinearGradient<'_>) -> Result<()> {
+        Error::from_raw(unsafe { sys::tvg_shape_set_stroke_gradient(self.raw, grad.into_raw()) })
+    }
+
+    /// Sets a radial gradient as the stroke fill.
+    ///
+    /// Companion to [`set_radial_gradient`](Self::set_radial_gradient)
+    /// on the fill side.  The underlying C call
+    /// (`tvg_shape_set_stroke_gradient`) takes a polymorphic
+    /// `Tvg_Gradient` and the C++ implementation
+    /// (`Shape::strokeFill(Fill*)`) accepts both gradient kinds —
+    /// the Rust binding previously restricted the input type to
+    /// linear by oversight.
+    pub fn set_stroke_radial_gradient(&mut self, grad: RadialGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_gradient(self.raw, grad.into_raw()) })
     }
 
