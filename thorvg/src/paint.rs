@@ -358,7 +358,7 @@ impl PaintType {
 
 /// Sealed-trait marker.
 ///
-/// `Paint::raw`/`into_raw`/`from_raw_paint` move opaque ThorVG
+/// `Paint::raw`/`into_raw`/`from_raw_paint` move opaque `ThorVG`
 /// pointers across the FFI boundary without any further validation;
 /// allowing downstream crates to implement [`Paint`] would let safe
 /// code hand bogus pointers to `tvg_canvas_add` etc.  The supertrait

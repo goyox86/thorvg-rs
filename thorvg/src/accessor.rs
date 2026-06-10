@@ -133,7 +133,7 @@ pub struct BorrowedAccessor<'a> {
     _life: core::marker::PhantomData<&'a ()>,
 }
 
-impl<'a> BorrowedAccessor<'a> {
+impl BorrowedAccessor<'_> {
     /// # Safety
     /// `raw` must be a valid accessor handle currently inside an
     /// active iteration; the returned view borrows for `'a`.
