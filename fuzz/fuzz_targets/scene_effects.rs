@@ -13,7 +13,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{BlurBorder, BlurDirection, DropShadow, Rgb, Rgba, Thorvg, Tritone};
+use thorvg::{BlurBorder, BlurDirection, DropShadow, Rgb, Rgba, Thorvg, Tint, Tritone};
 
 #[derive(Arbitrary, Debug)]
 enum Effect {
@@ -38,18 +38,18 @@ enum Effect {
         quality: u8,
     },
     Fill {
-        r: i32,
-        g: i32,
-        b: i32,
-        a: i32,
+        r: u8,
+        g: u8,
+        b: u8,
+        a: u8,
     },
     Tint {
-        r0: i32,
-        g0: i32,
-        b0: i32,
-        r1: i32,
-        g1: i32,
-        b1: i32,
+        r0: u8,
+        g0: u8,
+        b0: u8,
+        r1: u8,
+        g1: u8,
+        b1: u8,
         intensity: f64,
     },
     Tritone {
@@ -149,7 +149,7 @@ fuzz_target!(|input: Input| {
                     sigma,
                     quality,
                 }),
-                Effect::Fill { r, g, b, a } => scene.add_fill_effect(r, g, b, a),
+                Effect::Fill { r, g, b, a } => scene.add_fill_effect(Rgba::new(r, g, b, a)),
                 Effect::Tint {
                     r0,
                     g0,
@@ -158,7 +158,11 @@ fuzz_target!(|input: Input| {
                     g1,
                     b1,
                     intensity,
-                } => scene.add_tint_effect(r0, g0, b0, r1, g1, b1, intensity),
+                } => scene.add_tint_effect(Tint {
+                    black: Rgb::new(r0, g0, b0),
+                    white: Rgb::new(r1, g1, b1),
+                    intensity,
+                }),
                 Effect::Tritone {
                     sr,
                     sg,

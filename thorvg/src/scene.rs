@@ -288,6 +288,70 @@ impl Default for Tritone {
     }
 }
 
+/// Parameters for [`Scene::add_tint_effect`].
+///
+/// Mirrors the layout of
+/// `tvg_scene_add_effect_tint(scene, black_r, black_g, black_b, white_r, white_g, white_b, intensity)`,
+/// grouping the two RGB endpoints into named [`Rgb`] fields.
+///
+/// Same three construction styles as [`DropShadow`] are supported
+/// (struct literal, `..Default::default()`, builder).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tint {
+    /// Color the darkest scene pixels map to.
+    pub black: Rgb,
+    /// Color the brightest scene pixels map to.
+    pub white: Rgb,
+    /// Tint intensity, `[0, 100]`.  `0` leaves the original
+    /// colors untouched; `100` is full tint.
+    pub intensity: f64,
+}
+
+impl Tint {
+    /// Returns a neutral grayscale tint:
+    ///
+    /// | Field       | Value                            |
+    /// |-------------|----------------------------------|
+    /// | `black`     | `Rgb::new(0, 0, 0)` (black)      |
+    /// | `white`     | `Rgb::new(255, 255, 255)` (white)|
+    /// | `intensity` | `50.0`                           |
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            black: Rgb::new(0, 0, 0),
+            white: Rgb::new(255, 255, 255),
+            intensity: 50.0,
+        }
+    }
+
+    /// Sets the color the darkest scene pixels map to.
+    #[must_use]
+    pub const fn black(mut self, black: Rgb) -> Self {
+        self.black = black;
+        self
+    }
+
+    /// Sets the color the brightest scene pixels map to.
+    #[must_use]
+    pub const fn white(mut self, white: Rgb) -> Self {
+        self.white = white;
+        self
+    }
+
+    /// Sets the tint intensity, `[0, 100]`.
+    #[must_use]
+    pub const fn intensity(mut self, intensity: f64) -> Self {
+        self.intensity = intensity;
+        self
+    }
+}
+
+impl Default for Tint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A scene that groups multiple paint objects.
 ///
 /// The lifetime `'eng` ties this scene to a [`Thorvg`](crate::Thorvg) engine
@@ -392,25 +456,38 @@ impl Scene<'_> {
     }
 
     /// Adds a fill color effect (overrides scene content color).
-    pub fn add_fill_effect(&mut self, r: i32, g: i32, b: i32, a: i32) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_scene_add_effect_fill(self.raw, r, g, b, a) })
+    pub fn add_fill_effect(&mut self, color: Rgba) -> Result<()> {
+        let Rgba { r, g, b, a } = color;
+        Error::from_raw(unsafe {
+            sys::tvg_scene_add_effect_fill(
+                self.raw,
+                i32::from(r),
+                i32::from(g),
+                i32::from(b),
+                i32::from(a),
+            )
+        })
     }
 
     /// Adds a tint effect.
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_tint_effect(
-        &mut self,
-        black_r: i32,
-        black_g: i32,
-        black_b: i32,
-        white_r: i32,
-        white_g: i32,
-        white_b: i32,
-        intensity: f64,
-    ) -> Result<()> {
+    ///
+    /// See [`Tint`] for the parameter layout.
+    pub fn add_tint_effect(&mut self, params: Tint) -> Result<()> {
+        let Tint {
+            black,
+            white,
+            intensity,
+        } = params;
         Error::from_raw(unsafe {
             sys::tvg_scene_add_effect_tint(
-                self.raw, black_r, black_g, black_b, white_r, white_g, white_b, intensity,
+                self.raw,
+                i32::from(black.r),
+                i32::from(black.g),
+                i32::from(black.b),
+                i32::from(white.r),
+                i32::from(white.g),
+                i32::from(white.b),
+                intensity,
             )
         })
     }

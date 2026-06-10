@@ -9,7 +9,7 @@ mod common;
 
 use thorvg::{
     BlurBorder, BlurDirection, ColorSpace, DropShadow, EngineOption, Paint, Rgb, Rgba, Scene,
-    Thorvg, Tritone,
+    Thorvg, Tint, Tritone,
 };
 
 fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
@@ -71,13 +71,19 @@ fn main() {
 
     // ── Fill effect (recolor) ──────────────────────────────────────
     let mut scene4 = make_shape_group(&engine, 600.0, 30.0);
-    scene4.add_fill_effect(255, 60, 60, 200).unwrap();
+    scene4.add_fill_effect(Rgba::new(255, 60, 60, 200)).unwrap();
     canvas.push(scene4).unwrap();
 
     // ── Tint effect ────────────────────────────────────────────────
     let mut scene5 = make_shape_group(&engine, 30.0, 250.0);
+    // Builder form to demonstrate the chainable API.
     scene5
-        .add_tint_effect(20, 0, 40, 255, 200, 180, 80.0)
+        .add_tint_effect(
+            Tint::new()
+                .black(Rgb::new(20, 0, 40))
+                .white(Rgb::new(255, 200, 180))
+                .intensity(80.0),
+        )
         .unwrap();
     canvas.push(scene5).unwrap();
 
