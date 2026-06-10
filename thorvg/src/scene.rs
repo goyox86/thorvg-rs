@@ -56,7 +56,7 @@ impl Scene<'_> {
     }
 
     /// Adds a Gaussian blur effect.
-    pub fn add_gaussian_blur(
+    pub fn add_gaussian_blur_effect(
         &mut self,
         sigma: f64,
         direction: i32,
@@ -70,7 +70,7 @@ impl Scene<'_> {
 
     /// Adds a drop shadow effect.
     #[allow(clippy::too_many_arguments)]
-    pub fn add_drop_shadow(
+    pub fn add_drop_shadow_effect(
         &mut self,
         r: i32,
         g: i32,

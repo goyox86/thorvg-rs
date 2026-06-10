@@ -4,7 +4,7 @@
 //!
 //! Builds a scene populated with N arbitrary shapes, then applies
 //! an arbitrary sequence of post-processing effects:
-//! `add_gaussian_blur`, `add_drop_shadow`, `add_fill_effect`,
+//! `add_gaussian_blur_effect`, `add_drop_shadow_effect`, `add_fill_effect`,
 //! `add_tint_effect`, `add_tritone_effect`, `clear_effects`.  All
 //! effect parameters are arbitrary `i32`/`f64`s; the targets here
 //! are: (1) the wrapper's enum/bound translation, and (2) any
@@ -93,10 +93,10 @@ fuzz_target!(|input: Input| {
         for e in input.effects {
             let _ = match e {
                 Effect::GaussianBlur { sigma, direction, border, quality } => {
-                    scene.add_gaussian_blur(sigma, direction, border, quality)
+                    scene.add_gaussian_blur_effect(sigma, direction, border, quality)
                 }
                 Effect::DropShadow { r, g, b, a, angle, distance, sigma, quality } => {
-                    scene.add_drop_shadow(r, g, b, a, angle, distance, sigma, quality)
+                    scene.add_drop_shadow_effect(r, g, b, a, angle, distance, sigma, quality)
                 }
                 Effect::Fill { r, g, b, a } => scene.add_fill_effect(r, g, b, a),
                 Effect::Tint { r0, g0, b0, r1, g1, b1, intensity } => {

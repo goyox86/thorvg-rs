@@ -1058,7 +1058,7 @@ fn test_full_pipeline_scene_with_effects() {
     s2.set_fill_color(0, 0, 255, 255).unwrap();
     scene.push(s2).unwrap();
 
-    scene.add_gaussian_blur(2.0, 0, 0, 50).unwrap();
+    scene.add_gaussian_blur_effect(2.0, 0, 0, 50).unwrap();
     scene.translate(10.0, 10.0).unwrap();
 
     canvas.push(scene).unwrap();

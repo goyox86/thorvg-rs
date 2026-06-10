@@ -48,13 +48,13 @@ fn main() {
 
     // ── Gaussian blur ──────────────────────────────────────────────
     let mut scene2 = make_shape_group(&engine, 220.0, 30.0);
-    scene2.add_gaussian_blur(5.0, 0, 0, 80).unwrap();
+    scene2.add_gaussian_blur_effect(5.0, 0, 0, 80).unwrap();
     canvas.push(scene2).unwrap();
 
     // ── Drop shadow ────────────────────────────────────────────────
     let mut scene3 = make_shape_group(&engine, 410.0, 30.0);
     scene3
-        .add_drop_shadow(0, 0, 0, 150, 135.0, 8.0, 4.0, 80)
+        .add_drop_shadow_effect(0, 0, 0, 150, 135.0, 8.0, 4.0, 80)
         .unwrap();
     canvas.push(scene3).unwrap();
 
@@ -84,9 +84,9 @@ fn main() {
 
     // ── Blur + drop shadow (stacked) ───────────────────────────────
     let mut scene7 = make_shape_group(&engine, 410.0, 250.0);
-    scene7.add_gaussian_blur(2.0, 0, 0, 60).unwrap();
+    scene7.add_gaussian_blur_effect(2.0, 0, 0, 60).unwrap();
     scene7
-        .add_drop_shadow(0, 0, 0, 100, 45.0, 12.0, 6.0, 80)
+        .add_drop_shadow_effect(0, 0, 0, 100, 45.0, 12.0, 6.0, 80)
         .unwrap();
     canvas.push(scene7).unwrap();
 
@@ -94,7 +94,7 @@ fn main() {
     let mut scene8 = make_shape_group(&engine, 600.0, 250.0);
     scene8.scale(0.8).unwrap();
     scene8.translate(720.0, 310.0).unwrap();
-    scene8.add_gaussian_blur(3.0, 1, 0, 70).unwrap();
+    scene8.add_gaussian_blur_effect(3.0, 1, 0, 70).unwrap();
     canvas.push(scene8).unwrap();
 
     canvas.draw(true).unwrap();

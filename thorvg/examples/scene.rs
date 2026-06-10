@@ -66,7 +66,7 @@ fn main() {
     scene.translate(30.0, 40.0).unwrap();
 
     // Apply Gaussian blur to the entire scene
-    scene.add_gaussian_blur(3.0, 0, 0, 80).unwrap();
+    scene.add_gaussian_blur_effect(3.0, 0, 0, 80).unwrap();
 
     canvas.push(scene).unwrap();
 
