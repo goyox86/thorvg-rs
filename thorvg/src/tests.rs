@@ -39,6 +39,36 @@ fn test_canvas_create_destroy() {
 }
 
 #[test]
+fn test_canvas_trait_generic_dispatch() {
+    // The `Canvas` trait lets generic code accept any canvas type.
+    // Verify that dispatch through the trait actually reaches the
+    // underlying C functions on the concrete `SwCanvas` impl.
+    fn finalise<C: Canvas>(c: &mut C) -> Result<()> {
+        c.draw(true)?;
+        c.sync()
+    }
+
+    let engine = Thorvg::init(0).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut buffer = vec![0u32; 50 * 50];
+    unsafe { canvas.set_target(&mut buffer, 50, 50, 50, ColorSpace::ABGR8888) }.unwrap();
+
+    let mut shape = engine.shape().unwrap();
+    shape
+        .append_rect(Rect::new(0.0, 0.0, 25.0, 25.0))
+        .unwrap();
+    shape.set_fill_color(Rgba::new(0, 255, 0, 255)).unwrap();
+    canvas.add(shape).unwrap();
+
+    // The trait-bound function compiles only because `SwCanvas`
+    // implements `Canvas`; the inherent methods (`draw`, `sync`)
+    // would not be reachable through `<C as Canvas>` otherwise.
+    finalise(&mut canvas).unwrap();
+
+    assert!(buffer.iter().any(|&px| px != 0));
+}
+
+#[test]
 fn test_engine_option_bitflags_round_trip() {
     // The C `Tvg_Engine_Option` is a power-of-two bitfield (NONE = 0,
     // DEFAULT = 1, SMART_RENDER = 2) intended to be OR-combined.  The

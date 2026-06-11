@@ -2,6 +2,16 @@ use crate::error::{Error, Result};
 use crate::paint::Paint;
 use thorvg_sys as sys;
 
+/// Sealed-trait marker.
+///
+/// Restricts [`Canvas`] to the three concrete canvas types defined
+/// in this crate.  Downstream crates can use [`Canvas`] as a bound
+/// in generic code but cannot add new canvas backends — those are
+/// owned by the engine.
+mod sealed {
+    pub trait Sealed {}
+}
+
 /// Color space for the rendering buffer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -205,6 +215,62 @@ impl SwCanvas<'_> {
 
 // ── Shared canvas operations ───────────────────────────────────────
 
+/// Operations shared across [`SwCanvas`], [`GlCanvas`], and
+/// [`WgCanvas`].
+///
+/// All methods forward to the same `tvg_canvas_*` C functions; the
+/// trait exists so generic code can accept "any canvas" without
+/// caring about the rendering backend:
+///
+/// ```ignore
+/// fn finalise<C: thorvg::Canvas>(c: &mut C) -> thorvg::Result<()> {
+///     c.draw(true)?;
+///     c.sync()
+/// }
+/// ```
+///
+/// Every method is also exposed as an inherent method on each
+/// canvas type, so callers that don't need genericity can keep
+/// writing `canvas.add(shape)` without a `use thorvg::Canvas;`.
+///
+/// # Sealed
+///
+/// The trait is sealed via `sealed::Sealed` — only the canvas types
+/// defined in this crate can implement it.  Adding a new canvas
+/// backend is the engine's responsibility, not the user's.
+pub trait Canvas: sealed::Sealed {
+    /// Adds a paint object to the canvas for rendering.
+    ///
+    /// Ownership of the paint is transferred to the canvas.
+    fn add<P: Paint>(&mut self, paint: P) -> Result<()>;
+
+    /// Inserts a paint object before another existing paint in the canvas.
+    ///
+    /// Ownership of `target` is transferred to the canvas.
+    fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()>;
+
+    /// Removes a paint object from the canvas.
+    fn remove<P: Paint>(&mut self, paint: &P) -> Result<()>;
+
+    /// Removes all paint objects from the canvas.
+    fn clear(&mut self) -> Result<()>;
+
+    /// Updates all modified paint objects in preparation for rendering.
+    fn update(&mut self) -> Result<()>;
+
+    /// Renders all paint objects on the canvas.
+    fn draw(&mut self, clear: bool) -> Result<()>;
+
+    /// Waits for the rendering to finish.
+    fn sync(&mut self) -> Result<()>;
+
+    /// Sets the drawing viewport (clipping region).
+    fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()>;
+
+    /// Update, draw (clearing the buffer), and sync in one call.
+    fn render(&mut self) -> Result<()>;
+}
+
 macro_rules! impl_canvas_ops {
     ($ty:ident) => {
         impl $ty<'_> {
@@ -261,6 +327,42 @@ macro_rules! impl_canvas_ops {
                 self.update()?;
                 self.draw(true)?;
                 self.sync()
+            }
+        }
+
+        impl sealed::Sealed for $ty<'_> {}
+
+        impl Canvas for $ty<'_> {
+            // Forward each method to the inherent impl above.  The
+            // explicit `$ty::method(self, ...)` syntax avoids any
+            // method-resolution ambiguity with the trait method
+            // being defined here.
+            fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
+                $ty::add(self, paint)
+            }
+            fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
+                $ty::insert(self, target, at)
+            }
+            fn remove<P: Paint>(&mut self, paint: &P) -> Result<()> {
+                $ty::remove(self, paint)
+            }
+            fn clear(&mut self) -> Result<()> {
+                $ty::clear(self)
+            }
+            fn update(&mut self) -> Result<()> {
+                $ty::update(self)
+            }
+            fn draw(&mut self, clear: bool) -> Result<()> {
+                $ty::draw(self, clear)
+            }
+            fn sync(&mut self) -> Result<()> {
+                $ty::sync(self)
+            }
+            fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()> {
+                $ty::set_viewport(self, x, y, w, h)
+            }
+            fn render(&mut self) -> Result<()> {
+                $ty::render(self)
             }
         }
 
