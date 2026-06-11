@@ -118,8 +118,14 @@ fuzz_target!(|input: Input| {
                 Op::Reset => shape.reset(),
             };
         }
-        // Exercise the read-side path-counter getter at the end of
-        // a (potentially malformed) sequence.
-        let _ = shape.path();
+        // Exercise both read-side path getters at the end of a
+        // (potentially malformed) sequence: the cheap count-only
+        // probe and the full typed-data copy.
+        let _ = shape.path_counts();
+        if let Ok(path) = shape.path() {
+            // Walk the typed segments so the iterator's cursor
+            // arithmetic gets fuzzed on every shape too.
+            for _ in path.segments() {}
+        }
     });
 });

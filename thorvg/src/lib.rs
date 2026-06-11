@@ -84,6 +84,7 @@ mod error;
 mod gradient;
 mod lottie;
 mod paint;
+mod path;
 mod picture;
 mod saver;
 mod scene;
@@ -100,6 +101,7 @@ pub use gradient::{
 };
 pub use lottie::{LottieAnimation, Marker};
 pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType, Point};
+pub use path::{Path, PathCommand, Segment, Segments};
 pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
 pub use color::{Rgb, Rgba};

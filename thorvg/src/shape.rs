@@ -2,6 +2,7 @@ use crate::color::Rgba;
 use crate::error::{Error, Result};
 use crate::gradient::{BorrowedGradient, LinearGradient, RadialGradient};
 use crate::paint::{Paint, Point};
+use crate::path::{Path, PathCommand};
 use thorvg_sys as sys;
 
 /// An axis-aligned rectangle, optionally rounded.
@@ -332,9 +333,70 @@ impl Shape<'_> {
         })
     }
 
-    /// Gets the current path data (commands count and points count).
+    /// Returns the shape's current path data.
+    ///
+    /// The result bundles the command and point buffers as a
+    /// single [`Path`] value; walk it with [`Path::segments`] to
+    /// receive typed [`Segment`](crate::Segment)s instead of
+    /// managing a separate points cursor.
+    ///
+    /// Allocates two `Vec`s; for the cheap "how big is it?" query
+    /// use [`path_counts`](Self::path_counts) instead, which
+    /// passes `null` for the data pointers and avoids the copy.
+    ///
+    /// Unknown command bytes from the C side (none are expected
+    /// for a thorvg-built shape) are dropped silently while
+    /// keeping the points buffer intact, which keeps
+    /// [`Path::segments`] from desynchronising.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn path(&self) -> Result<(u32, u32)> {
+    pub fn path(&self) -> Result<Path> {
+        let mut cmd_ptr: *const sys::Tvg_Path_Command = core::ptr::null();
+        let mut pts_ptr: *const sys::Tvg_Point = core::ptr::null();
+        let mut cmds_cnt: u32 = 0;
+        let mut pts_cnt: u32 = 0;
+        Error::from_raw(unsafe {
+            sys::tvg_shape_get_path(
+                self.raw,
+                &raw mut cmd_ptr,
+                &raw mut cmds_cnt,
+                &raw mut pts_ptr,
+                &raw mut pts_cnt,
+            )
+        })?;
+
+        let commands = if cmd_ptr.is_null() || cmds_cnt == 0 {
+            alloc::vec::Vec::new()
+        } else {
+            // SAFETY: `cmd_ptr` was just returned non-null by
+            // `tvg_shape_get_path` and points to `cmds_cnt`
+            // command bytes living in the shape's path storage,
+            // which outlives `&self`.
+            let raw_cmds = unsafe { core::slice::from_raw_parts(cmd_ptr, cmds_cnt as usize) };
+            raw_cmds
+                .iter()
+                .filter_map(|&c| PathCommand::from_raw(c))
+                .collect()
+        };
+
+        let points = if pts_ptr.is_null() || pts_cnt == 0 {
+            alloc::vec::Vec::new()
+        } else {
+            // SAFETY: same as above for the points buffer.
+            let raw_pts = unsafe { core::slice::from_raw_parts(pts_ptr, pts_cnt as usize) };
+            raw_pts.iter().map(|p| Point { x: p.x, y: p.y }).collect()
+        };
+
+        Ok(Path { commands, points })
+    }
+
+    /// Returns `(commands_count, points_count)` for the shape's
+    /// current path without copying the buffers.
+    ///
+    /// Cheaper than [`path`](Self::path) when only the sizes are
+    /// needed (passes `null` for the data pointers, matching the
+    /// pre-typed-path Rust signature).
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn path_counts(&self) -> Result<(u32, u32)> {
         let mut cmds_cnt: u32 = 0;
         let mut pts_cnt: u32 = 0;
         Error::from_raw(unsafe {
