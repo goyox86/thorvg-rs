@@ -25,7 +25,7 @@ unsafe {
     canvas.set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888).unwrap();
 }
 
-let mut shape = engine.shape();
+let mut shape = engine.shape().unwrap();
 shape.append_rect(thorvg::Rect::new(10.0, 10.0, 200.0, 150.0).corner_radius(10.0)).unwrap();
 shape.set_fill_color(thorvg::Rgba::new(255, 0, 0, 255)).unwrap();
 
@@ -67,7 +67,7 @@ thorvg = "0.2"
 
 ```toml
 [dependencies]
-thorvg = { version = "0.1", default-features = false, features = ["vendored", "lottie", "svg"] }
+thorvg = { version = "0.2", default-features = false, features = ["vendored", "lottie", "svg"] }
 ```
 
 This gives you Lottie + SVG playback with no threads, no JerryScript,

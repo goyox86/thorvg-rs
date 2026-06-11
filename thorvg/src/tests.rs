@@ -48,7 +48,8 @@ fn test_canvas_draw_shape() {
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape.append_rect(Rect::new(10.0, 10.0, 50.0, 50.0))
+    shape
+        .append_rect(Rect::new(10.0, 10.0, 50.0, 50.0))
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
@@ -99,8 +100,7 @@ fn test_shape_ownership_transfer_to_canvas() {
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape.append_rect(Rect::new(0.0, 0.0, 50.0, 50.0))
-        .unwrap();
+    shape.append_rect(Rect::new(0.0, 0.0, 50.0, 50.0)).unwrap();
     shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     // Transfer ownership — shape should NOT be freed by Rust
@@ -114,8 +114,7 @@ fn test_shape_ownership_transfer_to_scene() {
     let mut scene = engine.scene().unwrap();
 
     let mut s1 = engine.shape().unwrap();
-    s1.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0))
-        .unwrap();
+    s1.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0)).unwrap();
     s1.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     let mut s2 = engine.shape().unwrap();
@@ -133,7 +132,8 @@ fn test_shape_not_transferred_is_freed() {
     let engine = Thorvg::init(0).unwrap();
     // Shape created but never pushed to canvas/scene — Rust must free it
     let mut shape = engine.shape().unwrap();
-    shape.append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
+    shape
+        .append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 255, 0, 255)).unwrap();
     shape.set_stroke_width(3.0).unwrap();
@@ -168,7 +168,8 @@ fn test_gradient_ownership_transfer_to_shape() {
     .unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape.append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
+    shape
+        .append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
         .unwrap();
     // Gradient ownership transferred to shape
     shape.set_linear_gradient(grad).unwrap();
@@ -676,7 +677,7 @@ fn test_saver_save_animation_ownership_transfer() {
     let anim = engine.animation().unwrap();
     let r = saver.save_animation_to_str(anim, "/tmp/thorvg-rs-test.gif", 100, 30);
     assert!(r.is_err()); // InsufficientCondition — no frames loaded
-                         // `anim` was moved into the call; no Drop runs on freed memory.
+    // `anim` was moved into the call; no Drop runs on freed memory.
 }
 
 // ── Text font loading ──────────────────────────────────────────────
@@ -743,8 +744,7 @@ fn test_accessor_for_each_borrowed_views() {
     // Build a tiny scene: parent with one shape child.
     let mut parent = engine.scene().unwrap();
     let mut child = engine.shape().unwrap();
-    child.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0))
-        .unwrap();
+    child.append_rect(Rect::new(0.0, 0.0, 10.0, 10.0)).unwrap();
     parent.add(child).unwrap();
 
     let mut visited: alloc::vec::Vec<PaintType> = alloc::vec::Vec::new();
@@ -794,12 +794,15 @@ fn test_clip_lifecycle() {
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape.append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
+    shape
+        .append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
         .unwrap();
     shape.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
 
     let mut clipper = engine.shape().unwrap();
-    clipper.append_circle(Circle::new(50.0, 50.0, 30.0)).unwrap();
+    clipper
+        .append_circle(Circle::new(50.0, 50.0, 30.0))
+        .unwrap();
     shape.set_clip(clipper).unwrap();
 
     canvas.add(shape).unwrap();
@@ -1010,13 +1013,15 @@ fn test_mask_getter_round_trip() {
     let engine = Thorvg::init(0).unwrap();
 
     let mut paint = engine.shape().unwrap();
-    paint.append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
+    paint
+        .append_rect(Rect::new(0.0, 0.0, 100.0, 100.0))
         .unwrap();
 
     assert!(paint.mask().is_none(), "no mask before set_mask");
 
     let mut mask_shape = engine.shape().unwrap();
-    mask_shape.append_circle(Circle::new(50.0, 50.0, 30.0))
+    mask_shape
+        .append_circle(Circle::new(50.0, 50.0, 30.0))
         .unwrap();
     paint.set_mask(mask_shape, MaskMethod::Alpha).unwrap();
 
