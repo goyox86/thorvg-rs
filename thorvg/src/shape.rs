@@ -315,18 +315,36 @@ impl Shape<'_> {
         Error::from_raw(unsafe { sys::tvg_shape_close(self.raw) })
     }
 
-    /// Appends a raw sub-path from commands and points.
+    /// Appends a sub-path described by a typed [`Path`].
+    ///
+    /// Closes the round-trip with [`path`](Self::path): a value
+    /// returned by that getter can be re-applied here verbatim.
+    /// Commands are translated through [`PathCommand::to_raw`] and
+    /// points are repacked as `Tvg_Point` for the C call.  Both
+    /// translations allocate a temporary `Vec`; the original
+    /// `Path` is left intact.
+    ///
+    /// thorvg's C-side path builder reads `points` lock-step with
+    /// `commands` according to [`PathCommand::points_consumed`].
+    /// Passing a `Path` whose `points` vector is shorter than the
+    /// command arities require is rejected by the engine with an
+    /// error result rather than read past the buffer; constructing
+    /// such a [`Path`] is still permitted on the Rust side so the
+    /// boundary can be tested.
     #[allow(clippy::cast_possible_truncation)]
-    pub fn append_path(&mut self, cmds: &[u8], pts: &[Point]) -> Result<()> {
-        let raw_pts: alloc::vec::Vec<sys::Tvg_Point> = pts
+    pub fn append_path(&mut self, path: &Path) -> Result<()> {
+        let raw_cmds: alloc::vec::Vec<sys::Tvg_Path_Command> =
+            path.commands.iter().map(|c| c.to_raw()).collect();
+        let raw_pts: alloc::vec::Vec<sys::Tvg_Point> = path
+            .points
             .iter()
             .map(|p| sys::Tvg_Point { x: p.x, y: p.y })
             .collect();
         Error::from_raw(unsafe {
             sys::tvg_shape_append_path(
                 self.raw,
-                cmds.as_ptr(),
-                cmds.len() as u32,
+                raw_cmds.as_ptr(),
+                raw_cmds.len() as u32,
                 raw_pts.as_ptr(),
                 raw_pts.len() as u32,
             )

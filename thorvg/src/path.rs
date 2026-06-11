@@ -52,12 +52,20 @@ impl PathCommand {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation)]
+    pub(crate) fn to_raw(self) -> sys::Tvg_Path_Command {
+        // `Tvg_Path_Command` is `u8`; the bindgen constants are
+        // `c_uint`.  All four values fit in a byte, so the
+        // narrowing cast is well-defined.
+        match self {
+            Self::Close => sys::TVG_PATH_COMMAND_CLOSE as sys::Tvg_Path_Command,
+            Self::MoveTo => sys::TVG_PATH_COMMAND_MOVE_TO as sys::Tvg_Path_Command,
+            Self::LineTo => sys::TVG_PATH_COMMAND_LINE_TO as sys::Tvg_Path_Command,
+            Self::CubicTo => sys::TVG_PATH_COMMAND_CUBIC_TO as sys::Tvg_Path_Command,
+        }
+    }
+
     /// Decodes a raw command byte coming back from the C side.
-    //
-    // No corresponding `to_raw` yet — it will be added alongside
-    // a future `Shape::append_path(&Path)` that consumes typed
-    // segments.  For now the input side still takes raw bytes.
-    //
     ///
     /// Returns `None` for any value outside the documented set so
     /// callers (currently only [`Path`]'s decoder) can decide how
