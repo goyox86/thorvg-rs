@@ -27,26 +27,93 @@ impl ColorSpace {
     }
 }
 
-/// Engine rendering options.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[non_exhaustive]
-pub enum EngineOption {
-    /// No options.
-    None,
-    /// Default rendering mode.
-    #[default]
-    Default,
-    /// Enable smart (partial) rendering.
-    SmartRender,
-}
+/// Engine rendering options, modelled as bitflags.
+///
+/// Maps to the C bitfield enum `Tvg_Engine_Option`.  Values are
+/// power-of-two bits intended to be combined with `|`:
+///
+/// ```ignore
+/// engine.sw_canvas(EngineOption::DEFAULT | EngineOption::SMART_RENDER)
+/// ```
+///
+/// # Per-canvas restrictions
+///
+/// * [`SwCanvas`] honours every flag.
+/// * [`GlCanvas`] and [`WgCanvas`] ignore [`SMART_RENDER`](Self::SMART_RENDER)
+///   today — the C engine documents the request as silently dropped
+///   on the GPU backends (`tvg_glcanvas_create` / `tvg_wgcanvas_create`
+///   header notes).  The flag is still accepted to keep the API
+///   uniform; behaviour is identical to passing
+///   [`DEFAULT`](Self::DEFAULT) on those backends.
+///
+/// `Default::default()` returns [`DEFAULT`](Self::DEFAULT), matching
+/// the previous behaviour of the now-removed `Default` variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EngineOption(sys::Tvg_Engine_Option);
 
 impl EngineOption {
+    /// No options enabled.  Explicitly disables every optional
+    /// behaviour.
+    pub const NONE: Self = Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE);
+    /// Use the default rendering mode.
+    pub const DEFAULT: Self = Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT);
+    /// Enable smart (partial) rendering optimisations — thorvg only
+    /// redraws regions of the canvas that changed between frames.
+    ///
+    /// May *hurt* performance on full-screen / large-area updates
+    /// because of change-tracking overhead; recommended only for
+    /// mostly-static UIs.  Ignored by [`GlCanvas`] / [`WgCanvas`]
+    /// (see type docs).
+    pub const SMART_RENDER: Self =
+        Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER);
+
+    /// Returns the empty flag set (equivalent to [`NONE`](Self::NONE)).
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self::NONE
+    }
+
+    /// Returns `true` if every flag in `other` is also set in `self`.
+    #[must_use]
+    pub const fn contains(self, other: Self) -> bool {
+        (self.0.0 & other.0.0) == other.0.0
+    }
+
     pub(crate) fn to_raw(self) -> sys::Tvg_Engine_Option {
-        match self {
-            EngineOption::None => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE,
-            EngineOption::Default => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT,
-            EngineOption::SmartRender => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER,
-        }
+        self.0
+    }
+}
+
+impl Default for EngineOption {
+    /// Returns [`EngineOption::DEFAULT`].
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl core::ops::BitOr for EngineOption {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl core::ops::BitOrAssign for EngineOption {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl core::ops::BitAnd for EngineOption {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        Self(self.0 & rhs.0)
+    }
+}
+
+impl core::ops::BitAndAssign for EngineOption {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
     }
 }
 

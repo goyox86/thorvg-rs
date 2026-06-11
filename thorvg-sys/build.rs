@@ -1025,7 +1025,15 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         .allowlist_var("TVG_.*")
         .rustified_enum("Tvg_Result")
         .rustified_enum("Tvg_Colorspace")
-        .rustified_enum("Tvg_Engine_Option")
+        // `Tvg_Engine_Option` is a power-of-two bitflags enum
+        // (see thorvg_capi.h: NONE = 0, DEFAULT = 1 << 0,
+        // SMART_RENDER = 1 << 1).  `bitfield_enum` emits a
+        // newtype with `BitOr` / `BitAnd` / `Not` impls so
+        // combined values like `DEFAULT | SMART_RENDER` are
+        // representable.  `rustified_enum` would force the
+        // value to match a declared variant exactly, making OR
+        // combinations unreachable from Rust.
+        .bitfield_enum("Tvg_Engine_Option")
         .rustified_enum("Tvg_Mask_Method")
         .rustified_enum("Tvg_Blend_Method")
         .rustified_enum("Tvg_Type")

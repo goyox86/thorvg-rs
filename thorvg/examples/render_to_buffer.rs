@@ -18,7 +18,7 @@ fn main() {
     let height = 300u32;
     let mut buffer = vec![0u32; (width * height) as usize];
 
-    let mut canvas = engine.sw_canvas(EngineOption::Default).expect("Failed to create canvas");
+    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 
     // ── Background: white rectangle ────────────────────────────────
