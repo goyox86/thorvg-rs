@@ -23,35 +23,35 @@ fn main() {
 
     // ── White background ───────────────────────────────────────────
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(Rect { x: 0.0, y: 0.0, width: width as f32, height: height as f32, rx: 0.0, ry: 0.0, cw: true })
+    bg.append_rect(Rect::new(0.0, 0.0, width as f32, height as f32))
         .unwrap();
     bg.set_fill_color(Rgba::new(255, 255, 255, 255)).unwrap();
     canvas.add(bg).unwrap();
 
     // ── Red rectangle ──────────────────────────────────────────────
     let mut rect = engine.shape().unwrap();
-    rect.append_rect(Rect { x: 50.0, y: 50.0, width: 200.0, height: 150.0, rx: 0.0, ry: 0.0, cw: true })
+    rect.append_rect(Rect::new(50.0, 50.0, 200.0, 150.0))
         .unwrap();
     rect.set_fill_color(Rgba::new(255, 0, 0, 255)).unwrap();
     canvas.add(rect).unwrap();
 
     // ── Rounded green rectangle ────────────────────────────────────
     let mut rounded = engine.shape().unwrap();
-    rounded.append_rect(Rect { x: 300.0, y: 50.0, width: 200.0, height: 150.0, rx: 20.0, ry: 20.0, cw: true })
+    rounded.append_rect(Rect::new(300.0, 50.0, 200.0, 150.0).corner_radius(20.0))
         .unwrap();
     rounded.set_fill_color(Rgba::new(0, 200, 0, 255)).unwrap();
     canvas.add(rounded).unwrap();
 
     // ── Blue circle ────────────────────────────────────────────────
     let mut circle = engine.shape().unwrap();
-    circle.append_circle(Circle { cx: 150.0, cy: 400.0, rx: 80.0, ry: 80.0, cw: true })
+    circle.append_circle(Circle::new(150.0, 400.0, 80.0))
         .unwrap();
     circle.set_fill_color(Rgba::new(0, 0, 255, 255)).unwrap();
     canvas.add(circle).unwrap();
 
     // ── Yellow ellipse ─────────────────────────────────────────────
     let mut ellipse = engine.shape().unwrap();
-    ellipse.append_circle(Circle { cx: 400.0, cy: 400.0, rx: 120.0, ry: 60.0, cw: true })
+    ellipse.append_circle(Circle::ellipse(400.0, 400.0, 120.0, 60.0))
         .unwrap();
     ellipse.set_fill_color(Rgba::new(255, 255, 0, 255)).unwrap();
     canvas.add(ellipse).unwrap();

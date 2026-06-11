@@ -18,7 +18,7 @@ fn main() {
 
     // Background
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(Rect { x: 0.0, y: 0.0, width: w as f32, height: h as f32, rx: 0.0, ry: 0.0, cw: true })
+    bg.append_rect(Rect::new(0.0, 0.0, w as f32, h as f32))
         .unwrap();
     bg.set_fill_color(Rgba::new(30, 30, 50, 255)).unwrap();
     canvas.add(bg).unwrap();
@@ -45,13 +45,13 @@ fn main() {
     .unwrap();
 
     let mut rect = engine.shape().unwrap();
-    rect.append_rect(Rect { x: 50.0, y: 50.0, width: 200.0, height: 300.0, rx: 0.0, ry: 0.0, cw: true })
+    rect.append_rect(Rect::new(50.0, 50.0, 200.0, 300.0))
         .unwrap();
     rect.set_linear_gradient(grad).unwrap();
 
     // Circle clip
     let mut clip1 = engine.shape().unwrap();
-    clip1.append_circle(Circle { cx: 150.0, cy: 200.0, rx: 90.0, ry: 90.0, cw: true }).unwrap();
+    clip1.append_circle(Circle::new(150.0, 200.0, 90.0)).unwrap();
     rect.set_clip(clip1).unwrap();
 
     canvas.add(rect).unwrap();
@@ -80,7 +80,7 @@ fn main() {
 
     // Rounded rectangle clip
     let mut clip2 = engine.shape().unwrap();
-    clip2.append_rect(Rect { x: 360.0, y: 100.0, width: 160.0, height: 200.0, rx: 20.0, ry: 20.0, cw: true })
+    clip2.append_rect(Rect::new(360.0, 100.0, 160.0, 200.0).corner_radius(20.0))
         .unwrap();
     star.set_clip(clip2).unwrap();
 

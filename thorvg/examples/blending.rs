@@ -18,7 +18,7 @@ fn main() {
 
     // Background
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(Rect { x: 0.0, y: 0.0, width: w as f32, height: h as f32, rx: 0.0, ry: 0.0, cw: true })
+    bg.append_rect(Rect::new(0.0, 0.0, w as f32, h as f32))
         .unwrap();
     bg.set_fill_color(Rgba::new(240, 240, 240, 255)).unwrap();
     canvas.add(bg).unwrap();
@@ -51,14 +51,14 @@ fn main() {
 
         // Red circle (bottom layer)
         let mut circle1 = engine.shape().unwrap();
-        circle1.append_circle(Circle { cx: x + 70.0, cy: y + 60.0, rx: 45.0, ry: 45.0, cw: true })
+        circle1.append_circle(Circle::new(x + 70.0, y + 60.0, 45.0))
             .unwrap();
         circle1.set_fill_color(Rgba::new(220, 40, 40, 255)).unwrap();
         canvas.add(circle1).unwrap();
 
         // Blue circle (top layer with blend)
         let mut circle2 = engine.shape().unwrap();
-        circle2.append_circle(Circle { cx: x + 110.0, cy: y + 60.0, rx: 45.0, ry: 45.0, cw: true })
+        circle2.append_circle(Circle::new(x + 110.0, y + 60.0, 45.0))
             .unwrap();
         circle2.set_fill_color(Rgba::new(40, 40, 220, 255)).unwrap();
         circle2.set_blend(*mode).unwrap();

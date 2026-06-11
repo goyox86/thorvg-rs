@@ -25,7 +25,7 @@ fn main() {
 
     // ── Background ─────────────────────────────────────────────────
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(Rect { x: 0.0, y: 0.0, width: width as f32, height: height as f32, rx: 0.0, ry: 0.0, cw: true })
+    bg.append_rect(Rect::new(0.0, 0.0, width as f32, height as f32))
         .unwrap();
     bg.set_fill_color(Rgba::new(240, 240, 240, 255)).unwrap();
     canvas.add(bg).unwrap();
@@ -35,14 +35,14 @@ fn main() {
 
     // Green circle
     let mut circle = engine.shape().unwrap();
-    circle.append_circle(Circle { cx: 150.0, cy: 150.0, rx: 80.0, ry: 80.0, cw: true })
+    circle.append_circle(Circle::new(150.0, 150.0, 80.0))
         .unwrap();
     circle.set_fill_color(Rgba::new(0, 200, 0, 255)).unwrap();
     scene.add(circle).unwrap();
 
     // Semi-transparent blue rectangle overlapping the circle
     let mut rect = engine.shape().unwrap();
-    rect.append_rect(Rect { x: 100.0, y: 100.0, width: 150.0, height: 100.0, rx: 10.0, ry: 10.0, cw: true })
+    rect.append_rect(Rect::new(100.0, 100.0, 150.0, 100.0).corner_radius(10.0))
         .unwrap();
     rect.set_fill_color(Rgba::new(0, 0, 200, 180)).unwrap();
     scene.add(rect).unwrap();

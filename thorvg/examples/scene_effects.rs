@@ -17,27 +17,13 @@ fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
 
     let mut circle = engine.shape().unwrap();
     circle
-        .append_circle(Circle {
-            cx: x + 60.0,
-            cy: y + 60.0,
-            rx: 40.0,
-            ry: 40.0,
-            cw: true,
-        })
+        .append_circle(Circle::new(x + 60.0, y + 60.0, 40.0))
         .unwrap();
     circle.set_fill_color(Rgba::new(0, 180, 80, 255)).unwrap();
     scene.add(circle).unwrap();
 
     let mut rect = engine.shape().unwrap();
-    rect.append_rect(Rect {
-        x: x + 30.0,
-        y: y + 30.0,
-        width: 80.0,
-        height: 60.0,
-        rx: 8.0,
-        ry: 8.0,
-        cw: true,
-    })
+    rect.append_rect(Rect::new(x + 30.0, y + 30.0, 80.0, 60.0).corner_radius(8.0))
     .unwrap();
     rect.set_fill_color(Rgba::new(80, 80, 220, 200)).unwrap();
     scene.add(rect).unwrap();
@@ -54,15 +40,7 @@ fn main() {
 
     // Background
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(Rect {
-        x: 0.0,
-        y: 0.0,
-        width: w as f32,
-        height: h as f32,
-        rx: 0.0,
-        ry: 0.0,
-        cw: true,
-    })
+    bg.append_rect(Rect::new(0.0, 0.0, w as f32, h as f32))
     .unwrap();
     bg.set_fill_color(Rgba::new(245, 245, 245, 255)).unwrap();
     canvas.add(bg).unwrap();

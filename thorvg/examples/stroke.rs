@@ -23,7 +23,7 @@ fn main() {
 
     // ── Dark background ────────────────────────────────────────────
     let mut bg = engine.shape().unwrap();
-    bg.append_rect(Rect { x: 0.0, y: 0.0, width: width as f32, height: height as f32, rx: 0.0, ry: 0.0, cw: true })
+    bg.append_rect(Rect::new(0.0, 0.0, width as f32, height as f32))
         .unwrap();
     bg.set_fill_color(Rgba::new(30, 30, 30, 255)).unwrap();
     canvas.add(bg).unwrap();
@@ -63,7 +63,7 @@ fn main() {
 
     // ── Dashed stroke ──────────────────────────────────────────────
     let mut dashed = engine.shape().unwrap();
-    dashed.append_rect(Rect { x: 50.0, y: 250.0, width: 300.0, height: 100.0, rx: 0.0, ry: 0.0, cw: true })
+    dashed.append_rect(Rect::new(50.0, 250.0, 300.0, 100.0))
         .unwrap();
     dashed.set_stroke_width(4.0).unwrap();
     dashed.set_stroke_color(Rgba::new(255, 255, 80, 255)).unwrap();
@@ -74,7 +74,7 @@ fn main() {
 
     // ── Stroked circle with fill ───────────────────────────────────
     let mut stroked_circle = engine.shape().unwrap();
-    stroked_circle.append_circle(Circle { cx: 600.0, cy: 300.0, rx: 60.0, ry: 60.0, cw: true })
+    stroked_circle.append_circle(Circle::new(600.0, 300.0, 60.0))
         .unwrap();
     stroked_circle.set_fill_color(Rgba::new(100, 100, 255, 128)).unwrap();
     stroked_circle.set_stroke_width(6.0).unwrap();
