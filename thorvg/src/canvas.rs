@@ -64,8 +64,7 @@ impl EngineOption {
     /// because of change-tracking overhead; recommended only for
     /// mostly-static UIs.  Ignored by [`GlCanvas`] / [`WgCanvas`]
     /// (see type docs).
-    pub const SMART_RENDER: Self =
-        Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER);
+    pub const SMART_RENDER: Self = Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER);
 
     /// Returns the empty flag set (equivalent to [`NONE`](Self::NONE)).
     #[must_use]
@@ -76,7 +75,7 @@ impl EngineOption {
     /// Returns `true` if every flag in `other` is also set in `self`.
     #[must_use]
     pub const fn contains(self, other: Self) -> bool {
-        (self.0.0 & other.0.0) == other.0.0
+        (self.0 .0 & other.0 .0) == other.0 .0
     }
 
     pub(crate) fn to_raw(self) -> sys::Tvg_Engine_Option {
@@ -202,79 +201,6 @@ impl SwCanvas<'_> {
         };
         Error::from_raw(result)
     }
-
-    /// Adds a paint object to the canvas for rendering.
-    ///
-    /// Ownership of the paint is transferred to the canvas.
-    pub fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
-        let raw_paint = paint.into_raw();
-        let result = unsafe { sys::tvg_canvas_add(self.raw, raw_paint) };
-        Error::from_raw(result)
-    }
-
-    /// Inserts a paint object before another existing paint in the canvas.
-    ///
-    /// Ownership of `target` is transferred to the canvas.
-    pub fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_insert(self.raw, target.into_raw(), at.raw()) };
-        Error::from_raw(result)
-    }
-
-    /// Removes a paint object from the canvas.
-    pub fn remove<P: Paint>(&mut self, paint: &P) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_remove(self.raw, paint.raw()) };
-        Error::from_raw(result)
-    }
-
-    /// Removes all paint objects from the canvas.
-    pub fn clear(&mut self) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_remove(self.raw, core::ptr::null_mut()) };
-        Error::from_raw(result)
-    }
-
-    /// Updates all modified paint objects in preparation for rendering.
-    pub fn update(&mut self) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_update(self.raw) };
-        Error::from_raw(result)
-    }
-
-    /// Renders all paint objects on the canvas.
-    ///
-    /// If `clear` is true, the target buffer is cleared before drawing.
-    pub fn draw(&mut self, clear: bool) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_draw(self.raw, clear) };
-        Error::from_raw(result)
-    }
-
-    /// Waits for the rendering to finish.
-    pub fn sync(&mut self) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_sync(self.raw) };
-        Error::from_raw(result)
-    }
-
-    /// Sets the drawing viewport (clipping region).
-    pub fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()> {
-        let result = unsafe { sys::tvg_canvas_set_viewport(self.raw, x, y, w, h) };
-        Error::from_raw(result)
-    }
-
-    /// Update, draw (clearing the buffer), and sync in one call.
-    ///
-    /// Equivalent to calling [`update`](Self::update), [`draw(true)`](Self::draw),
-    /// and [`sync`](Self::sync) in sequence.
-    pub fn render(&mut self) -> Result<()> {
-        self.update()?;
-        self.draw(true)?;
-        self.sync()
-    }
-}
-
-impl Drop for SwCanvas<'_> {
-    fn drop(&mut self) {
-        unsafe {
-            sys::tvg_canvas_destroy(self.raw);
-        }
-    }
 }
 
 // ── Shared canvas operations ───────────────────────────────────────
@@ -347,6 +273,8 @@ macro_rules! impl_canvas_ops {
         }
     };
 }
+
+impl_canvas_ops!(SwCanvas);
 
 // ── GlCanvas ───────────────────────────────────────────────────────
 

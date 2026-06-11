@@ -702,7 +702,7 @@ fn test_saver_save_animation_ownership_transfer() {
     let anim = engine.animation().unwrap();
     let r = saver.save_animation_to_str(anim, "/tmp/thorvg-rs-test.gif", 100, 30);
     assert!(r.is_err()); // InsufficientCondition — no frames loaded
-    // `anim` was moved into the call; no Drop runs on freed memory.
+                         // `anim` was moved into the call; no Drop runs on freed memory.
 }
 
 // ── Text font loading ──────────────────────────────────────────────

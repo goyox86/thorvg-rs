@@ -38,8 +38,8 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
     let picolibc_root = manifest_dir.join("picolibc");
     let picolibc_config = manifest_dir.join("picolibc-config");
     if target.is_bare_metal {
-        build_picolibc(&picolibc_root, &picolibc_config, &target.arch, &multilib)
-            .unwrap_or_else(|reason| {
+        build_picolibc(&picolibc_root, &picolibc_config, &target.arch, &multilib).unwrap_or_else(
+            |reason| {
                 panic!(
                     "picolibc build failed for target_arch={}: {reason}\n\
                      \n\
@@ -48,13 +48,9 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
                      and ensure `picolibc/libc/machine/<dir>/` exists.",
                     target.arch,
                 )
-            });
-        apply_picolibc_header_isolation(
-            &mut build,
-            &picolibc_root,
-            &picolibc_config,
-            &target.arch,
+            },
         );
+        apply_picolibc_header_isolation(&mut build, &picolibc_root, &picolibc_config, &target.arch);
     }
 
     for dir in &include_dirs {
@@ -104,9 +100,16 @@ impl TargetInfo {
         let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
         let is_bare_metal = os == "none";
         let is_msvc = env_ == "msvc";
-        let is_hosted =
-            matches!(env_.as_str(), "gnu" | "musl" | "msvc") || vendor == "apple";
-        Self { os, env: env_, vendor, arch, is_bare_metal, is_msvc, is_hosted }
+        let is_hosted = matches!(env_.as_str(), "gnu" | "musl" | "msvc") || vendor == "apple";
+        Self {
+            os,
+            env: env_,
+            vendor,
+            arch,
+            is_bare_metal,
+            is_msvc,
+            is_hosted,
+        }
     }
 }
 
@@ -454,9 +457,8 @@ fn build_picolibc(
 ) -> Result<(), String> {
     // ── Arch resolution ───────────────────────────────────────────────
 
-    let machine_subdir = picolibc_machine_subdir(target_arch).ok_or_else(|| {
-        format!("target_arch={target_arch} not mapped to a picolibc machine dir")
-    })?;
+    let machine_subdir = picolibc_machine_subdir(target_arch)
+        .ok_or_else(|| format!("target_arch={target_arch} not mapped to a picolibc machine dir"))?;
 
     let machine_dir = picolibc_root.join("libc/machine").join(machine_subdir);
     if !machine_dir.is_dir() {
