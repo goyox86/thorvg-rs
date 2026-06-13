@@ -8,8 +8,8 @@
 mod common;
 
 use thorvg::{
-    BlurBorder, BlurDirection, Circle, ColorSpace, DropShadow, EngineOption, Paint, Rect, Rgb,
-    Rgba, Scene, Thorvg, Tint, Tritone,
+    BlurBorder, BlurDirection, Circle, ColorSpace, DropShadow, EngineOption, GaussianBlur, Paint,
+    Rect, Rgb, Rgba, Scene, Thorvg, Tint, Tritone,
 };
 
 fn make_shape_group(engine: &Thorvg, x: f32, y: f32) -> Scene<'_> {
@@ -52,7 +52,8 @@ fn main() {
     // ── Gaussian blur ──────────────────────────────────────────────
     let mut scene2 = make_shape_group(&engine, 220.0, 30.0);
     scene2
-        .add_gaussian_blur_effect(5.0, BlurDirection::Both, BlurBorder::Duplicate, 80)
+        // Builder form: the Both / Duplicate defaults are left implicit.
+        .add_gaussian_blur_effect(GaussianBlur::new().sigma(5.0).quality(80))
         .unwrap();
     canvas.add(scene2).unwrap();
 
@@ -102,7 +103,12 @@ fn main() {
     // ── Blur + drop shadow (stacked) ───────────────────────────────
     let mut scene7 = make_shape_group(&engine, 410.0, 250.0);
     scene7
-        .add_gaussian_blur_effect(2.0, BlurDirection::Both, BlurBorder::Duplicate, 60)
+        .add_gaussian_blur_effect(GaussianBlur {
+            sigma: 2.0,
+            direction: BlurDirection::Both,
+            border: BlurBorder::Duplicate,
+            quality: 60,
+        })
         .unwrap();
     // Same effect, expressed via the chainable builder — fields
     // not mentioned inherit `DropShadow::new()`'s sensible defaults.
@@ -123,7 +129,12 @@ fn main() {
     scene8.scale(0.8).unwrap();
     scene8.translate(720.0, 310.0).unwrap();
     scene8
-        .add_gaussian_blur_effect(3.0, BlurDirection::Horizontal, BlurBorder::Duplicate, 70)
+        .add_gaussian_blur_effect(GaussianBlur {
+            sigma: 3.0,
+            direction: BlurDirection::Horizontal,
+            border: BlurBorder::Duplicate,
+            quality: 70,
+        })
         .unwrap();
     canvas.add(scene8).unwrap();
 

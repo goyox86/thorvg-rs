@@ -1184,7 +1184,12 @@ fn test_full_pipeline_scene_with_effects() {
     scene.add(s2).unwrap();
 
     scene
-        .add_gaussian_blur_effect(2.0, BlurDirection::Both, BlurBorder::Duplicate, 50)
+        .add_gaussian_blur_effect(GaussianBlur {
+            sigma: 2.0,
+            direction: BlurDirection::Both,
+            border: BlurBorder::Duplicate,
+            quality: 50,
+        })
         .unwrap();
     scene.translate(10.0, 10.0).unwrap();
 

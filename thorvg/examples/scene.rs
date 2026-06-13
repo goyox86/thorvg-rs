@@ -9,7 +9,10 @@
 
 mod common;
 
-use thorvg::{BlurBorder, BlurDirection, ColorSpace, EngineOption, Paint, Rgba, Circle, Rect, Thorvg};
+use thorvg::{
+    BlurBorder, BlurDirection, Circle, ColorSpace, EngineOption, GaussianBlur, Paint, Rect, Rgba,
+    Thorvg,
+};
 
 fn main() {
     let engine = Thorvg::init(0).expect("Failed to initialize ThorVG");
@@ -68,7 +71,12 @@ fn main() {
 
     // Apply Gaussian blur to the entire scene
     scene
-        .add_gaussian_blur_effect(3.0, BlurDirection::Both, BlurBorder::Duplicate, 80)
+        .add_gaussian_blur_effect(GaussianBlur {
+            sigma: 3.0,
+            direction: BlurDirection::Both,
+            border: BlurBorder::Duplicate,
+            quality: 80,
+        })
         .unwrap();
 
     canvas.add(scene).unwrap();

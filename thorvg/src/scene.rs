@@ -65,6 +65,85 @@ impl BlurBorder {
     }
 }
 
+/// Parameters for [`Scene::add_gaussian_blur_effect`].
+///
+/// Mirrors the layout of
+/// `tvg_scene_add_effect_gaussian_blur(scene, sigma, direction, border, quality)`,
+/// bundling the four arguments into one value with the same builder
+/// ergonomics as [`DropShadow`].
+///
+/// Same three construction styles as [`DropShadow`] are supported
+/// (struct literal, `..Default::default()`, builder).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GaussianBlur {
+    /// Blur radius (sigma).  Must be `> 0` or the engine rejects the
+    /// effect.
+    pub sigma: f64,
+    /// Axis (or axes) the kernel sweeps.
+    pub direction: BlurDirection,
+    /// Edge-sampling behaviour outside the scene bounds.
+    pub border: BlurBorder,
+    /// Blur quality level, `[0, 100]` (clamped by the engine).
+    pub quality: u8,
+}
+
+impl GaussianBlur {
+    /// Returns a blur with sensible defaults that render:
+    ///
+    /// | Field       | Value                     |
+    /// |-------------|---------------------------|
+    /// | `sigma`     | `2.0`                     |
+    /// | `direction` | [`BlurDirection::Both`]   |
+    /// | `border`    | [`BlurBorder::Duplicate`] |
+    /// | `quality`   | `50`                      |
+    ///
+    /// `sigma` is non-zero so the effect actually renders (the engine
+    /// rejects `sigma <= 0`).
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            sigma: 2.0,
+            direction: BlurDirection::Both,
+            border: BlurBorder::Duplicate,
+            quality: 50,
+        }
+    }
+
+    /// Sets the blur radius (sigma).  Must be `> 0`.
+    #[must_use]
+    pub const fn sigma(mut self, sigma: f64) -> Self {
+        self.sigma = sigma;
+        self
+    }
+
+    /// Sets the axis (or axes) the blur sweeps.
+    #[must_use]
+    pub const fn direction(mut self, direction: BlurDirection) -> Self {
+        self.direction = direction;
+        self
+    }
+
+    /// Sets the edge-sampling behaviour.
+    #[must_use]
+    pub const fn border(mut self, border: BlurBorder) -> Self {
+        self.border = border;
+        self
+    }
+
+    /// Sets the blur quality level, `[0, 100]`.
+    #[must_use]
+    pub const fn quality(mut self, quality: u8) -> Self {
+        self.quality = quality;
+        self
+    }
+}
+
+impl Default for GaussianBlur {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Parameters for [`Scene::add_drop_shadow_effect`].
 ///
 /// Mirrors the layout of
@@ -366,24 +445,21 @@ impl Scene<'_> {
 
     /// Adds a Gaussian blur effect.
     ///
-    /// `sigma` is the blur radius (must be `> 0`); `direction`
-    /// selects which axis (or both) the kernel sweeps; `border`
-    /// controls how samples outside the scene bounds are handled;
-    /// `quality` is in `[0, 100]` (clamped by the engine).
-    pub fn add_gaussian_blur_effect(
-        &mut self,
-        sigma: f64,
-        direction: BlurDirection,
-        border: BlurBorder,
-        quality: i32,
-    ) -> Result<()> {
+    /// See [`GaussianBlur`] for the parameter layout.
+    pub fn add_gaussian_blur_effect(&mut self, params: GaussianBlur) -> Result<()> {
+        let GaussianBlur {
+            sigma,
+            direction,
+            border,
+            quality,
+        } = params;
         Error::from_raw(unsafe {
             sys::tvg_scene_add_effect_gaussian_blur(
                 self.raw,
                 sigma,
                 direction.to_raw(),
                 border.to_raw(),
-                quality,
+                i32::from(quality),
             )
         })
     }
