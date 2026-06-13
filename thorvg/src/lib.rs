@@ -93,7 +93,10 @@ mod text;
 
 pub use accessor::{Accessor, BorrowedAccessor};
 pub use animation::Animation;
-pub use canvas::{Canvas, ColorSpace, EngineOption, GlCanvas, SwCanvas, WgCanvas, WgTargetType};
+pub use canvas::{
+    Canvas, ColorSpace, EngineOption, GlCanvas, GlTarget, SwCanvas, WgCanvas, WgTarget,
+    WgTargetType,
+};
 pub use error::{Error, Result};
 pub use gradient::{
     BorrowedGradient, BorrowedLinearGradient, BorrowedRadialGradient, ColorStop, FillSpread,

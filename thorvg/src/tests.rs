@@ -54,9 +54,7 @@ fn test_canvas_trait_generic_dispatch() {
     unsafe { canvas.set_target(&mut buffer, 50, 50, 50, ColorSpace::ABGR8888) }.unwrap();
 
     let mut shape = engine.shape().unwrap();
-    shape
-        .append_rect(Rect::new(0.0, 0.0, 25.0, 25.0))
-        .unwrap();
+    shape.append_rect(Rect::new(0.0, 0.0, 25.0, 25.0)).unwrap();
     shape.set_fill_color(Rgba::new(0, 255, 0, 255)).unwrap();
     canvas.add(shape).unwrap();
 
@@ -143,6 +141,53 @@ fn test_canvas_clear_all() {
     canvas.add(s).unwrap();
     canvas.draw(true).unwrap();
     canvas.sync().unwrap();
+}
+
+#[test]
+fn test_sw_canvas_set_target_rejects_stride_below_width() {
+    // `stride` is the row pitch; it must be `>= width` or rows would
+    // overlap.  The wrapper rejects this before handing the buffer to
+    // thorvg so the failure mode is a clean `InvalidArguments` instead
+    // of an in-engine out-of-bounds write.
+    let engine = Thorvg::init(0).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut buffer = vec![0u32; 100 * 100];
+    let err = unsafe { canvas.set_target(&mut buffer, 50, 100, 100, ColorSpace::ABGR8888) }
+        .expect_err("stride < width must be rejected");
+    assert_eq!(err, Error::InvalidArguments);
+}
+
+#[test]
+fn test_sw_canvas_set_target_rejects_undersized_buffer() {
+    // `stride * height` exceeds the buffer length — must be rejected
+    // before reaching the C engine.
+    let engine = Thorvg::init(0).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut buffer = vec![0u32; 10]; // only 10 pixels
+    let err = unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }
+        .expect_err("undersized buffer must be rejected");
+    assert_eq!(err, Error::InvalidArguments);
+}
+
+#[test]
+fn test_sw_canvas_set_target_rejects_stride_height_overflow() {
+    // `stride * height` would overflow `u32`; the u64-checked
+    // multiplication in the wrapper must catch this rather than wrap
+    // around and pass an artificially small "needed" size.
+    let engine = Thorvg::init(0).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut buffer = vec![0u32; 100];
+    let err = unsafe {
+        canvas.set_target(
+            &mut buffer,
+            u32::MAX,
+            u32::MAX,
+            u32::MAX,
+            ColorSpace::ABGR8888,
+        )
+    }
+    .expect_err("u32 overflow on stride*height must be rejected");
+    assert_eq!(err, Error::InvalidArguments);
 }
 
 // ── Shape Ownership ────────────────────────────────────────────────

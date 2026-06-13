@@ -85,7 +85,11 @@ impl EngineOption {
     /// Returns `true` if every flag in `other` is also set in `self`.
     #[must_use]
     pub const fn contains(self, other: Self) -> bool {
-        (self.0 .0 & other.0 .0) == other.0 .0
+        // `self.0` is the `sys::Tvg_Engine_Option` newtype; its `.0`
+        // is the raw `u32` bitfield underneath.
+        let bits = self.0 .0;
+        let mask = other.0 .0;
+        (bits & mask) == mask
     }
 
     pub(crate) fn to_raw(self) -> sys::Tvg_Engine_Option {
@@ -123,93 +127,6 @@ impl core::ops::BitAnd for EngineOption {
 impl core::ops::BitAndAssign for EngineOption {
     fn bitand_assign(&mut self, rhs: Self) {
         self.0 &= rhs.0;
-    }
-}
-
-/// A software-rendered canvas.
-///
-/// This canvas uses the CPU engine for rendering.
-///
-/// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
-/// instance. Create canvases via [`Thorvg::sw_canvas()`](crate::Thorvg::sw_canvas).
-///
-/// # Thread Safety
-///
-/// `SwCanvas` is [`Send`] but not [`Sync`]: you may move it to another
-/// thread, but you must not share references across threads.  All
-/// mutation goes through `&mut self`, so the borrow checker enforces
-/// exclusive access at compile time.
-pub struct SwCanvas<'eng> {
-    raw: sys::Tvg_Canvas,
-    _engine: core::marker::PhantomData<&'eng ()>,
-}
-
-// SAFETY: `SwCanvas` exclusively owns a heap-allocated ThorVG canvas
-// (`Tvg_Canvas`).  The C++ implementation guards shared global state
-// (renderer ref-count, memory pool, loader registry) with internal
-// mutexes (`_rendererMtx`, `ScopedLock` / `StrictKey`), and per-canvas
-// state is only accessed through `&mut self`.  Transferring sole
-// ownership to another thread is therefore safe.
-//
-// `SwCanvas` is intentionally `!Sync`: the raw pointer field prevents
-// the auto-`Sync` impl, which is correct — concurrent `&`-access to
-// the same C handle would be a data race.
-unsafe impl Send for SwCanvas<'_> {}
-
-impl SwCanvas<'_> {
-    /// Creates a new software canvas with the given engine options.
-    pub(crate) fn new(option: EngineOption) -> Result<Self> {
-        let raw = unsafe { sys::tvg_swcanvas_create(option.to_raw()) };
-        if raw.is_null() {
-            return Err(Error::Unknown);
-        }
-        Ok(Self {
-            raw,
-            _engine: core::marker::PhantomData,
-        })
-    }
-
-    /// Sets the rendering target buffer.
-    ///
-    /// The buffer must be at least `stride * height` elements.
-    ///
-    /// # Safety
-    /// The caller must ensure that `buffer` remains valid and is not moved,
-    /// reallocated, or dropped for the entire lifetime of the canvas (or until
-    /// `set_target` is called again with a different buffer). The canvas stores
-    /// the pointer internally and writes to it during [`draw`](Self::draw) and
-    /// [`sync`](Self::sync).
-    pub unsafe fn set_target(
-        &mut self,
-        buffer: &mut [u32],
-        stride: u32,
-        width: u32,
-        height: u32,
-        colorspace: ColorSpace,
-    ) -> Result<()> {
-        // Check `stride * height` in u64 — the obvious `u32 * u32`
-        // wraps in release (overflow-checks off) and would let a
-        // pathological size pass the bound check, after which thorvg
-        // would compute the same product on its side and read/write
-        // past the buffer.
-        let needed = u64::from(stride).checked_mul(u64::from(height));
-        let Some(needed) = needed else {
-            return Err(Error::InvalidArguments);
-        };
-        if (buffer.len() as u64) < needed {
-            return Err(Error::InvalidArguments);
-        }
-        let result = unsafe {
-            sys::tvg_swcanvas_set_target(
-                self.raw,
-                buffer.as_mut_ptr(),
-                stride,
-                width,
-                height,
-                colorspace.to_raw(),
-            )
-        };
-        Error::from_raw(result)
     }
 }
 
@@ -271,9 +188,53 @@ pub trait Canvas: sealed::Sealed {
     fn render(&mut self) -> Result<()>;
 }
 
-macro_rules! impl_canvas_ops {
-    ($ty:ident) => {
+/// Declares a canvas backend.
+///
+/// Generates the wrapper struct, its `Send` impl, the
+/// `(pub(crate)) new` constructor that calls the backend-specific
+/// `tvg_*canvas_create`, the inherent canvas ops, the [`Canvas`]
+/// trait impl that forwards to them, plus `Debug` and `Drop`.
+///
+/// Backend-specific `set_target` methods live in their own
+/// `impl Foo<'_>` blocks below — the macro only handles the parts
+/// that are byte-for-byte identical across SW/GL/WG.
+macro_rules! impl_canvas {
+    (
+        $(#[$meta:meta])*
+        $ty:ident, $create_fn:ident
+    ) => {
+        $(#[$meta])*
+        pub struct $ty<'eng> {
+            raw: sys::Tvg_Canvas,
+            _engine: core::marker::PhantomData<&'eng ()>,
+        }
+
+        // SAFETY: each canvas exclusively owns a heap-allocated
+        // `Tvg_Canvas`.  The C++ engine guards shared global state
+        // (renderer ref-count, memory pool, loader registry) with
+        // internal mutexes (`_rendererMtx`, `ScopedLock` /
+        // `StrictKey`), and per-canvas state is reached only through
+        // `&mut self`.  Transferring sole ownership across threads is
+        // therefore sound.
+        //
+        // The type is intentionally `!Sync`: the raw pointer field
+        // suppresses the auto-`Sync` impl, which is correct —
+        // concurrent shared access to the same C handle would race.
+        unsafe impl Send for $ty<'_> {}
+
         impl $ty<'_> {
+            /// Creates a new canvas with the given engine options.
+            pub(crate) fn new(option: EngineOption) -> Result<Self> {
+                let raw = unsafe { sys::$create_fn(option.to_raw()) };
+                if raw.is_null() {
+                    return Err(Error::Unknown);
+                }
+                Ok(Self {
+                    raw,
+                    _engine: core::marker::PhantomData,
+                })
+            }
+
             /// Adds a paint object to the canvas for rendering.
             ///
             /// Ownership of the paint is transferred to the canvas.
@@ -366,6 +327,12 @@ macro_rules! impl_canvas_ops {
             }
         }
 
+        impl core::fmt::Debug for $ty<'_> {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.debug_struct(stringify!($ty)).finish_non_exhaustive()
+            }
+        }
+
         impl Drop for $ty<'_> {
             fn drop(&mut self) {
                 unsafe {
@@ -376,63 +343,112 @@ macro_rules! impl_canvas_ops {
     };
 }
 
-impl_canvas_ops!(SwCanvas);
+// ── SwCanvas ───────────────────────────────────────────────────────
+
+impl_canvas! {
+    /// A software-rendered canvas.
+    ///
+    /// This canvas uses the CPU engine for rendering.
+    ///
+    /// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
+    /// instance. Create canvases via [`Thorvg::sw_canvas()`](crate::Thorvg::sw_canvas).
+    ///
+    /// # Thread Safety
+    ///
+    /// `SwCanvas` is [`Send`] but not [`Sync`]: you may move it to another
+    /// thread, but you must not share references across threads.  All
+    /// mutation goes through `&mut self`, so the borrow checker enforces
+    /// exclusive access at compile time.
+    SwCanvas, tvg_swcanvas_create
+}
+
+impl SwCanvas<'_> {
+    /// Sets the rendering target buffer.
+    ///
+    /// The buffer must be at least `stride * height` elements, and
+    /// `stride` must be `>= width` (otherwise rows would overlap or
+    /// truncate).
+    ///
+    /// # Safety
+    /// The caller must ensure that `buffer` remains valid and is not moved,
+    /// reallocated, or dropped for the entire lifetime of the canvas (or until
+    /// `set_target` is called again with a different buffer). The canvas stores
+    /// the pointer internally and writes to it during [`draw`](Self::draw) and
+    /// [`sync`](Self::sync).
+    pub unsafe fn set_target(
+        &mut self,
+        buffer: &mut [u32],
+        stride: u32,
+        width: u32,
+        height: u32,
+        colorspace: ColorSpace,
+    ) -> Result<()> {
+        // Stride is the row pitch in pixels and must be at least as
+        // wide as the visible row — otherwise thorvg would write
+        // partial rows that bleed into the next one.
+        if stride < width {
+            return Err(Error::InvalidArguments);
+        }
+        // Check `stride * height` in u64 — the obvious `u32 * u32`
+        // wraps in release (overflow-checks off) and would let a
+        // pathological size pass the bound check, after which thorvg
+        // would compute the same product on its side and read/write
+        // past the buffer.
+        let needed = u64::from(stride).checked_mul(u64::from(height));
+        let Some(needed) = needed else {
+            return Err(Error::InvalidArguments);
+        };
+        if (buffer.len() as u64) < needed {
+            return Err(Error::InvalidArguments);
+        }
+        let result = unsafe {
+            sys::tvg_swcanvas_set_target(
+                self.raw,
+                buffer.as_mut_ptr(),
+                stride,
+                width,
+                height,
+                colorspace.to_raw(),
+            )
+        };
+        Error::from_raw(result)
+    }
+}
 
 // ── GlCanvas ───────────────────────────────────────────────────────
 
-/// An OpenGL/ES-rendered canvas.
-///
-/// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
-/// instance. Create canvases via [`Thorvg::gl_canvas()`](crate::Thorvg::gl_canvas).
-///
-/// # Thread Safety
-///
-/// `GlCanvas` is [`Send`] but not [`Sync`]: you may move it to another
-/// thread, but you must not share references across threads.
-pub struct GlCanvas<'eng> {
-    raw: sys::Tvg_Canvas,
-    _engine: core::marker::PhantomData<&'eng ()>,
+impl_canvas! {
+    /// An OpenGL/ES-rendered canvas.
+    ///
+    /// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
+    /// instance. Create canvases via [`Thorvg::gl_canvas()`](crate::Thorvg::gl_canvas).
+    ///
+    /// # Thread Safety
+    ///
+    /// `GlCanvas` is [`Send`] but not [`Sync`]: you may move it to another
+    /// thread, but you must not share references across threads.
+    GlCanvas, tvg_glcanvas_create
 }
 
-// SAFETY: same rationale as `SwCanvas` — exclusive ownership of a
-// heap-allocated C handle; global state is mutex-protected.
-unsafe impl Send for GlCanvas<'_> {}
-
 impl GlCanvas<'_> {
-    /// Creates a new OpenGL canvas with the given engine options.
-    pub(crate) fn new(option: EngineOption) -> Result<Self> {
-        let raw = unsafe { sys::tvg_glcanvas_create(option.to_raw()) };
-        if raw.is_null() {
-            return Err(Error::Unknown);
-        }
-        Ok(Self {
-            raw,
-            _engine: core::marker::PhantomData,
-        })
-    }
-
     /// Sets the OpenGL drawing target.
     ///
-    /// - `display` — platform-specific display handle (`EGLDisplay`), or `null` for non-EGL.
-    /// - `surface` — platform-specific surface handle (`EGLSurface` / `HDC`), or `null`.
-    /// - `context` — the OpenGL context for rendering.
-    /// - `id` — GL target ID (FBO ID), `0` for the main surface.
-    /// - `w`, `h` — dimensions in pixels.
-    /// - `colorspace` — pixel format (currently only `ABGR8888S` as `GL_RGBA8`).
+    /// See [`GlTarget`] for the parameter layout.
     ///
     /// # Safety
-    /// The caller must ensure the provided pointers are valid GL/EGL handles.
-    #[allow(clippy::too_many_arguments)]
-    pub unsafe fn set_target(
-        &mut self,
-        display: *mut core::ffi::c_void,
-        surface: *mut core::ffi::c_void,
-        context: *mut core::ffi::c_void,
-        id: i32,
-        w: u32,
-        h: u32,
-        colorspace: ColorSpace,
-    ) -> Result<()> {
+    /// The caller must ensure the pointer fields of `target` are
+    /// valid GL/EGL handles (or null where allowed; see
+    /// [`GlTarget`]).
+    pub unsafe fn set_target(&mut self, target: GlTarget) -> Result<()> {
+        let GlTarget {
+            display,
+            surface,
+            context,
+            id,
+            width,
+            height,
+            colorspace,
+        } = target;
         Error::from_raw(unsafe {
             sys::tvg_glcanvas_set_target(
                 self.raw,
@@ -440,15 +456,76 @@ impl GlCanvas<'_> {
                 surface,
                 context,
                 id,
-                w,
-                h,
+                width,
+                height,
                 colorspace.to_raw(),
             )
         })
     }
 }
 
-impl_canvas_ops!(GlCanvas);
+/// Parameters for [`GlCanvas::set_target`].
+///
+/// Bundles the seven positional arguments of the underlying
+/// `tvg_glcanvas_set_target(display, surface, context, id, w, h, cs)`
+/// call.  All pointer fields are opaque GL/EGL handles; the
+/// `set_target` method is `unsafe` because the caller is
+/// responsible for handle validity.
+///
+/// Field set is closed; either construct via the [`new`](Self::new)
+/// helper or use a struct literal directly.
+#[derive(Debug, Clone, Copy)]
+pub struct GlTarget {
+    /// Platform-specific display handle (`EGLDisplay` for EGL,
+    /// `null` for non-EGL backends).
+    pub display: *mut core::ffi::c_void,
+    /// Platform-specific surface handle (`EGLSurface` for EGL,
+    /// `HDC` for WGL, `null` if not applicable).
+    pub surface: *mut core::ffi::c_void,
+    /// OpenGL context handle used for rendering.
+    pub context: *mut core::ffi::c_void,
+    /// GL target ID (typically an FBO ID); `0` selects the main
+    /// surface.
+    pub id: i32,
+    /// Target width in pixels.
+    pub width: u32,
+    /// Target height in pixels.
+    pub height: u32,
+    /// Pixel format.  thorvg currently accepts only
+    /// [`ColorSpace::ABGR8888S`] (mapped to `GL_RGBA8`); other
+    /// values are rejected by the engine at runtime.
+    pub colorspace: ColorSpace,
+}
+
+impl GlTarget {
+    /// Builds a [`GlTarget`] from its seven required fields.
+    ///
+    /// All fields are required — unlike [`Rect`](crate::Rect),
+    /// there are no sensible defaults for GL/EGL handles.  This
+    /// constructor exists for callers that prefer positional args
+    /// to a struct literal; both forms produce identical values.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        display: *mut core::ffi::c_void,
+        surface: *mut core::ffi::c_void,
+        context: *mut core::ffi::c_void,
+        id: i32,
+        width: u32,
+        height: u32,
+        colorspace: ColorSpace,
+    ) -> Self {
+        Self {
+            display,
+            surface,
+            context,
+            id,
+            width,
+            height,
+            colorspace,
+        }
+    }
+}
 
 // ── WgCanvas ───────────────────────────────────────────────────────
 
@@ -462,67 +539,46 @@ pub enum WgTargetType {
     Texture = 1,
 }
 
-/// A WebGPU-rendered canvas.
-///
-/// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
-/// instance. Create canvases via [`Thorvg::wg_canvas()`](crate::Thorvg::wg_canvas).
-///
-/// # Thread Safety
-///
-/// `WgCanvas` is [`Send`] but not [`Sync`]: you may move it to another
-/// thread, but you must not share references across threads.
-pub struct WgCanvas<'eng> {
-    raw: sys::Tvg_Canvas,
-    _engine: core::marker::PhantomData<&'eng ()>,
+impl_canvas! {
+    /// A WebGPU-rendered canvas.
+    ///
+    /// The lifetime `'eng` ties this canvas to a [`Thorvg`](crate::Thorvg) engine
+    /// instance. Create canvases via [`Thorvg::wg_canvas()`](crate::Thorvg::wg_canvas).
+    ///
+    /// # Thread Safety
+    ///
+    /// `WgCanvas` is [`Send`] but not [`Sync`]: you may move it to another
+    /// thread, but you must not share references across threads.
+    WgCanvas, tvg_wgcanvas_create
 }
 
-// SAFETY: same rationale as `SwCanvas` — exclusive ownership of a
-// heap-allocated C handle; global state is mutex-protected.
-unsafe impl Send for WgCanvas<'_> {}
-
 impl WgCanvas<'_> {
-    /// Creates a new WebGPU canvas with the given engine options.
-    pub(crate) fn new(option: EngineOption) -> Result<Self> {
-        let raw = unsafe { sys::tvg_wgcanvas_create(option.to_raw()) };
-        if raw.is_null() {
-            return Err(Error::Unknown);
-        }
-        Ok(Self {
-            raw,
-            _engine: core::marker::PhantomData,
-        })
-    }
-
     /// Sets the WebGPU drawing target.
     ///
-    /// - `device` — `WGPUDevice` handle, or `null` to let `ThorVG` assign one.
-    /// - `instance` — `WGPUInstance` context.
-    /// - `target` — `WGPUSurface` or `WGPUTexture` handle.
-    /// - `w`, `h` — dimensions.
-    /// - `colorspace` — pixel format (currently only `ABGR8888S` as `RGBA8Unorm`).
-    /// - `target_type` — whether `target` is a surface or texture.
+    /// See [`WgTarget`] for the parameter layout.
     ///
     /// # Safety
-    /// The caller must ensure the provided pointers are valid WebGPU handles.
-    #[allow(clippy::too_many_arguments)]
-    pub unsafe fn set_target(
-        &mut self,
-        device: *mut core::ffi::c_void,
-        instance: *mut core::ffi::c_void,
-        target: *mut core::ffi::c_void,
-        w: u32,
-        h: u32,
-        colorspace: ColorSpace,
-        target_type: WgTargetType,
-    ) -> Result<()> {
+    /// The caller must ensure the pointer fields of `target` are
+    /// valid WebGPU handles (or null where allowed; see
+    /// [`WgTarget`]).
+    pub unsafe fn set_target(&mut self, target: WgTarget) -> Result<()> {
+        let WgTarget {
+            device,
+            instance,
+            target: target_handle,
+            width,
+            height,
+            colorspace,
+            target_type,
+        } = target;
         Error::from_raw(unsafe {
             sys::tvg_wgcanvas_set_target(
                 self.raw,
                 device,
                 instance,
-                target,
-                w,
-                h,
+                target_handle,
+                width,
+                height,
                 colorspace.to_raw(),
                 target_type as i32,
             )
@@ -530,22 +586,58 @@ impl WgCanvas<'_> {
     }
 }
 
-impl_canvas_ops!(WgCanvas);
-
-impl core::fmt::Debug for SwCanvas<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SwCanvas").finish_non_exhaustive()
-    }
+/// Parameters for [`WgCanvas::set_target`].
+///
+/// Bundles the seven positional arguments of the underlying
+/// `tvg_wgcanvas_set_target(device, instance, target, w, h, cs, type)`
+/// call.  All pointer fields are opaque WebGPU handles; the
+/// `set_target` method is `unsafe` because the caller is
+/// responsible for handle validity.
+#[derive(Debug, Clone, Copy)]
+pub struct WgTarget {
+    /// `WGPUDevice` handle, or `null` to let thorvg assign one
+    /// internally.
+    pub device: *mut core::ffi::c_void,
+    /// `WGPUInstance` context handle.
+    pub instance: *mut core::ffi::c_void,
+    /// Presentable target: either a `WGPUSurface` or a
+    /// `WGPUTexture`, discriminated by [`target_type`](Self::target_type).
+    pub target: *mut core::ffi::c_void,
+    /// Target width in pixels.
+    pub width: u32,
+    /// Target height in pixels.
+    pub height: u32,
+    /// Pixel format.  thorvg currently accepts only
+    /// [`ColorSpace::ABGR8888S`] (mapped to `WGPUTextureFormat_RGBA8Unorm`).
+    pub colorspace: ColorSpace,
+    /// Whether [`target`](Self::target) is a surface or texture.
+    pub target_type: WgTargetType,
 }
 
-impl core::fmt::Debug for GlCanvas<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("GlCanvas").finish_non_exhaustive()
-    }
-}
-
-impl core::fmt::Debug for WgCanvas<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("WgCanvas").finish_non_exhaustive()
+impl WgTarget {
+    /// Builds a [`WgTarget`] from its seven required fields.
+    ///
+    /// See [`GlTarget::new`] for the rationale on positional vs
+    /// struct-literal construction.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        device: *mut core::ffi::c_void,
+        instance: *mut core::ffi::c_void,
+        target: *mut core::ffi::c_void,
+        width: u32,
+        height: u32,
+        colorspace: ColorSpace,
+        target_type: WgTargetType,
+    ) -> Self {
+        Self {
+            device,
+            instance,
+            target,
+            width,
+            height,
+            colorspace,
+            target_type,
+        }
     }
 }
