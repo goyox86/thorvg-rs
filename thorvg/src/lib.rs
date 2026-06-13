@@ -108,7 +108,7 @@ pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
 pub use color::{ColorSpace, Rgb, Rgba};
 pub use scene::{BlurBorder, BlurDirection, DropShadow, Scene, Tint, Tritone};
-pub use shape::{Circle, FillRule, Rect, Shape, StrokeCap, StrokeJoin};
+pub use shape::{Circle, FillRule, PaintOrder, Rect, Shape, StrokeCap, StrokeJoin};
 pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 
 use thorvg_sys as sys;

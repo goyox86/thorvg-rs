@@ -427,6 +427,16 @@ fn test_shape_fill_rule_roundtrip() {
 }
 
 #[test]
+fn test_shape_set_paint_order_accepts_both_orders() {
+    // `set_paint_order` takes a `PaintOrder` (no C getter exists);
+    // verify both variants reach the engine without error.
+    let engine = Thorvg::init(0).unwrap();
+    let mut shape = engine.shape().unwrap();
+    shape.set_paint_order(PaintOrder::StrokeThenFill).unwrap();
+    shape.set_paint_order(PaintOrder::FillThenStroke).unwrap();
+}
+
+#[test]
 fn test_paint_opacity_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
     let mut shape = engine.shape().unwrap();

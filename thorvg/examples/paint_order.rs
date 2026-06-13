@@ -8,7 +8,7 @@
 
 mod common;
 
-use thorvg::{ColorSpace, EngineOption, StrokeCap, Rgba, Circle, Rect, Thorvg};
+use thorvg::{ColorSpace, EngineOption, PaintOrder, StrokeCap, Rgba, Circle, Rect, Thorvg};
 
 fn main() {
     let engine = Thorvg::init(0).unwrap();
@@ -39,7 +39,7 @@ fn main() {
     s2.set_fill_color(Rgba::new(100, 150, 255, 255)).unwrap();
     s2.set_stroke_width(12.0).unwrap();
     s2.set_stroke_color(Rgba::new(255, 80, 80, 255)).unwrap();
-    s2.set_paint_order(true).unwrap(); // stroke first
+    s2.set_paint_order(PaintOrder::StrokeThenFill).unwrap();
     canvas.add(s2).unwrap();
 
     // ── Trim path: show partial path ───────────────────────────────

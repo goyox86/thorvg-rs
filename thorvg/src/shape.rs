@@ -239,6 +239,28 @@ impl StrokeJoin {
     }
 }
 
+/// Rendering order of a shape's fill and stroke.
+///
+/// Models the `strokeFirst` boolean of the C
+/// `tvg_shape_set_paint_order` as a named two-state choice, so call
+/// sites read `set_paint_order(PaintOrder::StrokeThenFill)` instead of
+/// a bare `true`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PaintOrder {
+    /// Fill is painted first, then the stroke on top — the engine
+    /// default.
+    FillThenStroke,
+    /// Stroke is painted first, then the fill on top.
+    StrokeThenFill,
+}
+
+impl PaintOrder {
+    /// Maps to the C `strokeFirst` flag.
+    fn to_raw(self) -> bool {
+        matches!(self, PaintOrder::StrokeThenFill)
+    }
+}
+
 /// A two-dimensional shape with path, fill, and stroke properties.
 ///
 /// The lifetime `'eng` ties this shape to a [`Thorvg`](crate::Thorvg) engine
@@ -519,9 +541,9 @@ impl Shape<'_> {
         Ok(Some(unsafe { BorrowedGradient::from_raw(grad) }?))
     }
 
-    /// Sets the rendering order of stroke and fill.
-    pub fn set_paint_order(&mut self, stroke_first: bool) -> Result<()> {
-        Error::from_raw(unsafe { sys::tvg_shape_set_paint_order(self.raw, stroke_first) })
+    /// Sets the rendering order of fill and stroke.  See [`PaintOrder`].
+    pub fn set_paint_order(&mut self, order: PaintOrder) -> Result<()> {
+        Error::from_raw(unsafe { sys::tvg_shape_set_paint_order(self.raw, order.to_raw()) })
     }
 
     // ── Stroke ─────────────────────────────────────────────────────
