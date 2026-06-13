@@ -35,20 +35,8 @@ fn main() {
     linear_grad.set_bounds(50.0, 50.0, 350.0, 200.0).unwrap();
     linear_grad
         .set_color_stops(&[
-            ColorStop {
-                offset: 0.0,
-                r: 255,
-                g: 0,
-                b: 0,
-                a: 255,
-            },
-            ColorStop {
-                offset: 1.0,
-                r: 0,
-                g: 0,
-                b: 255,
-                a: 255,
-            },
+            ColorStop { offset: 0.0, color: Rgba::new(255, 0, 0, 255) },
+            ColorStop { offset: 1.0, color: Rgba::new(0, 0, 255, 255) },
         ])
         .unwrap();
 
@@ -64,34 +52,10 @@ fn main() {
     rainbow_grad.set_bounds(50.0, 250.0, 350.0, 250.0).unwrap();
     rainbow_grad
         .set_color_stops(&[
-            ColorStop {
-                offset: 0.0,
-                r: 255,
-                g: 0,
-                b: 0,
-                a: 255,
-            },
-            ColorStop {
-                offset: 0.33,
-                r: 255,
-                g: 255,
-                b: 0,
-                a: 255,
-            },
-            ColorStop {
-                offset: 0.66,
-                r: 0,
-                g: 255,
-                b: 0,
-                a: 255,
-            },
-            ColorStop {
-                offset: 1.0,
-                r: 0,
-                g: 0,
-                b: 255,
-                a: 255,
-            },
+            ColorStop { offset: 0.0, color: Rgba::new(255, 0, 0, 255) },
+            ColorStop { offset: 0.33, color: Rgba::new(255, 255, 0, 255) },
+            ColorStop { offset: 0.66, color: Rgba::new(0, 255, 0, 255) },
+            ColorStop { offset: 1.0, color: Rgba::new(0, 0, 255, 255) },
         ])
         .unwrap();
     rainbow_grad.set_spread(FillSpread::Pad).unwrap();
@@ -110,27 +74,9 @@ fn main() {
         .unwrap();
     radial_grad
         .set_color_stops(&[
-            ColorStop {
-                offset: 0.0,
-                r: 255,
-                g: 255,
-                b: 255,
-                a: 255,
-            },
-            ColorStop {
-                offset: 0.5,
-                r: 255,
-                g: 200,
-                b: 0,
-                a: 255,
-            },
-            ColorStop {
-                offset: 1.0,
-                r: 200,
-                g: 0,
-                b: 0,
-                a: 255,
-            },
+            ColorStop { offset: 0.0, color: Rgba::new(255, 255, 255, 255) },
+            ColorStop { offset: 0.5, color: Rgba::new(255, 200, 0, 255) },
+            ColorStop { offset: 1.0, color: Rgba::new(200, 0, 0, 255) },
         ])
         .unwrap();
 
@@ -148,20 +94,8 @@ fn main() {
         .unwrap();
     focal_grad
         .set_color_stops(&[
-            ColorStop {
-                offset: 0.0,
-                r: 0,
-                g: 255,
-                b: 0,
-                a: 255,
-            },
-            ColorStop {
-                offset: 1.0,
-                r: 0,
-                g: 0,
-                b: 128,
-                a: 255,
-            },
+            ColorStop { offset: 0.0, color: Rgba::new(0, 255, 0, 255) },
+            ColorStop { offset: 1.0, color: Rgba::new(0, 0, 128, 255) },
         ])
         .unwrap();
 

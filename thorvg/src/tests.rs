@@ -245,20 +245,8 @@ fn test_gradient_ownership_transfer_to_shape() {
     let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(0.0, 0.0, 100.0, 100.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop {
-            offset: 0.0,
-            r: 255,
-            g: 0,
-            b: 0,
-            a: 255,
-        },
-        ColorStop {
-            offset: 1.0,
-            r: 0,
-            g: 0,
-            b: 255,
-            a: 255,
-        },
+        ColorStop { offset: 0.0, color: Rgba::new(255, 0, 0, 255) },
+        ColorStop { offset: 1.0, color: Rgba::new(0, 0, 255, 255) },
     ])
     .unwrap();
 
@@ -278,20 +266,8 @@ fn test_gradient_not_transferred_is_freed() {
     let mut grad = engine.radial_gradient().unwrap();
     grad.set_radial(50.0, 50.0, 30.0, 50.0, 50.0, 0.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop {
-            offset: 0.0,
-            r: 255,
-            g: 255,
-            b: 255,
-            a: 255,
-        },
-        ColorStop {
-            offset: 1.0,
-            r: 0,
-            g: 0,
-            b: 0,
-            a: 255,
-        },
+        ColorStop { offset: 0.0, color: Rgba::new(255, 255, 255, 255) },
+        ColorStop { offset: 1.0, color: Rgba::new(0, 0, 0, 255) },
     ])
     .unwrap();
     // Dropped here — must be freed by gradient_del
@@ -304,27 +280,9 @@ fn test_gradient_duplicate() {
     let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(0.0, 0.0, 200.0, 200.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop {
-            offset: 0.0,
-            r: 255,
-            g: 0,
-            b: 0,
-            a: 255,
-        },
-        ColorStop {
-            offset: 0.5,
-            r: 0,
-            g: 255,
-            b: 0,
-            a: 255,
-        },
-        ColorStop {
-            offset: 1.0,
-            r: 0,
-            g: 0,
-            b: 255,
-            a: 255,
-        },
+        ColorStop { offset: 0.0, color: Rgba::new(255, 0, 0, 255) },
+        ColorStop { offset: 0.5, color: Rgba::new(0, 255, 0, 255) },
+        ColorStop { offset: 1.0, color: Rgba::new(0, 0, 255, 255) },
     ])
     .unwrap();
 
@@ -681,36 +639,16 @@ fn test_gradient_color_stops_roundtrip() {
     let engine = Thorvg::init(0).unwrap();
     let mut grad = engine.linear_gradient().unwrap();
     let stops = [
-        ColorStop {
-            offset: 0.0,
-            r: 10,
-            g: 20,
-            b: 30,
-            a: 40,
-        },
-        ColorStop {
-            offset: 0.5,
-            r: 100,
-            g: 110,
-            b: 120,
-            a: 130,
-        },
-        ColorStop {
-            offset: 1.0,
-            r: 200,
-            g: 210,
-            b: 220,
-            a: 230,
-        },
+        ColorStop { offset: 0.0, color: Rgba::new(10, 20, 30, 40) },
+        ColorStop { offset: 0.5, color: Rgba::new(100, 110, 120, 130) },
+        ColorStop { offset: 1.0, color: Rgba::new(200, 210, 220, 230) },
     ];
     grad.set_color_stops(&stops).unwrap();
     let got = grad.color_stops().unwrap();
     assert_eq!(got.len(), 3);
     for (a, b) in stops.iter().zip(got.iter()) {
         assert!((a.offset - b.offset).abs() < f32::EPSILON);
-        assert_eq!(a.r, b.r);
-        assert_eq!(a.g, b.g);
-        assert_eq!(a.b, b.b);
+        assert_eq!(a.color, b.color);
     }
 }
 

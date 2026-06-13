@@ -32,27 +32,9 @@ fn main() {
     let mut grad = engine.linear_gradient().unwrap();
     grad.set_bounds(50.0, 50.0, 350.0, 250.0).unwrap();
     grad.set_color_stops(&[
-        ColorStop {
-            offset: 0.0,
-            r: 64,
-            g: 0,
-            b: 128,
-            a: 255,
-        },
-        ColorStop {
-            offset: 0.5,
-            r: 0,
-            g: 128,
-            b: 255,
-            a: 255,
-        },
-        ColorStop {
-            offset: 1.0,
-            r: 0,
-            g: 255,
-            b: 128,
-            a: 255,
-        },
+        ColorStop { offset: 0.0, color: Rgba::new(64, 0, 128, 255) },
+        ColorStop { offset: 0.5, color: Rgba::new(0, 128, 255, 255) },
+        ColorStop { offset: 1.0, color: Rgba::new(0, 255, 128, 255) },
     ])
     .unwrap();
 

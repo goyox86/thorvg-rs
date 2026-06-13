@@ -1,18 +1,30 @@
 use alloc::vec::Vec;
 use core::mem;
 
+use crate::color::Rgba;
 use crate::error::{Error, Result};
 use crate::paint::{Matrix, PaintType};
 use thorvg_sys as sys;
 
 /// A color stop in a gradient.
-#[derive(Debug, Clone, Copy)]
+///
+/// Field set is closed; literal construction
+/// (`ColorStop { offset, color }`) and [`ColorStop::new`] both work.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColorStop {
+    /// Position along the gradient, normalised to `[0.0, 1.0]`.
     pub offset: f32,
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-    pub a: u8,
+    /// Color at this stop.
+    pub color: Rgba,
+}
+
+impl ColorStop {
+    /// Builds a [`ColorStop`] at `offset` (normalised `[0.0, 1.0]`)
+    /// with the given color.
+    #[must_use]
+    pub const fn new(offset: f32, color: Rgba) -> Self {
+        Self { offset, color }
+    }
 }
 
 /// How to fill the area outside the gradient bounds.
@@ -30,8 +42,11 @@ pub struct ColorStop {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FillSpread {
+    /// Clamp to the edge colors beyond the gradient bounds.
     Pad,
+    /// Mirror the gradient on each repetition.
     Reflect,
+    /// Tile the gradient, restarting from the first stop.
     Repeat,
 }
 
@@ -503,10 +518,10 @@ fn set_color_stops_raw(raw: sys::Tvg_Gradient, stops: &[ColorStop]) -> Result<()
         .iter()
         .map(|s| sys::Tvg_Color_Stop {
             offset: s.offset,
-            r: s.r,
-            g: s.g,
-            b: s.b,
-            a: s.a,
+            r: s.color.r,
+            g: s.color.g,
+            b: s.color.b,
+            a: s.color.a,
         })
         .collect();
     Error::from_raw(unsafe {
@@ -526,10 +541,7 @@ fn get_color_stops_raw(raw: sys::Tvg_Gradient) -> Result<Vec<ColorStop>> {
         .iter()
         .map(|s| ColorStop {
             offset: s.offset,
-            r: s.r,
-            g: s.g,
-            b: s.b,
-            a: s.a,
+            color: Rgba::new(s.r, s.g, s.b, s.a),
         })
         .collect())
 }
