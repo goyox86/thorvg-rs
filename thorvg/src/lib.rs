@@ -113,9 +113,12 @@ pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};
 
 use thorvg_sys as sys;
 
-#[cfg(test)]
-mod tests;
-
+// Public-API ("black-box") tests live in `tests/integration.rs` — they
+// touch no crate-private items, so they belong in `tests/` rather than
+// an in-crate `#[cfg(test)]` module.  The one exception is below: the
+// no-`threads` `init()` signature can only be exercised under
+// `not(feature = "threads")`, which the threads-gated integration suite
+// cannot cover, so it stays inline here.
 #[cfg(all(test, not(feature = "threads")))]
 mod tests_no_threads {
     use super::Thorvg;

@@ -1,11 +1,34 @@
+//! Integration tests for the public `thorvg` API.
+//!
+//! These are black-box tests: they depend on the crate exactly as a
+//! downstream user does (`use thorvg::*`) and touch only the public
+//! surface — none reach into crate-private items, which is why they
+//! live here rather than in `#[cfg(test)]` modules inside `src/`.
+//!
+//! # Why a single file (not one per source module)
+//!
+//! Cargo compiles and links **each** `tests/*.rs` as its own separate
+//! test binary.  This crate links `thorvg-sys`, which statically
+//! embeds the entire ThorVG C++ engine — a large archive.  Splitting
+//! these tests across several `tests/` files would relink that whole
+//! engine once per file, multiplying link time for no benefit.
+//! Keeping every test in this one file links the engine exactly once.
+//! (It also gives the cross-cutting tests — canvas + shape + scene,
+//! trait dispatch, ownership transfer between paint types — a single
+//! natural home, and lets the `threads`-feature gate below cover the
+//! whole suite with one attribute.)
+//!
+//! `extern crate alloc;` is retained so the test bodies keep the
+//! `alloc::`-qualified paths from when this suite was an in-crate
+//! `#![no_std]` module; `alloc` is available unchanged inside the
+//! `std`-linked test binary.
 #![cfg(feature = "threads")]
 #![allow(clippy::cast_precision_loss)]
 
 extern crate alloc;
-extern crate std;
 
-use crate::*;
 use alloc::vec;
+use thorvg::*;
 
 // ── Engine & Version ───────────────────────────────────────────────
 
@@ -1027,7 +1050,7 @@ fn test_asset_resolver_returns_bytes_path() {
     // the trampoline succeeds and we cover the
     // `r == TVG_RESULT_SUCCESS` branch.  The fixture lives under
     // `thorvg/tests/assets/` (CC0; see the README in that dir).
-    const LOGO_PNG: &[u8] = include_bytes!("../tests/assets/logo.png");
+    const LOGO_PNG: &[u8] = include_bytes!("assets/logo.png");
 
     let engine = Thorvg::init(0).unwrap();
     let mut lottie = engine.lottie_animation().unwrap();
