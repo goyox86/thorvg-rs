@@ -199,17 +199,30 @@ impl LottieAnimation<'_> {
 
     // ── Expressions ────────────────────────────────────────────────
 
-    /// Updates the value of an expression variable for a specific layer.
-    pub fn assign(&mut self, layer: &str, ix: u32, var: &str, val: f32) -> Result<()> {
+    /// Updates the value of an expression variable on a layer.
+    ///
+    /// * `layer` — name of the layer holding the variable.
+    /// * `property_index` — index of the property within that layer.
+    /// * `variable` — name of the variable to update.
+    /// * `value` — new value to assign.
+    ///
+    /// Wraps the experimental `tvg_lottie_animation_assign` C API.
+    pub fn assign(
+        &mut self,
+        layer: &str,
+        property_index: u32,
+        variable: &str,
+        value: f32,
+    ) -> Result<()> {
         let c_layer = CString::new(layer).map_err(|_| Error::InvalidArguments)?;
-        let c_var = CString::new(var).map_err(|_| Error::InvalidArguments)?;
+        let c_var = CString::new(variable).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe {
             sys::tvg_lottie_animation_assign(
                 self.inner.raw(),
                 c_layer.as_ptr(),
-                ix,
+                property_index,
                 c_var.as_ptr(),
-                val,
+                value,
             )
         })
     }
