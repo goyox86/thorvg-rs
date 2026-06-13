@@ -94,8 +94,7 @@ mod text;
 pub use accessor::{Accessor, BorrowedAccessor};
 pub use animation::Animation;
 pub use canvas::{
-    Canvas, ColorSpace, EngineOption, GlCanvas, GlTarget, SwCanvas, WgCanvas, WgTarget,
-    WgTargetType,
+    Canvas, EngineOption, GlCanvas, GlTarget, SwCanvas, WgCanvas, WgTarget, WgTargetType,
 };
 pub use error::{Error, Result};
 pub use gradient::{
@@ -107,7 +106,7 @@ pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType
 pub use path::{Path, PathCommand, Segment, Segments};
 pub use picture::{FilterMethod, MimeType, Picture};
 pub use saver::Saver;
-pub use color::{Rgb, Rgba};
+pub use color::{ColorSpace, Rgb, Rgba};
 pub use scene::{BlurBorder, BlurDirection, DropShadow, Scene, Tint, Tritone};
 pub use shape::{Circle, FillRule, Rect, Shape, StrokeCap, StrokeJoin};
 pub use text::{GlyphMetrics, Text, TextMetrics, TextWrap};

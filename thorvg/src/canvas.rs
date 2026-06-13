@@ -1,3 +1,4 @@
+use crate::color::ColorSpace;
 use crate::error::{Error, Result};
 use crate::paint::Paint;
 use thorvg_sys as sys;
@@ -10,31 +11,6 @@ use thorvg_sys as sys;
 /// owned by the engine.
 mod sealed {
     pub trait Sealed {}
-}
-
-/// Color space for the rendering buffer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ColorSpace {
-    /// Alpha, Blue, Green, Red (premultiplied alpha).
-    ABGR8888,
-    /// Alpha, Red, Green, Blue (premultiplied alpha).
-    ARGB8888,
-    /// Alpha, Blue, Green, Red (straight alpha).
-    ABGR8888S,
-    /// Alpha, Red, Green, Blue (straight alpha).
-    ARGB8888S,
-}
-
-impl ColorSpace {
-    pub(crate) fn to_raw(self) -> sys::Tvg_Colorspace {
-        match self {
-            ColorSpace::ABGR8888 => sys::Tvg_Colorspace::TVG_COLORSPACE_ABGR8888,
-            ColorSpace::ARGB8888 => sys::Tvg_Colorspace::TVG_COLORSPACE_ARGB8888,
-            ColorSpace::ABGR8888S => sys::Tvg_Colorspace::TVG_COLORSPACE_ABGR8888S,
-            ColorSpace::ARGB8888S => sys::Tvg_Colorspace::TVG_COLORSPACE_ARGB8888S,
-        }
-    }
 }
 
 /// Engine rendering option, selected per canvas at creation.
