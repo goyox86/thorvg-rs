@@ -150,8 +150,18 @@ impl Default for Matrix {
 /// A point in 2D space.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
+    /// X coordinate.
     pub x: f32,
+    /// Y coordinate.
     pub y: f32,
+}
+
+impl Point {
+    /// Builds a [`Point`] from its coordinates.
+    #[must_use]
+    pub const fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
 }
 
 /// Blending method for compositing paint objects.
@@ -167,22 +177,39 @@ pub struct Point {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum BlendMethod {
+    /// Source is drawn over the destination (the default, no blending).
     Normal = 0,
+    /// Multiplies source and destination — always darkens.
     Multiply,
+    /// Inverse-multiplies — always lightens.
     Screen,
+    /// `Multiply` in dark areas, `Screen` in light areas.
     Overlay,
+    /// Keeps the darker of source and destination per channel.
     Darken,
+    /// Keeps the lighter of source and destination per channel.
     Lighten,
+    /// Brightens the destination to reflect the source.
     ColorDodge,
+    /// Darkens the destination to reflect the source.
     ColorBurn,
+    /// `Overlay` with source and destination swapped.
     HardLight,
+    /// A softer variant of `HardLight`.
     SoftLight,
+    /// Absolute difference of source and destination per channel.
     Difference,
+    /// Like `Difference` but with lower contrast.
     Exclusion,
+    /// Hue of the source with destination saturation and luminosity.
     Hue,
+    /// Saturation of the source with destination hue and luminosity.
     Saturation,
+    /// Hue and saturation of the source with destination luminosity.
     Color,
+    /// Luminosity of the source with destination hue and saturation.
     Luminosity,
+    /// Additive blending — sums source and destination per channel.
     Add,
 }
 
@@ -215,16 +242,27 @@ impl BlendMethod {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum MaskMethod {
+    /// No masking applied.
     None = 0,
+    /// Masks by the target's alpha channel.
     Alpha,
+    /// Masks by the inverse of the target's alpha channel.
     InvAlpha,
+    /// Masks by the target's luminance.
     Luma,
+    /// Masks by the inverse of the target's luminance.
     InvLuma,
+    /// Adds the target's coverage to the source.
     Add,
+    /// Subtracts the target's coverage from the source.
     Subtract,
+    /// Keeps only where source and target overlap.
     Intersect,
+    /// Keeps the non-overlapping coverage of source and target.
     Difference,
+    /// Keeps the lighter coverage of source and target.
     Lighten,
+    /// Keeps the darker coverage of source and target.
     Darken,
 }
 
@@ -333,12 +371,19 @@ impl core::fmt::Debug for BorrowedPaint<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum PaintType {
+    /// Unknown or unset type.
     Undefined,
+    /// A [`Shape`](crate::Shape).
     Shape,
+    /// A [`Scene`](crate::Scene).
     Scene,
+    /// A [`Picture`](crate::Picture).
     Picture,
+    /// A [`Text`](crate::Text).
     Text,
+    /// A [`LinearGradient`](crate::LinearGradient).
     LinearGradient,
+    /// A [`RadialGradient`](crate::RadialGradient).
     RadialGradient,
 }
 
