@@ -772,7 +772,19 @@ fn test_saver_save_animation_ownership_transfer() {
     let anim = engine.animation().unwrap();
     let r = saver.save_animation_to_str(anim, "/tmp/thorvg-rs-test.gif", 100, 30);
     assert!(r.is_err()); // InsufficientCondition — no frames loaded
-                         // `anim` was moved into the call; no Drop runs on freed memory.
+    // `anim` was moved into the call; no Drop runs on freed memory.
+}
+
+// ── Text API ───────────────────────────────────────────────────────
+
+#[test]
+fn test_text_set_color_and_outline_accept_rgb() {
+    // `set_color` / `set_outline` take `Rgb` (text is RGB-only, no
+    // alpha).  Verify both reach the engine without error.
+    let engine = Thorvg::init(0).unwrap();
+    let mut text = engine.text().unwrap();
+    text.set_color(Rgb::new(255, 128, 0)).unwrap();
+    text.set_outline(2.0, Rgb::new(0, 0, 0)).unwrap();
 }
 
 // ── Text font loading ──────────────────────────────────────────────
@@ -799,8 +811,8 @@ fn test_load_font_data_static_zero_copy() {
     // returns &'static [u8; N], so it coerces to &'static [u8] and
     // thorvg can borrow the buffer for the engine's lifetime
     // without copying.
-    let engine = Thorvg::init(0).unwrap();
     static FONT: &[u8] = include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf");
+    let engine = Thorvg::init(0).unwrap();
     engine
         .load_font_data_static("Arial-Static", FONT, None)
         .unwrap();

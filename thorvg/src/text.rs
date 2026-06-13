@@ -1,5 +1,6 @@
 use alloc::ffi::CString;
 
+use crate::color::Rgb;
 use crate::error::{Error, Result};
 use crate::gradient::{LinearGradient, RadialGradient};
 use crate::paint::{Paint, Point};
@@ -9,10 +10,16 @@ use thorvg_sys as sys;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TextWrap {
+    /// No wrapping; text overflows the layout box.
     None,
+    /// Break at any character that exceeds the layout width.
     Character,
+    /// Break at word boundaries (whitespace).
     Word,
+    /// Word-aware wrapping that falls back to character breaks for
+    /// words too long to fit a line.
     Smart,
+    /// Truncate overflowing text and append an ellipsis (`…`).
     Ellipsis,
 }
 
@@ -31,18 +38,28 @@ impl TextWrap {
 /// Font metrics for a text object.
 #[derive(Debug, Clone, Copy)]
 pub struct TextMetrics {
+    /// Distance from the baseline to the top of the tallest glyph.
     pub ascent: f32,
+    /// Distance from the baseline to the bottom of the lowest glyph
+    /// (typically negative).
     pub descent: f32,
+    /// Recommended vertical gap between consecutive lines.
     pub linegap: f32,
+    /// Horizontal advance for the whole text run.
     pub advance: f32,
 }
 
 /// Layout metrics of a glyph.
 #[derive(Debug, Clone, Copy)]
 pub struct GlyphMetrics {
+    /// Horizontal advance to the next glyph's origin.
     pub advance: f32,
+    /// Left side bearing — offset from the origin to the glyph's
+    /// left edge.
     pub bearing: f32,
+    /// Top-left corner of the glyph's bounding box.
     pub min: Point,
+    /// Bottom-right corner of the glyph's bounding box.
     pub max: Point,
 }
 
@@ -92,7 +109,12 @@ impl Text<'_> {
     }
 
     /// Sets the text fill color.
-    pub fn set_color(&mut self, r: u8, g: u8, b: u8) -> Result<()> {
+    ///
+    /// Text color is RGB only (no alpha), so this takes [`Rgb`] rather
+    /// than [`Rgba`](crate::Rgba); use [`Paint::set_opacity`] for
+    /// translucency.
+    pub fn set_color(&mut self, color: Rgb) -> Result<()> {
+        let Rgb { r, g, b } = color;
         Error::from_raw(unsafe { sys::tvg_text_set_color(self.raw, r, g, b) })
     }
 
@@ -127,7 +149,11 @@ impl Text<'_> {
     }
 
     /// Sets an outline (stroke) around the text.
-    pub fn set_outline(&mut self, width: f32, r: u8, g: u8, b: u8) -> Result<()> {
+    ///
+    /// The outline color is RGB only (no alpha), matching
+    /// [`set_color`](Self::set_color).
+    pub fn set_outline(&mut self, width: f32, color: Rgb) -> Result<()> {
+        let Rgb { r, g, b } = color;
         Error::from_raw(unsafe { sys::tvg_text_set_outline(self.raw, width, r, g, b) })
     }
 
