@@ -33,7 +33,7 @@ fn test_init_signature_with_threads() {
 fn test_canvas_create_destroy() {
     let engine = Thorvg::init(0).unwrap();
     // Canvas should be created and dropped without issues
-    let canvas = engine.sw_canvas(EngineOption::DEFAULT);
+    let canvas = engine.sw_canvas(EngineOption::Default);
     assert!(canvas.is_ok());
     // Implicit drop here
 }
@@ -49,7 +49,7 @@ fn test_canvas_trait_generic_dispatch() {
     }
 
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 50 * 50];
     unsafe { canvas.set_target(&mut buffer, 50, 50, 50, ColorSpace::ABGR8888) }.unwrap();
 
@@ -67,34 +67,29 @@ fn test_canvas_trait_generic_dispatch() {
 }
 
 #[test]
-fn test_engine_option_bitflags_round_trip() {
-    // The C `Tvg_Engine_Option` is a power-of-two bitfield (NONE = 0,
-    // DEFAULT = 1, SMART_RENDER = 2) intended to be OR-combined.  The
-    // wrapper exposes it as a bitflags newtype; verify here that the
-    // combination actually reaches the engine end-to-end (i.e. the C
-    // ABI accepts the OR'd value, the engine returns a non-null
-    // canvas), and that the Rust-side query helpers see the expected
-    // bits.
-    let combined = EngineOption::DEFAULT | EngineOption::SMART_RENDER;
-    assert!(combined.contains(EngineOption::DEFAULT));
-    assert!(combined.contains(EngineOption::SMART_RENDER));
-    assert!(!EngineOption::DEFAULT.contains(EngineOption::SMART_RENDER));
-    assert_eq!(EngineOption::default(), EngineOption::DEFAULT);
-    assert_eq!(EngineOption::empty(), EngineOption::NONE);
+fn test_engine_option_round_trip() {
+    // `EngineOption` mirrors the C++ `enum struct EngineOption`
+    // exactly: three mutually-exclusive values, compared by the engine
+    // by value rather than as a bitmask.  Verify the derived `Default`
+    // matches the `Default` variant and that every variant reaches the
+    // engine end-to-end (the C ABI accepts it and the engine returns a
+    // non-null canvas).
+    assert_eq!(EngineOption::default(), EngineOption::Default);
 
     let engine = Thorvg::init(0).unwrap();
-    // Pass the combined value to the actual canvas constructor;
-    // this exercises the new `bitfield_enum` bindgen path — a
-    // `rustified_enum` would have refused to round-trip the OR'd
-    // discriminant.
-    let canvas = engine.sw_canvas(combined);
-    assert!(canvas.is_ok());
+    for opt in [
+        EngineOption::None,
+        EngineOption::Default,
+        EngineOption::SmartRender,
+    ] {
+        assert!(engine.sw_canvas(opt).is_ok(), "sw_canvas rejected {opt:?}");
+    }
 }
 
 #[test]
 fn test_canvas_draw_shape() {
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let (width, height) = (100u32, 100u32);
     let mut buffer = vec![0u32; (width * height) as usize];
 
@@ -119,7 +114,7 @@ fn test_canvas_draw_shape() {
 #[test]
 fn test_canvas_clear_all() {
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
@@ -150,7 +145,7 @@ fn test_sw_canvas_set_target_rejects_stride_below_width() {
     // thorvg so the failure mode is a clean `InvalidArguments` instead
     // of an in-engine out-of-bounds write.
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
     let err = unsafe { canvas.set_target(&mut buffer, 50, 100, 100, ColorSpace::ABGR8888) }
         .expect_err("stride < width must be rejected");
@@ -162,7 +157,7 @@ fn test_sw_canvas_set_target_rejects_undersized_buffer() {
     // `stride * height` exceeds the buffer length — must be rejected
     // before reaching the C engine.
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 10]; // only 10 pixels
     let err = unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }
         .expect_err("undersized buffer must be rejected");
@@ -175,7 +170,7 @@ fn test_sw_canvas_set_target_rejects_stride_height_overflow() {
     // multiplication in the wrapper must catch this rather than wrap
     // around and pass an artificially small "needed" size.
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100];
     let err = unsafe {
         canvas.set_target(
@@ -195,7 +190,7 @@ fn test_sw_canvas_set_target_rejects_stride_height_overflow() {
 #[test]
 fn test_shape_ownership_transfer_to_canvas() {
     let engine = Thorvg::init(0).unwrap();
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
@@ -352,7 +347,7 @@ fn test_gradient_duplicate() {
 fn test_scene_nested_drop() {
     let engine = Thorvg::init(0).unwrap();
 
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
     unsafe { canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888) }.unwrap();
 
@@ -889,7 +884,7 @@ fn test_shape_stroke_color_without_stroke() {
 fn test_clip_lifecycle() {
     let engine = Thorvg::init(0).unwrap();
 
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 100 * 100];
     unsafe { canvas.set_target(&mut buffer, 100, 100, 100, ColorSpace::ABGR8888) }.unwrap();
 
@@ -1002,7 +997,7 @@ fn test_asset_resolver_invoked_during_lottie_render() {
     let _ = lottie.set_frame(total * 0.5);
 
     // Drive a draw so the build phase definitely runs.
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 800 * 800];
     unsafe { canvas.set_target(&mut buffer, 800, 800, 800, ColorSpace::ABGR8888) }.unwrap();
     // The picture is owned by the animation; push a duplicate so we
@@ -1136,7 +1131,7 @@ fn test_mask_getter_round_trip() {
 fn test_full_pipeline_scene_with_effects() {
     let engine = Thorvg::init(0).unwrap();
 
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     let mut buffer = vec![0u32; 200 * 200];
     unsafe { canvas.set_target(&mut buffer, 200, 200, 200, ColorSpace::ABGR8888) }.unwrap();
 

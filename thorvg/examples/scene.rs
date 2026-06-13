@@ -19,7 +19,7 @@ fn main() {
     let mut buffer = vec![0u32; (width * height) as usize];
 
     let mut canvas = engine
-        .sw_canvas(EngineOption::DEFAULT)
+        .sw_canvas(EngineOption::Default)
         .expect("Failed to create canvas");
     unsafe { canvas.set_target(&mut buffer, width, width, height, ColorSpace::ABGR8888) }.unwrap();
 

@@ -37,96 +37,47 @@ impl ColorSpace {
     }
 }
 
-/// Engine rendering options, modelled as bitflags.
+/// Engine rendering option, selected per canvas at creation.
 ///
-/// Maps to the C bitfield enum `Tvg_Engine_Option`.  Values are
-/// power-of-two bits intended to be combined with `|`:
+/// Mirrors the C++ `EngineOption` enum.  The C header gives the values
+/// power-of-two literals (`NONE = 0`, `DEFAULT = 1 << 0`,
+/// `SMART_RENDER = 1 << 1`), but the engine compares the option by
+/// *exact value*, not as a bitmask — so the variants are mutually
+/// exclusive and are not meant to be combined.
 ///
-/// ```ignore
-/// engine.sw_canvas(EngineOption::DEFAULT | EngineOption::SMART_RENDER)
-/// ```
+/// # Per-backend behaviour
 ///
-/// # Per-canvas restrictions
+/// * [`SwCanvas`]: [`None`](Self::None) disables partial (dirty-region)
+///   redraw, which is otherwise enabled.  [`Default`](Self::Default)
+///   and [`SmartRender`](Self::SmartRender) both leave it enabled, so
+///   they are equivalent today.
+/// * [`GlCanvas`] / [`WgCanvas`]: the option is ignored entirely — the
+///   GPU renderers take it but do nothing with it.
 ///
-/// * [`SwCanvas`] honours every flag.
-/// * [`GlCanvas`] and [`WgCanvas`] ignore [`SMART_RENDER`](Self::SMART_RENDER)
-///   today — the C engine documents the request as silently dropped
-///   on the GPU backends (`tvg_glcanvas_create` / `tvg_wgcanvas_create`
-///   header notes).  The flag is still accepted to keep the API
-///   uniform; behaviour is identical to passing
-///   [`DEFAULT`](Self::DEFAULT) on those backends.
-///
-/// `Default::default()` returns [`DEFAULT`](Self::DEFAULT), matching
-/// the previous behaviour of the now-removed `Default` variant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct EngineOption(sys::Tvg_Engine_Option);
+/// `Default::default()` is [`Default`](Self::Default).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum EngineOption {
+    /// Disable all optional behaviour.  On [`SwCanvas`] this turns off
+    /// partial (dirty-region) redraw.
+    None,
+    /// Default rendering mode.  Partial (dirty-region) redraw stays
+    /// enabled on [`SwCanvas`].
+    #[default]
+    Default,
+    /// Requests partial (smart) rendering.  Identical to
+    /// [`Default`](Self::Default) on [`SwCanvas`] today (partial redraw
+    /// is already on there) and ignored on the GPU backends.
+    SmartRender,
+}
 
 impl EngineOption {
-    /// No options enabled.  Explicitly disables every optional
-    /// behaviour.
-    pub const NONE: Self = Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE);
-    /// Use the default rendering mode.
-    pub const DEFAULT: Self = Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT);
-    /// Enable smart (partial) rendering optimisations — thorvg only
-    /// redraws regions of the canvas that changed between frames.
-    ///
-    /// May *hurt* performance on full-screen / large-area updates
-    /// because of change-tracking overhead; recommended only for
-    /// mostly-static UIs.  Ignored by [`GlCanvas`] / [`WgCanvas`]
-    /// (see type docs).
-    pub const SMART_RENDER: Self = Self(sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER);
-
-    /// Returns the empty flag set (equivalent to [`NONE`](Self::NONE)).
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self::NONE
-    }
-
-    /// Returns `true` if every flag in `other` is also set in `self`.
-    #[must_use]
-    pub const fn contains(self, other: Self) -> bool {
-        // `self.0` is the `sys::Tvg_Engine_Option` newtype; its `.0`
-        // is the raw `u32` bitfield underneath.
-        let bits = self.0 .0;
-        let mask = other.0 .0;
-        (bits & mask) == mask
-    }
-
     pub(crate) fn to_raw(self) -> sys::Tvg_Engine_Option {
-        self.0
-    }
-}
-
-impl Default for EngineOption {
-    /// Returns [`EngineOption::DEFAULT`].
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-impl core::ops::BitOr for EngineOption {
-    type Output = Self;
-    fn bitor(self, rhs: Self) -> Self {
-        Self(self.0 | rhs.0)
-    }
-}
-
-impl core::ops::BitOrAssign for EngineOption {
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0;
-    }
-}
-
-impl core::ops::BitAnd for EngineOption {
-    type Output = Self;
-    fn bitand(self, rhs: Self) -> Self {
-        Self(self.0 & rhs.0)
-    }
-}
-
-impl core::ops::BitAndAssign for EngineOption {
-    fn bitand_assign(&mut self, rhs: Self) {
-        self.0 &= rhs.0;
+        match self {
+            EngineOption::None => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE,
+            EngineOption::Default => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT,
+            EngineOption::SmartRender => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER,
+        }
     }
 }
 

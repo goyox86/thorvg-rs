@@ -13,7 +13,7 @@ fn main() {
     let engine = Thorvg::init(0).unwrap();
     let (w, h) = (700u32, 350u32);
     let mut buffer = vec![0u32; (w * h) as usize];
-    let mut canvas = engine.sw_canvas(EngineOption::DEFAULT).unwrap();
+    let mut canvas = engine.sw_canvas(EngineOption::Default).unwrap();
     unsafe { canvas.set_target(&mut buffer, w, w, h, ColorSpace::ABGR8888) }.unwrap();
 
     // Checkerboard background
