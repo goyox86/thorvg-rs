@@ -11,7 +11,7 @@
 //! To use in `no_std`, disable default features:
 //! ```toml
 //! [dependencies]
-//! thorvg = { version = "0.2", default-features = false }
+//! thorvg = { version = "0.3", default-features = false }
 //! ```
 //!
 //! **`no_std` panic policy:** the crate executes user-supplied closures

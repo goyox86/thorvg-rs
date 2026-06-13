@@ -60,14 +60,14 @@ canvas.sync().unwrap();
 
 ```toml
 [dependencies]
-thorvg = "0.2"
+thorvg = "0.3"
 ```
 
 ### Embedded / `no_std` (pick only what you need)
 
 ```toml
 [dependencies]
-thorvg = { version = "0.2", default-features = false, features = ["vendored", "lottie", "svg"] }
+thorvg = { version = "0.3", default-features = false, features = ["vendored", "lottie", "svg"] }
 ```
 
 This gives you Lottie + SVG playback with no threads, no JerryScript,
@@ -99,7 +99,7 @@ build pipeline, runtime stubs, and how to override them.
 
 ## API Coverage
 
-154 of the 158 ThorVG C API functions are wrapped (~97%).  Unwrapped:
+157 of the 161 ThorVG C API functions are wrapped (~98%).  Unwrapped:
 the four `tvg_paint_ref` / `tvg_paint_unref` / `tvg_paint_get_ref` /
 `tvg_paint_get_parent` refcount-and-parent helpers (ownership is
 already modelled in the Rust types).

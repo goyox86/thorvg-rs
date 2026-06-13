@@ -144,7 +144,7 @@ impl LinearGradient<'_> {
 
     /// Gets the affine transformation matrix.
     #[deprecated(
-        since = "0.2.0",
+        since = "0.3.0",
         note = "renamed to `transform` for consistency with `Paint::transform`"
     )]
     pub fn get_transform(&self) -> Result<Matrix> {
@@ -269,7 +269,7 @@ impl RadialGradient<'_> {
 
     /// Gets the affine transformation matrix.
     #[deprecated(
-        since = "0.2.0",
+        since = "0.3.0",
         note = "renamed to `transform` for consistency with `Paint::transform`"
     )]
     pub fn get_transform(&self) -> Result<Matrix> {
