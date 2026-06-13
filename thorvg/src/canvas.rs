@@ -203,6 +203,13 @@ macro_rules! impl_canvas {
             }
 
             /// Sets the drawing viewport (clipping region).
+            ///
+            /// Must be called **before** adding paints or drawing — changing
+            /// the viewport after [`add`](Self::add), `remove`,
+            /// [`update`](Self::update), or [`draw`](Self::draw) is rejected
+            /// with [`Error::InsufficientCondition`]. The canvas must be in a
+            /// synced state. Resetting the target also resets the viewport to
+            /// the target size.
             pub fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_set_viewport(self.raw, x, y, w, h) })
             }
