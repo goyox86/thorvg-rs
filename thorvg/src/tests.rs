@@ -778,6 +778,19 @@ fn test_saver_save_animation_ownership_transfer() {
 // ── Text API ───────────────────────────────────────────────────────
 
 #[test]
+fn test_text_get_text_round_trips_set_text() {
+    // `text()` wraps `tvg_text_get_text`; a freshly-created object has
+    // no text set, and after `set_text` the getter returns a copy of
+    // what was assigned.
+    let engine = Thorvg::init(0).unwrap();
+    let mut text = engine.text().unwrap();
+    assert_eq!(text.text(), None);
+
+    text.set_text("Hello, ThorVG").unwrap();
+    assert_eq!(text.text().as_deref(), Some("Hello, ThorVG"));
+}
+
+#[test]
 fn test_text_set_color_and_outline_accept_rgb() {
     // `set_color` / `set_outline` take `Rgb` (text is RGB-only, no
     // alpha).  Verify both reach the engine without error.

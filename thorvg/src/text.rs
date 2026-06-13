@@ -1,4 +1,5 @@
 use alloc::ffi::CString;
+use alloc::string::String;
 
 use crate::color::Rgb;
 use crate::error::{Error, Result};
@@ -106,6 +107,25 @@ impl Text<'_> {
     pub fn set_text(&mut self, text: &str) -> Result<()> {
         let c_text = CString::new(text).map_err(|_| Error::InvalidArguments)?;
         Error::from_raw(unsafe { sys::tvg_text_set_text(self.raw, c_text.as_ptr()) })
+    }
+
+    /// Returns the currently assigned text (UTF-8), or `None` if none
+    /// has been set.
+    ///
+    /// Wraps the experimental `tvg_text_get_text` C API; the returned
+    /// string is copied, so it is independent of the text object's
+    /// later mutations.
+    pub fn text(&self) -> Option<String> {
+        let ptr = unsafe { sys::tvg_text_get_text(self.raw) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(
+                unsafe { core::ffi::CStr::from_ptr(ptr) }
+                    .to_string_lossy()
+                    .into_owned(),
+            )
+        }
     }
 
     /// Sets the text fill color.
