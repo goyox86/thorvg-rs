@@ -169,7 +169,7 @@ impl Picture<'_> {
     /// filesystem it returns an error; embed the asset and use
     /// [`load_data_static`](Self::load_data_static) instead.
     pub fn load_from_str(&mut self, path: &str) -> Result<()> {
-        let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        let c_path = CString::new(path)?;
         Error::from_raw(unsafe { sys::tvg_picture_load(self.raw, c_path.as_ptr()) })
     }
 
@@ -426,9 +426,7 @@ fn load_data_inner(
     resource_path: Option<&str>,
     copy: bool,
 ) -> Result<()> {
-    let c_rpath = resource_path
-        .map(|p| CString::new(p).map_err(|_| Error::InvalidArguments))
-        .transpose()?;
+    let c_rpath = resource_path.map(CString::new).transpose()?;
     let rpath_ptr = c_rpath.as_ref().map_or(core::ptr::null(), |c| c.as_ptr());
     Error::from_raw(unsafe {
         sys::tvg_picture_load_data(

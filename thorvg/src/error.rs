@@ -50,4 +50,14 @@ impl fmt::Display for Error {
     }
 }
 
+impl From<alloc::ffi::NulError> for Error {
+    /// An interior NUL byte makes the string unusable as a C string,
+    /// so it is reported as [`Error::InvalidArguments`].  This lets
+    /// `CString::new(s)?` propagate directly without a manual
+    /// `map_err`.
+    fn from(_: alloc::ffi::NulError) -> Self {
+        Error::InvalidArguments
+    }
+}
+
 impl core::error::Error for Error {}

@@ -47,7 +47,7 @@ impl Saver<'_> {
     /// default; pulled in transitively by the `std` feature on this
     /// crate).
     pub fn save_to_str<P: Paint>(&mut self, paint: P, path: &str, quality: u32) -> Result<()> {
-        let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        let c_path = CString::new(path)?;
         Error::from_raw(unsafe {
             sys::tvg_saver_save_paint(self.raw, paint.into_raw(), c_path.as_ptr(), quality)
         })
@@ -90,7 +90,7 @@ impl Saver<'_> {
         quality: u32,
         fps: u32,
     ) -> Result<()> {
-        let c_path = CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        let c_path = CString::new(path)?;
         Error::from_raw(unsafe {
             sys::tvg_saver_save_animation(
                 self.raw,

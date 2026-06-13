@@ -182,7 +182,7 @@ impl LottieAnimation<'_> {
 
     /// Specifies a playback segment by marker name.
     pub fn set_marker(&mut self, marker: &str) -> Result<()> {
-        let c_marker = CString::new(marker).map_err(|_| Error::InvalidArguments)?;
+        let c_marker = CString::new(marker)?;
         Error::from_raw(unsafe {
             sys::tvg_lottie_animation_set_marker(self.inner.raw(), c_marker.as_ptr())
         })
@@ -214,8 +214,8 @@ impl LottieAnimation<'_> {
         variable: &str,
         value: f32,
     ) -> Result<()> {
-        let c_layer = CString::new(layer).map_err(|_| Error::InvalidArguments)?;
-        let c_var = CString::new(variable).map_err(|_| Error::InvalidArguments)?;
+        let c_layer = CString::new(layer)?;
+        let c_var = CString::new(variable)?;
         Error::from_raw(unsafe {
             sys::tvg_lottie_animation_assign(
                 self.inner.raw(),

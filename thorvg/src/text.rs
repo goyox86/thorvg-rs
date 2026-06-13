@@ -94,7 +94,7 @@ impl Text<'_> {
 
     /// Sets the font family name.
     pub fn set_font(&mut self, name: &str) -> Result<()> {
-        let c_name = CString::new(name).map_err(|_| Error::InvalidArguments)?;
+        let c_name = CString::new(name)?;
         Error::from_raw(unsafe { sys::tvg_text_set_font(self.raw, c_name.as_ptr()) })
     }
 
@@ -105,7 +105,7 @@ impl Text<'_> {
 
     /// Sets the text content (UTF-8).
     pub fn set_text(&mut self, text: &str) -> Result<()> {
-        let c_text = CString::new(text).map_err(|_| Error::InvalidArguments)?;
+        let c_text = CString::new(text)?;
         Error::from_raw(unsafe { sys::tvg_text_set_text(self.raw, c_text.as_ptr()) })
     }
 
@@ -206,7 +206,7 @@ impl Text<'_> {
 
     /// Gets glyph metrics for a UTF-8 character.
     pub fn glyph_metrics(&self, ch: &str) -> Result<GlyphMetrics> {
-        let c_ch = CString::new(ch).map_err(|_| Error::InvalidArguments)?;
+        let c_ch = CString::new(ch)?;
         let mut m = sys::Tvg_Glyph_Metrics {
             advance: 0.0,
             bearing: 0.0,

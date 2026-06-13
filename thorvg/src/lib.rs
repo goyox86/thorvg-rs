@@ -306,7 +306,7 @@ impl Thorvg {
     /// filesystem it returns an error; embed the font and use
     /// [`load_font_data_static`](Self::load_font_data_static) instead.
     pub fn load_font_from_str(&self, path: &str) -> Result<()> {
-        let c_path = alloc::ffi::CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        let c_path = alloc::ffi::CString::new(path)?;
         Error::from_raw(unsafe { sys::tvg_font_load(c_path.as_ptr()) })
     }
 
@@ -322,7 +322,7 @@ impl Thorvg {
     /// path keys into thorvg's registry; this needs the same working
     /// filesystem at runtime under `no_std`.
     pub fn unload_font_from_str(&self, path: &str) -> Result<()> {
-        let c_path = alloc::ffi::CString::new(path).map_err(|_| Error::InvalidArguments)?;
+        let c_path = alloc::ffi::CString::new(path)?;
         Error::from_raw(unsafe { sys::tvg_font_unload(c_path.as_ptr()) })
     }
 
@@ -387,10 +387,8 @@ impl Drop for Thorvg {
 
 #[allow(clippy::cast_possible_truncation)]
 fn load_font_data_inner(name: &str, data: &[u8], mimetype: Option<&str>, copy: bool) -> Result<()> {
-    let c_name = alloc::ffi::CString::new(name).map_err(|_| Error::InvalidArguments)?;
-    let c_mime = mimetype
-        .map(|m| alloc::ffi::CString::new(m).map_err(|_| Error::InvalidArguments))
-        .transpose()?;
+    let c_name = alloc::ffi::CString::new(name)?;
+    let c_mime = mimetype.map(alloc::ffi::CString::new).transpose()?;
     let mime_ptr = c_mime.as_ref().map_or(core::ptr::null(), |c| c.as_ptr());
     Error::from_raw(unsafe {
         sys::tvg_font_load_data(
