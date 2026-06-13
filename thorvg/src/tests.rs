@@ -669,6 +669,25 @@ fn test_stroke_dash_roundtrip() {
     assert!((offset - 2.5).abs() < f32::EPSILON);
 }
 
+// ── Path Segments ──────────────────────────────────────────────────
+
+#[test]
+fn test_path_segments_size_hint_tracks_remaining_commands() {
+    // Each command yields exactly one segment, so `size_hint`'s upper
+    // bound is the remaining command count; the lower bound stays 0
+    // because a malformed path can stop early.
+    let path = Path {
+        commands: vec![PathCommand::MoveTo, PathCommand::LineTo, PathCommand::Close],
+        points: vec![Point::new(0.0, 0.0), Point::new(10.0, 10.0)],
+    };
+    let mut it = path.segments();
+    assert_eq!(it.size_hint(), (0, Some(3)));
+    it.next();
+    assert_eq!(it.size_hint(), (0, Some(2)));
+    // A well-formed path yields one segment per command.
+    assert_eq!(path.segments().count(), 3);
+}
+
 // ── Picture Lifecycle ──────────────────────────────────────────────
 
 #[test]

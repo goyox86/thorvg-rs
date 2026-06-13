@@ -191,6 +191,14 @@ impl Iterator for Segments<'_> {
             },
         })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // Each remaining command yields exactly one segment, so the
+        // remaining command count is an upper bound.  The lower bound
+        // stays 0: a malformed path (points exhausted before commands)
+        // stops early, so the count is not exact.
+        (0, Some(self.commands.len()))
+    }
 }
 
 impl core::iter::FusedIterator for Segments<'_> {}
