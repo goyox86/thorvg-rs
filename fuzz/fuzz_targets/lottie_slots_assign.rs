@@ -1,7 +1,6 @@
 #![no_main]
 
-//! Fuzz target for the `LottieAnimation` slot/marker/assign/expression
-//! surface.
+//! Fuzz target for the `LottieAnimation` slot/marker surface.
 //!
 //! Complements [`lottie_load_and_play`]: where that target stresses
 //! the parser and playback controllers, this one focuses on the
@@ -11,10 +10,11 @@
 //!   * `gen_slot` (parses a small slot JSON snippet),
 //!   * `apply_slot` / `del_slot` (arbitrary u32 IDs, including
 //!     ones the engine never produced),
-//!   * `assign` (layer/var strings + index + value f32 — expression
-//!     binding),
 //!   * `set_marker` (UTF-8 marker name lookup),
 //!   * `set_size` (arbitrary f32 dimensions).
+//!
+//! (The expression `assign` API this target once covered was removed
+//! upstream in ThorVG 1.0.6.)
 
 use libfuzzer_sys::arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
@@ -28,10 +28,8 @@ struct Input<'a> {
     use_returned_slot_id: bool,
     raw_slot_id: u32,
     marker: &'a str,
-    layer: &'a str,
-    var: &'a str,
+    /// Index used for the marker-table lookups below.
     var_ix: u32,
-    var_val: f32,
     width: f32,
     height: f32,
 }
@@ -45,8 +43,8 @@ fuzz_target!(|input: Input<'_>| {
         let Ok(mut lottie) = engine.lottie_animation() else {
             return;
         };
-        // Loading may fail; the slot/marker/assign APIs should still
-        // be defined to operate (return Err) without crashing.
+        // Loading may fail; the slot/marker APIs should still be
+        // defined to operate (return Err) without crashing.
         let _ = lottie.load_data(input.json);
         let _ = lottie.set_size(input.width, input.height);
 
@@ -58,7 +56,6 @@ fuzz_target!(|input: Input<'_>| {
         };
         let _ = lottie.apply_slot(id);
         let _ = lottie.set_marker(input.marker);
-        let _ = lottie.assign(input.layer, input.var_ix, input.var, input.var_val);
 
         // Marker query surface — markers_count / marker_name /
         // marker_info exercise an integer index lookup into a

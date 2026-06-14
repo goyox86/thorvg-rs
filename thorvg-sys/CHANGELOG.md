@@ -11,6 +11,29 @@ bundling ThorVG `1.0.5`. Because the crate is `0.x`, a **minor** bump is
 breaking; the safe [`thorvg`](../thorvg/CHANGELOG.md) crate's dependency
 moves in lockstep.
 
+## [0.2.0+thorvg-1.0.6] - 2026-06-14
+
+Bundles **ThorVG 1.0.6**. The minor bump reflects a breaking change to
+the generated FFI surface (a removed C API symbol).
+
+### Changed
+
+- **Bumped vendored ThorVG to 1.0.6.** The seven bare-metal patches that
+  sat on `v1.0.5` were rebased unchanged onto `v1.0.6`.
+
+### Added
+
+- `tvg_lottie_animation_set_audio_resolver`, the `Tvg_Audio_Resolver`
+  callback type, and the `Tvg_Audio_Info` struct — new in ThorVG 1.0.6
+  for synchronizing external audio playback with the Lottie timeline.
+- `TVG_ENGINE_OPTION_ALIASED` — re-introduced upstream (disables
+  anti-aliased rendering); it had been dropped in 1.0.5.
+
+### Removed
+
+- `tvg_lottie_animation_assign` — removed upstream in ThorVG 1.0.6.
+  **Breaking** for any code that called it through the raw bindings.
+
 ## [0.1.0+thorvg-1.0.5] - 2026-06-13
 
 First release under the crate's own versioning. **Supersedes the yanked
@@ -57,4 +80,5 @@ stayed at 1.0.5. Bundles **ThorVG 1.0.5**.
   welding across `tvgLock.h`, `tvgInitializer.cpp`, `tvgRender.cpp`,
   `tvgSwRenderer.cpp`, and `tvgSwMemPool.cpp`.
 
+[0.2.0+thorvg-1.0.6]: https://github.com/goyox86/thorvg-rs/releases/tag/thorvg-sys-v0.2.0
 [0.1.0+thorvg-1.0.5]: https://github.com/goyox86/thorvg-rs/releases/tag/thorvg-sys-v0.1.0

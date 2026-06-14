@@ -17,6 +17,96 @@ pub struct Marker {
     pub end: f32,
 }
 
+/// Borrowed view of a Lottie audio layer's current playback state.
+///
+/// Passed to the closure registered with
+/// [`LottieAnimation::set_audio_resolver`]. The borrow is valid only for
+/// the duration of that callback — the underlying strings are owned by
+/// thorvg and must not be retained past the call (copy out what you need).
+pub struct AudioInfo<'a> {
+    raw: &'a sys::Tvg_Audio_Info,
+}
+
+impl<'a> AudioInfo<'a> {
+    /// The audio source as a file path or URL.
+    ///
+    /// Returns `None` for embedded audio (use [`embedded_data`](Self::embedded_data))
+    /// or if the source is not valid UTF-8.
+    pub fn source(&self) -> Option<&'a str> {
+        if self.raw.embedded || self.raw.src.is_null() {
+            return None;
+        }
+        // SAFETY: non-null C string owned by thorvg, valid for the
+        // callback's duration (`'a`).
+        unsafe { core::ffi::CStr::from_ptr(self.raw.src) }
+            .to_str()
+            .ok()
+    }
+
+    /// The embedded raw audio bytes, of length [`size`](Self::size).
+    ///
+    /// Returns `None` when the source is a path/URL rather than embedded
+    /// data (see [`is_embedded`](Self::is_embedded)).
+    pub fn embedded_data(&self) -> Option<&'a [u8]> {
+        if !self.raw.embedded || self.raw.src.is_null() {
+            return None;
+        }
+        // SAFETY: thorvg guarantees `src` points to `size` bytes of
+        // embedded data when `embedded` is set; valid for `'a`.
+        Some(unsafe {
+            core::slice::from_raw_parts(self.raw.src.cast::<u8>(), self.raw.size as usize)
+        })
+    }
+
+    /// MIME type of the embedded audio, when present.
+    pub fn mime_type(&self) -> Option<&'a str> {
+        if self.raw.mimeType.is_null() {
+            return None;
+        }
+        // SAFETY: non-null C string owned by thorvg, valid for `'a`.
+        unsafe { core::ffi::CStr::from_ptr(self.raw.mimeType) }
+            .to_str()
+            .ok()
+    }
+
+    /// Size of the embedded audio data in bytes (valid when [`is_embedded`](Self::is_embedded)).
+    pub fn size(&self) -> u32 {
+        self.raw.size
+    }
+
+    /// Playback position within the audio in seconds (valid when [`is_active`](Self::is_active)).
+    pub fn offset(&self) -> f32 {
+        self.raw.offset
+    }
+
+    /// Volume in the range `[0, 100]` (valid when [`is_active`](Self::is_active)).
+    pub fn volume(&self) -> f32 {
+        self.raw.volume
+    }
+
+    /// `true` while the layer is within its playback range.
+    pub fn is_active(&self) -> bool {
+        self.raw.active
+    }
+
+    /// `true` if the source is embedded raw audio data; `false` if it is
+    /// a file path or URL.
+    pub fn is_embedded(&self) -> bool {
+        self.raw.embedded
+    }
+}
+
+impl core::fmt::Debug for AudioInfo<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AudioInfo")
+            .field("active", &self.is_active())
+            .field("embedded", &self.is_embedded())
+            .field("offset", &self.offset())
+            .field("volume", &self.volume())
+            .finish_non_exhaustive()
+    }
+}
+
 /// A Lottie animation controller with Lottie-specific extensions.
 ///
 /// This wraps [`Animation`] and adds slots, markers, tweening,
@@ -50,6 +140,15 @@ pub struct Marker {
 /// [`Thorvg::lottie_animation()`](crate::Thorvg::lottie_animation).
 pub struct LottieAnimation<'eng> {
     inner: Animation<'eng>,
+    /// Type-erased audio resolver, kept alive for the animation's
+    /// lifetime.  The closure lives in its own `Box<F>` on the heap;
+    /// `data` is a thin pointer to that allocation, which thorvg stores
+    /// verbatim and feeds back to the monomorphized trampoline.  Moving
+    /// the `LottieAnimation` does not invalidate the pointer because the
+    /// closure stays at its heap address.  Declared **after** `inner` so
+    /// the C animation handle is released before this box is freed.
+    /// `None` until [`set_audio_resolver`](Self::set_audio_resolver) is called.
+    audio_resolver: Option<ErasedAudioResolver>,
 }
 
 impl LottieAnimation<'_> {
@@ -61,6 +160,7 @@ impl LottieAnimation<'_> {
         }
         Ok(Self {
             inner: unsafe { Animation::from_raw(raw) },
+            audio_resolver: None,
         })
     }
 
@@ -197,36 +297,6 @@ impl LottieAnimation<'_> {
         })
     }
 
-    // ── Expressions ────────────────────────────────────────────────
-
-    /// Updates the value of an expression variable on a layer.
-    ///
-    /// * `layer` — name of the layer holding the variable.
-    /// * `property_index` — index of the property within that layer.
-    /// * `variable` — name of the variable to update.
-    /// * `value` — new value to assign.
-    ///
-    /// Wraps the experimental `tvg_lottie_animation_assign` C API.
-    pub fn assign(
-        &mut self,
-        layer: &str,
-        property_index: u32,
-        variable: &str,
-        value: f32,
-    ) -> Result<()> {
-        let c_layer = CString::new(layer)?;
-        let c_var = CString::new(variable)?;
-        Error::from_raw(unsafe {
-            sys::tvg_lottie_animation_assign(
-                self.inner.raw(),
-                c_layer.as_ptr(),
-                property_index,
-                c_var.as_ptr(),
-                value,
-            )
-        })
-    }
-
     // ── Quality ────────────────────────────────────────────────────
 
     /// Sets the quality level for Lottie effects (0–100).
@@ -234,6 +304,87 @@ impl LottieAnimation<'_> {
     /// Lower values prioritize performance, higher values prioritize quality.
     pub fn set_quality(&mut self, value: u8) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_lottie_animation_set_quality(self.inner.raw(), value) })
+    }
+
+    // ── Audio ──────────────────────────────────────────────────────
+
+    /// Installs an audio resolver for the animation's Lottie audio layers.
+    ///
+    /// thorvg invokes the closure whenever an audio layer's playback
+    /// state changes during rendering, handing it an [`AudioInfo`]
+    /// describing the current timeline state. The closure is responsible
+    /// for driving an external audio engine — start/seek playback when
+    /// [`AudioInfo::is_active`] is `true`, stop it when `false`. thorvg
+    /// itself does not play audio.
+    ///
+    /// The closure is stored inside this `LottieAnimation` and lives for
+    /// the animation's lifetime; calling `set_audio_resolver` again
+    /// replaces (and drops) the previous closure.
+    ///
+    /// *Experimental:* the underlying C API is marked experimental by
+    /// upstream and may change in a future `ThorVG` release.
+    ///
+    /// ```ignore
+    /// lottie.set_audio_resolver(|info: &thorvg::AudioInfo| {
+    ///     if info.is_active() {
+    ///         player.play(info.source().unwrap(), info.offset(), info.volume());
+    ///     } else {
+    ///         player.stop();
+    ///     }
+    /// })?;
+    /// ```
+    pub fn set_audio_resolver<F>(&mut self, resolver: F) -> Result<()>
+    where
+        F: FnMut(&AudioInfo<'_>) + Send + 'static,
+    {
+        // Detach any previous resolver from the C side first, so the old
+        // Box is not freed while thorvg still holds its address.
+        if self.audio_resolver.is_some() {
+            unsafe {
+                sys::tvg_lottie_animation_set_audio_resolver(
+                    self.inner.raw(),
+                    None,
+                    core::ptr::null_mut(),
+                );
+            }
+            self.audio_resolver = None;
+        }
+        // Heap-allocate the concrete closure and hand thorvg a thin
+        // pointer to it.  The monomorphized `audio_trampoline::<F>` casts
+        // the pointer back to `*mut F` and calls `F` directly — no `dyn`,
+        // no double box.
+        let boxed: alloc::boxed::Box<F> = alloc::boxed::Box::new(resolver);
+        let raw_f: *mut F = alloc::boxed::Box::into_raw(boxed);
+        // SAFETY: `Box::into_raw` never returns null.
+        let data = unsafe { core::ptr::NonNull::new_unchecked(raw_f.cast::<()>()) };
+        self.audio_resolver = Some(ErasedAudioResolver {
+            data,
+            drop_fn: drop_audio_resolver::<F>,
+        });
+        // SAFETY: `data` references a heap allocation owned by
+        // `self.audio_resolver`; `Drop` unregisters the resolver before
+        // that allocation is freed, so C never dereferences a dangling
+        // pointer.
+        Error::from_raw(unsafe {
+            sys::tvg_lottie_animation_set_audio_resolver(
+                self.inner.raw(),
+                Some(audio_trampoline::<F>),
+                data.as_ptr().cast::<core::ffi::c_void>(),
+            )
+        })
+    }
+
+    /// Removes any previously installed audio resolver.
+    pub fn clear_audio_resolver(&mut self) -> Result<()> {
+        let r = Error::from_raw(unsafe {
+            sys::tvg_lottie_animation_set_audio_resolver(
+                self.inner.raw(),
+                None,
+                core::ptr::null_mut(),
+            )
+        });
+        self.audio_resolver = None;
+        r
     }
 }
 
@@ -255,4 +406,101 @@ impl core::fmt::Debug for LottieAnimation<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("LottieAnimation").finish_non_exhaustive()
     }
+}
+
+impl Drop for LottieAnimation<'_> {
+    fn drop(&mut self) {
+        // Unregister the resolver from the C side BEFORE the `inner`
+        // animation handle is freed (and before our resolver Box drops).
+        // thorvg holds a pointer into our Box; letting it drop first
+        // would leave thorvg dereferencing freed memory on any further
+        // audio resolution.
+        if self.audio_resolver.is_some() {
+            unsafe {
+                sys::tvg_lottie_animation_set_audio_resolver(
+                    self.inner.raw(),
+                    None,
+                    core::ptr::null_mut(),
+                );
+            }
+        }
+    }
+}
+
+/// Owning, type-erased handle to a heap-allocated audio-resolver closure.
+///
+/// Mirrors the resolver-storage scheme used by `Picture`: each
+/// `set_audio_resolver::<F>` call monomorphizes its own trampoline that
+/// casts the thin `data` pointer back to `*mut F` directly, and `drop_fn`
+/// reconstructs the original `Box<F>` so the right `Drop` runs — avoiding
+/// the `Box<Box<dyn ...>>` double-indirection a `dyn` resolver needs.
+struct ErasedAudioResolver {
+    /// Thin pointer to a heap-allocated `F` produced by `Box::into_raw`.
+    data: core::ptr::NonNull<()>,
+    /// Reconstructs and drops the original `Box<F>`.
+    drop_fn: unsafe fn(core::ptr::NonNull<()>),
+}
+
+impl Drop for ErasedAudioResolver {
+    fn drop(&mut self) {
+        // SAFETY: `data` was produced by `Box::<F>::into_raw` and
+        // `drop_fn` was set to `drop_audio_resolver::<F>` for the same
+        // `F` at construction time, so the cast inside is sound.
+        unsafe { (self.drop_fn)(self.data) }
+    }
+}
+
+// SAFETY: `set_audio_resolver` requires `F: Send`, so the boxed closure
+// behind `data` is `Send`.  `drop_fn` is a plain function pointer.
+unsafe impl Send for ErasedAudioResolver {}
+
+/// Monomorphized destructor used by [`ErasedAudioResolver`] to drop the
+/// original `Box<F>` behind the erased `data` pointer.
+unsafe fn drop_audio_resolver<F>(data: core::ptr::NonNull<()>) {
+    // SAFETY: caller guarantees `data` originated from `Box::<F>::into_raw`
+    // for this same `F`.
+    drop(unsafe { alloc::boxed::Box::from_raw(data.as_ptr().cast::<F>()) });
+}
+
+/// FFI trampoline bridging thorvg's C audio callback to the boxed Rust
+/// closure stored in [`LottieAnimation::audio_resolver`].  Monomorphized
+/// on the concrete closure type `F`: `data` is the thin `*mut F` produced
+/// by [`LottieAnimation::set_audio_resolver`].
+unsafe extern "C" fn audio_trampoline<F>(
+    info: *const sys::Tvg_Audio_Info,
+    data: *mut core::ffi::c_void,
+) where
+    F: FnMut(&AudioInfo<'_>) + Send + 'static,
+{
+    if data.is_null() || info.is_null() {
+        return;
+    }
+    let f = unsafe { &mut *data.cast::<F>() };
+    // SAFETY: `info` is non-null and valid for the duration of this call.
+    let view = AudioInfo {
+        raw: unsafe { &*info },
+    };
+    // A panic here would unwind across the C++ caller above us, which is
+    // UB.  Catch it (see `invoke_audio`); in `no_std` builds the crate
+    // requires `panic = "abort"`, so termination cannot cross the FFI
+    // boundary.
+    invoke_audio::<F>(f, &view);
+}
+
+#[cfg(feature = "std")]
+fn invoke_audio<F>(f: &mut F, info: &AudioInfo<'_>)
+where
+    F: FnMut(&AudioInfo<'_>) + Send + 'static,
+{
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(info)));
+}
+
+#[cfg(not(feature = "std"))]
+fn invoke_audio<F>(f: &mut F, info: &AudioInfo<'_>)
+where
+    F: FnMut(&AudioInfo<'_>) + Send + 'static,
+{
+    // `no_std` users build with `panic = "abort"` (see crate docs); an
+    // aborting panic cannot cross the FFI boundary, so no `catch_unwind`.
+    f(info);
 }

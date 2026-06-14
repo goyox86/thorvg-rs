@@ -45,6 +45,12 @@ pub enum EngineOption {
     /// [`Default`](Self::Default) on [`SwCanvas`] today (partial redraw
     /// is already on there) and ignored on the GPU backends.
     SmartRender,
+    /// Disables anti-aliased rendering.  Re-introduced upstream in
+    /// `ThorVG` 1.0.6 (it had been dropped in 1.0.5).
+    ///
+    /// *Experimental:* upstream marks this option experimental, so its
+    /// behaviour may change in a future `ThorVG` release.
+    Aliased,
 }
 
 impl EngineOption {
@@ -53,6 +59,7 @@ impl EngineOption {
             EngineOption::None => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_NONE,
             EngineOption::Default => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_DEFAULT,
             EngineOption::SmartRender => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_SMART_RENDER,
+            EngineOption::Aliased => sys::Tvg_Engine_Option::TVG_ENGINE_OPTION_ALIASED,
         }
     }
 }

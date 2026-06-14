@@ -11,7 +11,7 @@
 //! To use in `no_std`, disable default features:
 //! ```toml
 //! [dependencies]
-//! thorvg = { version = "0.3", default-features = false }
+//! thorvg = { version = "0.4", default-features = false }
 //! ```
 //!
 //! **`no_std` panic policy:** the crate executes user-supplied closures
@@ -101,7 +101,7 @@ pub use gradient::{
     BorrowedGradient, BorrowedLinearGradient, BorrowedRadialGradient, ColorStop, FillSpread,
     LinearGradient, RadialGradient,
 };
-pub use lottie::{LottieAnimation, Marker};
+pub use lottie::{AudioInfo, LottieAnimation, Marker};
 pub use paint::{BlendMethod, BorrowedPaint, MaskMethod, Matrix, Paint, PaintType, Point};
 pub use path::{Path, PathCommand, Segment, Segments};
 pub use picture::{FilterMethod, MimeType, Picture};

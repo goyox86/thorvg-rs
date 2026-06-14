@@ -115,6 +115,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "lottie_audio_resolver"
+path = "fuzz_targets/lottie_audio_resolver.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "saver_save"
 path = "fuzz_targets/saver_save.rs"
 test = false

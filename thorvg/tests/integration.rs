@@ -92,11 +92,12 @@ fn test_canvas_trait_generic_dispatch() {
 #[test]
 fn test_engine_option_round_trip() {
     // `EngineOption` mirrors the C++ `enum struct EngineOption`
-    // exactly: three mutually-exclusive values, compared by the engine
-    // by value rather than as a bitmask.  Verify the derived `Default`
+    // exactly: mutually-exclusive values, compared by the engine by
+    // value rather than as a bitmask.  Verify the derived `Default`
     // matches the `Default` variant and that every variant reaches the
     // engine end-to-end (the C ABI accepts it and the engine returns a
-    // non-null canvas).
+    // non-null canvas).  `Aliased` was re-introduced upstream in
+    // ThorVG 1.0.6.
     assert_eq!(EngineOption::default(), EngineOption::Default);
 
     let engine = Thorvg::init(0).unwrap();
@@ -104,6 +105,7 @@ fn test_engine_option_round_trip() {
         EngineOption::None,
         EngineOption::Default,
         EngineOption::SmartRender,
+        EngineOption::Aliased,
     ] {
         assert!(engine.sw_canvas(opt).is_ok(), "sw_canvas rejected {opt:?}");
     }
@@ -1108,6 +1110,173 @@ fn test_asset_resolver_panic_is_caught() {
 
     // Animation (and the picture it owns) dropping at end of scope
     // must run the resolver's `Drop` without UAF.
+}
+
+// ── Audio resolver ─────────────────────────────────────────────────
+
+#[test]
+fn test_audio_resolver_install_replace_clear() {
+    // Mirror of `test_asset_resolver_install_replace_clear` for the
+    // Lottie audio resolver (new in ThorVG 1.0.6): exercises the
+    // install / replace / clear / drop machinery — heap-boxing, type
+    // erasure, and the `Drop`-time C-side unregister that guards against
+    // use-after-free.
+    //
+    // This loads a fixture with no audio layer, so the callback never
+    // runs and the counter stays at zero — what we verify here is purely
+    // that the registration lifecycle is sound. The trampoline body is
+    // driven end-to-end in `test_audio_resolver_invoked_for_audio_layer`.
+    use alloc::sync::Arc;
+    use core::sync::atomic::{AtomicUsize, Ordering};
+
+    let engine = Thorvg::init(0).unwrap();
+    let mut lottie = engine.lottie_animation().unwrap();
+
+    // Before load there is no loader, so the C API rejects registration
+    // with `InsufficientCondition` (see `LottieAnimation::resolver`).
+    // This pins the documented "load first" ordering requirement.
+    assert_eq!(
+        lottie.set_audio_resolver(|_info: &AudioInfo| {}),
+        Err(Error::InsufficientCondition)
+    );
+
+    lottie.load_data(LOTTIE_RESOLVER_JSON).unwrap();
+
+    let calls = Arc::new(AtomicUsize::new(0));
+
+    // Install
+    let calls_clone = Arc::clone(&calls);
+    lottie
+        .set_audio_resolver(move |_info: &AudioInfo| {
+            calls_clone.fetch_add(1, Ordering::SeqCst);
+        })
+        .unwrap();
+
+    // Replace (the previous closure's Box must drop cleanly)
+    let calls_clone = Arc::clone(&calls);
+    lottie
+        .set_audio_resolver(move |_info: &AudioInfo| {
+            calls_clone.fetch_add(10, Ordering::SeqCst);
+        })
+        .unwrap();
+
+    // Clear
+    lottie.clear_audio_resolver().unwrap();
+
+    // Drop the animation — `Drop` must unregister cleanly even though no
+    // resolver remains installed (the detach path simply no-ops).
+    drop(lottie);
+
+    // The fixture has no audio layer, so the callback never fired.
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+/// Minimal hand-authored Lottie with a single embedded-audio layer
+/// (`ty: 6`) referencing an asset whose `p` is a `data:audio/mpeg`
+/// base64 payload decoding to the bytes `ABC`. Upstream ships no
+/// audio-layer fixture, so this is the only thing that drives the
+/// audio trampoline body end-to-end.
+const LOTTIE_AUDIO_JSON: &[u8] = include_bytes!("assets/audio_layer.json");
+
+#[test]
+fn test_audio_resolver_invoked_for_audio_layer() {
+    // Exercises the real `audio_trampoline` body and every `AudioInfo`
+    // accessor.  The engine runs tasks inline under `init(0)`, so each
+    // `set_frame` drives the builder (and thus `updateAudio`) before it
+    // returns.  The layer is active on `[0, 120)`, and `updateAudio`
+    // fires the resolver on every activation transition, so stepping
+    // across the out-point and back yields an active→inactive→active
+    // sequence.
+    use alloc::string::String;
+    use alloc::sync::Arc;
+    use alloc::vec::Vec;
+    use std::sync::Mutex;
+
+    #[derive(Clone)]
+    struct Snap {
+        active: bool,
+        embedded: bool,
+        size: u32,
+        mime: Option<String>,
+        data: Option<Vec<u8>>,
+        source: Option<String>,
+    }
+
+    let engine = Thorvg::init(0).unwrap();
+    let mut lottie = engine.lottie_animation().unwrap();
+    lottie.load_data(LOTTIE_AUDIO_JSON).unwrap();
+
+    let snaps: Arc<Mutex<Vec<Snap>>> = Arc::new(Mutex::new(Vec::new()));
+    let snaps_c = Arc::clone(&snaps);
+    lottie
+        .set_audio_resolver(move |info: &AudioInfo| {
+            snaps_c.lock().unwrap().push(Snap {
+                active: info.is_active(),
+                embedded: info.is_embedded(),
+                size: info.size(),
+                mime: info.mime_type().map(String::from),
+                data: info.embedded_data().map(<[u8]>::to_vec),
+                source: info.source().map(String::from),
+            });
+        })
+        .unwrap();
+
+    // The composition spans [0, 120) but the audio layer ends at 60, so
+    // frame 90 is in-range yet past the layer's out-point.  (The builder
+    // clamps the frame to the composition range, so a frame beyond 120
+    // would just snap back inside the active window.)
+    // 30 -> active, 90 -> inactive, 30 -> active again.
+    let _ = lottie.set_frame(30.0);
+    let _ = lottie.set_frame(90.0);
+    let _ = lottie.set_frame(30.0);
+
+    let got = snaps.lock().unwrap().clone();
+    assert!(!got.is_empty(), "audio resolver never fired");
+
+    // An activation must report the embedded payload verbatim: `ABC`
+    // (3 bytes), MIME `mpeg`, embedded, and no path-style `source`.
+    assert!(
+        got.iter().any(|s| s.active
+            && s.embedded
+            && s.size == 3
+            && s.mime.as_deref() == Some("mpeg")
+            && s.data.as_deref() == Some(b"ABC")
+            && s.source.is_none()),
+        "expected an active embedded-audio callback, got {} calls",
+        got.len()
+    );
+    // Stepping past the out-point must report a deactivation.
+    assert!(
+        got.iter().any(|s| !s.active),
+        "expected a deactivation callback when stepping past the out-point"
+    );
+}
+
+#[test]
+fn test_audio_resolver_panic_is_caught() {
+    // The audio counterpart to `test_asset_resolver_panic_is_caught`:
+    // the monomorphized `invoke_audio::<F>` wraps the closure in
+    // `catch_unwind` under `std`, so a panic inside the resolver must be
+    // absorbed at the `extern "C"` boundary rather than unwinding across
+    // the C++ frame that called it (UB).  If the guard regresses, the
+    // unwind crosses the FFI boundary and the test process aborts.
+    let engine = Thorvg::init(0).unwrap();
+    let mut lottie = engine.lottie_animation().unwrap();
+    lottie.load_data(LOTTIE_AUDIO_JSON).unwrap();
+
+    lottie
+        .set_audio_resolver(|_info: &AudioInfo| {
+            panic!("intentional panic from test audio resolver");
+        })
+        .unwrap();
+
+    // Drives the trampoline (frame 30 activates the audio layer); the
+    // panic must be caught inside it.
+    let _ = lottie.set_frame(30.0);
+
+    // Surviving to here means the panic was absorbed.  The animation must
+    // still be usable afterwards.
+    assert!(lottie.total_frame().unwrap() > 0.0);
 }
 
 // ── Masking ────────────────────────────────────────────────────────

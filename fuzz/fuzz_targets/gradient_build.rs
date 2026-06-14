@@ -14,7 +14,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{ColorStop, FillSpread, LinearGradient, Matrix, RadialGradient, Rect, Thorvg};
+use thorvg::{ColorStop, FillSpread, LinearGradient, Matrix, RadialGradient, Rect, Rgba, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 struct ArbStop {
@@ -104,10 +104,7 @@ fn stops_vec(arb: &[ArbStop]) -> Vec<ColorStop> {
     arb.iter()
         .map(|s| ColorStop {
             offset: s.offset,
-            r: s.r,
-            g: s.g,
-            b: s.b,
-            a: s.a,
+            color: Rgba::new(s.r, s.g, s.b, s.a),
         })
         .collect()
 }
@@ -127,7 +124,7 @@ fn run_linear<'a>(engine: &'a Thorvg, input: &Input) -> Option<LinearGradient<'a
     let _ = g.bounds();
     let _ = g.color_stops();
     let _ = g.spread();
-    let _ = g.get_transform();
+    let _ = g.transform();
     let _ = g.gradient_type();
     Some(g)
 }
@@ -151,7 +148,7 @@ fn run_radial<'a>(engine: &'a Thorvg, input: &Input) -> Option<RadialGradient<'a
     let _ = g.radial();
     let _ = g.color_stops();
     let _ = g.spread();
-    let _ = g.get_transform();
+    let _ = g.transform();
     let _ = g.gradient_type();
     Some(g)
 }

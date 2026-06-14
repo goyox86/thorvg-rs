@@ -4,7 +4,7 @@ name = "thorvg-sys"
 # release is recorded as build metadata (`+thorvg-X.Y.Z`); it is not the
 # crate version. 0.x: a minor bump is breaking, so the safe `thorvg`
 # crate's dependency moves in lockstep.
-version = "0.1.0+thorvg-1.0.5"
+version = "0.2.0+thorvg-1.0.6"
 edition = "2024"
 license = "MIT"
 description = "Raw FFI bindings to the ThorVG vector graphics library"

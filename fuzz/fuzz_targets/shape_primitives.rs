@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{Circle, FillRule, Rect, Rgba, StrokeCap, StrokeJoin, Thorvg};
+use thorvg::{Circle, FillRule, PaintOrder, Rect, Rgba, StrokeCap, StrokeJoin, Thorvg};
 
 #[derive(Arbitrary, Debug)]
 enum Op {
@@ -114,7 +114,11 @@ fuzz_target!(|input: Input| {
                 Op::SetStrokeMiterlimit(m) => shape.set_stroke_miterlimit(m),
                 Op::SetStrokeDash(pattern, offset) => shape.set_stroke_dash(&pattern, offset),
                 Op::SetTrimpath(b, e, sim) => shape.set_trimpath(b, e, sim),
-                Op::SetPaintOrder(stroke_first) => shape.set_paint_order(stroke_first),
+                Op::SetPaintOrder(stroke_first) => shape.set_paint_order(if stroke_first {
+                    PaintOrder::StrokeThenFill
+                } else {
+                    PaintOrder::FillThenStroke
+                }),
                 Op::Reset => shape.reset(),
             };
         }

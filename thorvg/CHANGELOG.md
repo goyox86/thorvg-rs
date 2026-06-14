@@ -10,6 +10,32 @@ version (`0.y`), per SemVer's `0.x` rule.
 The companion `thorvg-sys` FFI crate is versioned independently — see
 [`thorvg-sys/CHANGELOG.md`](../thorvg-sys/CHANGELOG.md).
 
+## [0.4.0] - 2026-06-14
+
+Tracks **ThorVG 1.0.6** (via `thorvg-sys` 0.2). Picks up the upstream
+API changes that affect the safe surface.
+
+### Changed (breaking)
+
+- **Depends on `thorvg-sys` 0.2** (bundling ThorVG 1.0.6).
+
+### Added
+
+- **`LottieAnimation::set_audio_resolver` / `clear_audio_resolver`** and the
+  **`AudioInfo`** borrowed view — safe wrappers over ThorVG 1.0.6's new
+  Lottie audio-resolver callback, for synchronizing external audio
+  playback with the animation timeline. The closure is heap-stored and
+  unregistered on drop (same ownership model as the asset resolver).
+  Experimental upstream.
+- **`EngineOption::Aliased`** — re-introduced upstream in ThorVG 1.0.6
+  (disables anti-aliased rendering). Marked experimental by upstream.
+  The `EngineOption` enum is `#[non_exhaustive]`, so this is additive.
+
+### Removed (breaking)
+
+- **`LottieAnimation::assign`** — the underlying experimental
+  `tvg_lottie_animation_assign` C API was removed in ThorVG 1.0.6.
+
 ## [0.3.0] - 2026-06-13
 
 A large API-hardening and ergonomics release. The headline themes are
@@ -149,6 +175,7 @@ Initial release of the safe `thorvg` bindings.
   `expressions`, `threads`, `file-io` pass through to `thorvg-sys`.
 - Removed `EngineOption::Aliased` (dropped upstream in ThorVG 1.0.5).
 
+[0.4.0]: https://github.com/goyox86/thorvg-rs/releases/tag/thorvg-v0.4.0
 [0.3.0]: https://github.com/goyox86/thorvg-rs/releases/tag/thorvg-v0.3.0
 [0.2.0]: https://github.com/goyox86/thorvg-rs/releases/tag/thorvg-v0.2.0
 [0.1.2]: https://github.com/goyox86/thorvg-rs/releases/tag/thorvg-v0.1.2

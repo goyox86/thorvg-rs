@@ -13,7 +13,9 @@
 
 use libfuzzer_sys::arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-use thorvg::{BlurBorder, BlurDirection, DropShadow, Rect, Rgb, Rgba, Thorvg, Tint, Tritone};
+use thorvg::{
+    BlurBorder, BlurDirection, DropShadow, GaussianBlur, Rect, Rgb, Rgba, Thorvg, Tint, Tritone,
+};
 
 #[derive(Arbitrary, Debug)]
 enum Effect {
@@ -25,7 +27,7 @@ enum Effect {
         direction: u8,
         /// Mapped into [`BlurBorder`] via `% 2`.
         border: u8,
-        quality: i32,
+        quality: u8,
     },
     DropShadow {
         r: u8,
@@ -131,7 +133,12 @@ fuzz_target!(|input: Input| {
                     } else {
                         BlurBorder::Wrap
                     };
-                    scene.add_gaussian_blur_effect(sigma, direction, border, quality)
+                    scene.add_gaussian_blur_effect(GaussianBlur {
+                        sigma,
+                        direction,
+                        border,
+                        quality,
+                    })
                 }
                 Effect::DropShadow {
                     r,

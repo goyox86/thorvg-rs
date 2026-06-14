@@ -954,7 +954,7 @@ fn write_config_h(out_dir: &Path) {
          #pragma once\n\n\
          #define THORVG_CAPI_BINDING_SUPPORT 1\n\
          #define THORVG_CPU_ENGINE_SUPPORT 1\n\
-         #define THORVG_VERSION_STRING \"1.0.5\"\n",
+         #define THORVG_VERSION_STRING \"1.0.6\"\n",
     );
 
     if cfg!(feature = "lottie") {
