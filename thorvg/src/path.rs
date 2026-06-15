@@ -72,13 +72,18 @@ impl PathCommand {
     /// to react to an unrecognised command rather than silently
     /// coercing it to a default kind.
     pub(crate) fn from_raw(c: sys::Tvg_Path_Command) -> Option<Self> {
-        // Widen to the type bindgen used for the named constants
-        // (`c_uint`) so the match arms line up.
-        match u32::from(c) {
-            sys::TVG_PATH_COMMAND_CLOSE => Some(Self::Close),
-            sys::TVG_PATH_COMMAND_MOVE_TO => Some(Self::MoveTo),
-            sys::TVG_PATH_COMMAND_LINE_TO => Some(Self::LineTo),
-            sys::TVG_PATH_COMMAND_CUBIC_TO => Some(Self::CubicTo),
+        // bindgen types these constants as `c_uint` on some targets and
+        // `c_int` on others (MSVC). Normalise them to `u32` consts so the
+        // match patterns are stable regardless of the generated repr.
+        const CLOSE: u32 = sys::TVG_PATH_COMMAND_CLOSE as u32;
+        const MOVE_TO: u32 = sys::TVG_PATH_COMMAND_MOVE_TO as u32;
+        const LINE_TO: u32 = sys::TVG_PATH_COMMAND_LINE_TO as u32;
+        const CUBIC_TO: u32 = sys::TVG_PATH_COMMAND_CUBIC_TO as u32;
+        match c as u32 {
+            CLOSE => Some(Self::Close),
+            MOVE_TO => Some(Self::MoveTo),
+            LINE_TO => Some(Self::LineTo),
+            CUBIC_TO => Some(Self::CubicTo),
             _ => None,
         }
     }
