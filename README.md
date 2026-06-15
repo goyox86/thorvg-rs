@@ -1,5 +1,7 @@
 # thorvg-rs
 
+[![CI](https://github.com/goyox86/thorvg-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/goyox86/thorvg-rs/actions/workflows/ci.yml)
+
 > **⚠️ Work in progress** — This crate is under active development and not yet ready for production use. APIs may change without notice.
 
 Rust bindings for [ThorVG](https://github.com/thorvg/thorvg), a production-ready vector graphics engine supporting SVG, Lottie animations, shapes, text, gradients, effects, and more.
@@ -79,15 +81,20 @@ ThorVG is compiled from C++ source using the [`cc`](https://crates.io/crates/cc)
 picks up the correct cross-compiler from Cargo's target environment.
 No meson or ninja required.
 
-Tested targets:
+Tested targets (⚙️ = exercised in CI):
 
 | Target | Runtime | Notes |
 |--------|---------|-------|
-| `x86_64-unknown-linux-gnu` | system libc | Desktop default |
+| `x86_64-unknown-linux-gnu` | system libc | Desktop default ⚙️ |
+| `x86_64-pc-windows-msvc` | system libc (MSVC) | Desktop ⚙️ |
+| `aarch64-apple-darwin` | system libc | macOS, Apple Silicon ⚙️ |
 | `xtensa-esp32s3-espidf` | ESP-IDF | SDK provides libc |
 | `xtensa-esp32-espidf` | ESP-IDF | SDK provides libc |
 | `riscv32imc-esp-espidf` | ESP-IDF | SDK provides libc |
-| `riscv32imac-unknown-none-elf` | bare-metal | Vendored picolibc — see [`thorvg-sys/docs/bare_metal.md`](thorvg-sys/docs/bare_metal.md) |
+| `riscv32imac-unknown-none-elf` | bare-metal | Vendored picolibc — see [`thorvg-sys/docs/bare_metal.md`](thorvg-sys/docs/bare_metal.md) ⚙️ |
+
+CI also covers the non-vendored path (linking a system ThorVG via
+`pkg-config`) on Linux and macOS.
 
 On `target_os == "none"` targets, `thorvg-sys` vendors and compiles
 [picolibc](https://github.com/picolibc/picolibc) as the libc; the
