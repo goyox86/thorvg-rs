@@ -50,6 +50,38 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo check -p thorvg --no-default-features --features "${{ matrix.features }}"
 
+  # The non-vendored path: link against a system ThorVG shared library via
+  # pkg-config instead of compiling the vendored sources. Needs a real
+  # libthorvg.so built with the C API (-Dbindings=capi) so the tvg_* symbols
+  # exist to link against.
+  system-lib:
+    name: system lib (non-vendored)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # capi header (bindgen) + meson sources
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang meson ninja-build
+      - name: Build & install system thorvg (shared, C API)
+        run: |
+          meson setup /tmp/tvg thorvg-sys/thorvg \
+            --prefix=/usr --libdir=lib --buildtype=release \
+            -Dbindings=capi -Dengines=cpu \
+            -Dloaders="svg, png, lottie, ttf, otf" \
+            -Dthreads=true -Dfile=true
+          sudo meson install -C /tmp/tvg
+          sudo ldconfig
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build against the shared library
+        env:
+          PKG_CONFIG_PATH: /usr/lib/pkgconfig
+        run: >
+          cargo build -p thorvg
+          --no-default-features
+          --features std,lottie,svg,png,fonts,expressions,threads,file-io
+
   clippy:
     name: clippy
     runs-on: ubuntu-latest
