@@ -10,6 +10,23 @@ version (`0.y`), per SemVer's `0.x` rule.
 The companion `thorvg-sys` FFI crate is versioned independently — see
 [`thorvg-sys/CHANGELOG.md`](../thorvg-sys/CHANGELOG.md).
 
+## [0.4.1] - 2026-06-15
+
+Portability and documentation fixes. No API change — a patch bump.
+
+### Fixed
+
+- **Windows (MSVC) build.** Path-command decoding no longer depends on
+  bindgen's enum repr: the `TVG_PATH_COMMAND_*` constants are `c_uint` on
+  most targets but `c_int` on MSVC, which broke the `match` (E0308).
+- **Three broken rustdoc intra-doc links** (`Thorvg::load_font`,
+  `BorrowedPaint`, `BorrowedPaint::paint_type`).
+
+### Changed
+
+- **Depends on `thorvg-sys` 0.2.1**, which carries the MSVC and
+  system-library (pkg-config) build fixes.
+
 ## [0.4.0] - 2026-06-15
 
 Tracks **ThorVG 1.0.6** (via `thorvg-sys` 0.2). Picks up the upstream
