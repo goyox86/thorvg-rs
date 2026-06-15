@@ -30,18 +30,19 @@ jobs:
           submodules: recursive # thorvg + picolibc
       - name: Install libclang (for host bindgen)
         run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang
-      # Ubuntu's gcc-riscv64-unknown-elf is C-only; ThorVG is C++ and needs
-      # libstdc++ headers even on bare metal. The xPack toolchain ships them
-      # plus the rv32 multilibs.
-      - name: Install xPack riscv-none-elf-gcc (C++ stdlib + multilibs)
+      # ThorVG is C++ and needs libstdc++ headers even on bare metal.
+      # build.rs's picolibc header isolation is tuned to Espressif's
+      # riscv32-esp-elf toolchain (the one documented in thorvg-sys/README),
+      # so use it rather than a generic bare-metal GCC.
+      - name: Install riscv32-esp-elf toolchain (Espressif)
         run: |
-          url=$(curl -fsSL https://api.github.com/repos/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/latest \
-            | grep -oE 'https://[^"]*-linux-x64\.tar\.gz' | head -1)
+          url=$(curl -fsSL https://api.github.com/repos/espressif/crosstool-NG/releases/latest \
+            | grep -oE 'https://[^"]*riscv32-esp-elf[^"]*x86_64-linux-gnu\.tar\.xz' | head -1)
           echo "Downloading $url"
-          curl -fsSL "$url" -o /tmp/riscv-gcc.tar.gz
-          sudo mkdir -p /opt/riscv
-          sudo tar -xf /tmp/riscv-gcc.tar.gz -C /opt/riscv --strip-components=1
-          echo "/opt/riscv/bin" >> "$GITHUB_PATH"
+          curl -fsSL "$url" -o /tmp/riscv-esp.tar.xz
+          sudo mkdir -p /opt/esp
+          sudo tar -xf /tmp/riscv-esp.tar.xz -C /opt/esp
+          echo "/opt/esp/riscv32-esp-elf/bin" >> "$GITHUB_PATH"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: riscv32imac-unknown-none-elf
@@ -51,8 +52,8 @@ jobs:
       # cross compiler (no vendor binary name is hardcoded).
       - name: Build (no_std + picolibc)
         env:
-          CC_riscv32imac_unknown_none_elf: riscv-none-elf-gcc
-          CXX_riscv32imac_unknown_none_elf: riscv-none-elf-g++
+          CC_riscv32imac_unknown_none_elf: riscv32-esp-elf-gcc
+          CXX_riscv32imac_unknown_none_elf: riscv32-esp-elf-g++
         run: >
           cargo build -p thorvg
           --target riscv32imac-unknown-none-elf
