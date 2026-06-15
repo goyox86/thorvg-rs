@@ -39,8 +39,12 @@ jobs:
       # macOS: libclang ships with the Xcode command-line tools.
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace --all-targets
-      - run: cargo test --workspace --doc
+      # ThorVG's engine is a process-global, refcounted singleton, so running
+      # the engine init/term tests in parallel races on its lifecycle. That
+      # surfaces as an intermittent blank render on arm64's weak memory model
+      # (benign on x86's stronger ordering). Run the suite single-threaded.
+      - run: cargo test --workspace --all-targets -- --test-threads=1
+      - run: cargo test --workspace --doc -- --test-threads=1
 
   features:
     name: features (${{ matrix.features }})
