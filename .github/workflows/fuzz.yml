@@ -32,7 +32,9 @@ jobs:
       - name: Install libclang
         run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang
       - uses: dtolnay/rust-toolchain@nightly
-      - uses: taiki-e/install-action@cargo-fuzz
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: fuzz

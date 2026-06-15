@@ -359,10 +359,11 @@ impl Picture<'_> {
 
     /// Retrieves a paint object from the picture scene by its unique ID.
     ///
-    /// The returned [`BorrowedPaint`] is owned by the picture's scene
-    /// graph; its lifetime is tied to `&self`, so it cannot outlive
-    /// the picture.  Use [`BorrowedPaint::paint_type`] to dispatch on
-    /// the runtime type.
+    /// The returned [`BorrowedPaint`](crate::paint::BorrowedPaint) is owned
+    /// by the picture's scene graph; its lifetime is tied to `&self`, so it
+    /// cannot outlive the picture.  Use
+    /// [`BorrowedPaint::paint_type`](crate::paint::BorrowedPaint::paint_type)
+    /// to dispatch on the runtime type.
     pub fn get_paint(&self, id: u32) -> Option<crate::paint::BorrowedPaint<'_>> {
         let raw = unsafe { sys::tvg_picture_get_paint(self.raw, id) };
         if raw.is_null() {

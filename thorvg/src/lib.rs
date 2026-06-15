@@ -6,7 +6,7 @@
 //! # `no_std` Support
 //!
 //! This crate is `no_std` compatible (requires `alloc`). The `std` feature (enabled by default)
-//! adds file I/O APIs that accept [`std::path::Path`] (e.g., [`Picture::load`], [`Text::load_font`]).
+//! adds file I/O APIs that accept [`std::path::Path`] (e.g., [`Picture::load`], [`Thorvg::load_font`]).
 //!
 //! To use in `no_std`, disable default features:
 //! ```toml
