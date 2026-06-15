@@ -1,3 +1,8 @@
+//! Rendering canvases (software, OpenGL, WebGPU) and the shared
+//! [`Canvas`] trait.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use crate::color::ColorSpace;
 use crate::error::{Error, Result};
 use crate::paint::Paint;
@@ -90,35 +95,109 @@ impl EngineOption {
 /// defined in this crate can implement it.  Adding a new canvas
 /// backend is the engine's responsibility, not the user's.
 pub trait Canvas: sealed::Sealed {
-    /// Adds a paint object to the canvas for rendering.
+    /// Adds a paint object to the canvas for rendering, appending it
+    /// after any previously added paints.
     ///
-    /// Ownership of the paint is transferred to the canvas.
+    /// Ownership of the paint is transferred to the canvas; it is
+    /// released when the canvas is dropped or the paint is removed.
+    /// Paints render in the order they are added.
+    ///
+    /// See [`SwCanvas::add`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is not in
+    /// a valid state to accept new paints.
     fn add<P: Paint>(&mut self, paint: P) -> Result<()>;
 
-    /// Inserts a paint object before another existing paint in the canvas.
+    /// Inserts a paint object immediately before another existing paint
+    /// in the canvas.
     ///
-    /// Ownership of `target` is transferred to the canvas.
+    /// Ownership of `target` is transferred to the canvas. Paints
+    /// render in scene order, so `target` will render before `at`.
+    ///
+    /// See [`SwCanvas::insert`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `at` is not a paint
+    /// currently held by this canvas.
     fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()>;
 
-    /// Removes a paint object from the canvas.
+    /// Removes a paint object from the canvas, dropping the canvas'
+    /// reference to it.
+    ///
+    /// See [`SwCanvas::remove`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `paint` is not held by
+    /// this canvas.
     fn remove<P: Paint>(&mut self, paint: &P) -> Result<()>;
 
     /// Removes all paint objects from the canvas.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     fn clear(&mut self) -> Result<()>;
 
     /// Updates all modified paint objects in preparation for rendering.
+    ///
+    /// See [`SwCanvas::update`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is not
+    /// prepared — for instance when no target has been set, or while a
+    /// previous [`draw`](Self::draw) has not been followed by
+    /// [`sync`](Self::sync).
     fn update(&mut self) -> Result<()>;
 
     /// Renders all paint objects on the canvas.
+    ///
+    /// See [`SwCanvas::draw`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is not
+    /// prepared — for instance when no target has been set, or while a
+    /// previous draw has not been followed by [`sync`](Self::sync).
     fn draw(&mut self, clear: bool) -> Result<()>;
 
-    /// Waits for the rendering to finish.
+    /// Waits for the rendering started by [`draw`](Self::draw) to
+    /// finish.
+    ///
+    /// See [`SwCanvas::sync`] for details.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     fn sync(&mut self) -> Result<()>;
 
     /// Sets the drawing viewport (clipping region).
+    ///
+    /// See [`SwCanvas::set_viewport`] for the ordering and synced-state
+    /// requirements.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is not in
+    /// a synced state, or if the viewport is changed after
+    /// [`add`](Self::add), `remove`, [`update`](Self::update), or
+    /// [`draw`](Self::draw).
     fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()>;
 
-    /// Update, draw (clearing the buffer), and sync in one call.
+    /// Updates, draws (clearing the buffer), and syncs in one call.
+    ///
+    /// Equivalent to [`update`](Self::update),
+    /// [`draw(true)`](Self::draw), then [`sync`](Self::sync).
+    ///
+    /// # Errors
+    ///
+    /// Returns the first [`Error`] produced by the wrapped
+    /// [`update`](Self::update), [`draw`](Self::draw), or
+    /// [`sync`](Self::sync) call.
     fn render(&mut self) -> Result<()>;
 }
 
@@ -169,42 +248,117 @@ macro_rules! impl_canvas {
                 })
             }
 
-            /// Adds a paint object to the canvas for rendering.
+            /// Adds a paint object to the canvas for rendering,
+            /// appending it after any previously added paints.
             ///
-            /// Ownership of the paint is transferred to the canvas.
+            /// Ownership of the paint is transferred to the canvas:
+            /// the paint is released when the canvas is dropped, when
+            /// the canvas is [`clear`](Self::clear)ed, or when the
+            /// paint is [`remove`](Self::remove)d. Paints render in the
+            /// order they are added, so later additions draw on top.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`Error::InsufficientCondition`] if the canvas
+            /// is not in a valid state to accept new paints.
             pub fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
                 let raw_paint = paint.into_raw();
                 Error::from_raw(unsafe { sys::tvg_canvas_add(self.raw, raw_paint) })
             }
 
-            /// Inserts a paint object before another existing paint in the canvas.
+            /// Inserts a paint object immediately before another
+            /// existing paint in the canvas.
+            ///
+            /// Ownership of `target` is transferred to the canvas (see
+            /// [`add`](Self::add)). Because paints render in scene
+            /// order, `target` draws *before* `at`.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`Error::InvalidArguments`] if `at` is not a
+            /// paint currently held by this canvas. (The wrapper always
+            /// passes a non-null `at`; the C API would otherwise append
+            /// when `at` is null.)
             pub fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
                 Error::from_raw(unsafe {
                     sys::tvg_canvas_insert(self.raw, target.into_raw(), at.raw())
                 })
             }
 
-            /// Removes a paint object from the canvas.
+            /// Removes a paint object from the canvas, dropping the
+            /// canvas' reference to it.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`Error::InvalidArguments`] if `paint` is not
+            /// held by this canvas.
             pub fn remove<P: Paint>(&mut self, paint: &P) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_remove(self.raw, paint.raw()) })
             }
 
             /// Removes all paint objects from the canvas.
+            ///
+            /// Forwards to `tvg_canvas_remove` with a null paint, which
+            /// the C API treats as "remove everything".
+            ///
+            /// # Errors
+            ///
+            /// Returns an [`Error`] if the underlying engine reports a
+            /// failure.
             pub fn clear(&mut self) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_remove(self.raw, core::ptr::null_mut()) })
             }
 
-            /// Updates all modified paint objects in preparation for rendering.
+            /// Updates all modified paint objects in preparation for
+            /// rendering.
+            ///
+            /// Only paints changed since the last update are
+            /// reprocessed. [`draw`](Self::draw) performs this
+            /// implicitly if the canvas has not been updated, so an
+            /// explicit call is only needed when you want updating and
+            /// drawing separated.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`Error::InsufficientCondition`] if the canvas
+            /// is not prepared — for instance when no target has been
+            /// set, or while a previous [`draw`](Self::draw) has not
+            /// been followed by [`sync`](Self::sync).
             pub fn update(&mut self) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_update(self.raw) })
             }
 
             /// Renders all paint objects on the canvas.
+            ///
+            /// If `clear` is `true`, the target buffer is zeroed before
+            /// drawing; pass `false` to skip the clear when the canvas
+            /// will be fully covered by opaque content. Rendering may
+            /// run asynchronously, so call [`sync`](Self::sync)
+            /// afterwards to guarantee completion before reading the
+            /// target.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`Error::InsufficientCondition`] if the canvas
+            /// is not prepared — for instance when no target has been
+            /// set, or while a previous draw has not been followed by
+            /// [`sync`](Self::sync).
             pub fn draw(&mut self, clear: bool) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_draw(self.raw, clear) })
             }
 
-            /// Waits for the rendering to finish.
+            /// Waits for the rendering started by [`draw`](Self::draw)
+            /// to finish.
+            ///
+            /// Must be called after every [`draw`](Self::draw)
+            /// regardless of threading. Until it returns, the target
+            /// buffer is being written by the engine and must not be
+            /// accessed.
+            ///
+            /// # Errors
+            ///
+            /// Returns an [`Error`] if the underlying engine reports a
+            /// failure.
             pub fn sync(&mut self) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_sync(self.raw) })
             }
@@ -217,14 +371,28 @@ macro_rules! impl_canvas {
             /// with [`Error::InsufficientCondition`]. The canvas must be in a
             /// synced state. Resetting the target also resets the viewport to
             /// the target size.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`Error::InsufficientCondition`] if the canvas
+            /// is not in a synced state, or if the viewport is changed
+            /// after [`add`](Self::add), `remove`,
+            /// [`update`](Self::update), or [`draw`](Self::draw).
             pub fn set_viewport(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<()> {
                 Error::from_raw(unsafe { sys::tvg_canvas_set_viewport(self.raw, x, y, w, h) })
             }
 
-            /// Update, draw (clearing the buffer), and sync in one call.
+            /// Updates, draws (clearing the buffer), and syncs in one
+            /// call.
             ///
             /// Equivalent to calling [`update`](Self::update), [`draw(true)`](Self::draw),
             /// and [`sync`](Self::sync) in sequence.
+            ///
+            /// # Errors
+            ///
+            /// Returns the first [`Error`] produced by the wrapped
+            /// [`update`](Self::update), [`draw`](Self::draw), or
+            /// [`sync`](Self::sync) call.
             pub fn render(&mut self) -> Result<()> {
                 self.update()?;
                 self.draw(true)?;
@@ -306,9 +474,19 @@ impl_canvas! {
 impl SwCanvas<'_> {
     /// Sets the rendering target buffer.
     ///
-    /// The buffer must be at least `stride * height` elements, and
-    /// `stride` must be `>= width` (otherwise rows would overlap or
-    /// truncate).
+    /// `stride` is the row pitch in pixels (`u32` elements) and is
+    /// usually equal to `width`; `width`/`height` are the visible
+    /// raster dimensions. `ThorVG` does not allocate the output buffer
+    /// itself — the caller owns it and it must hold at least
+    /// `stride * height` `u32` pixels. `colorspace` selects how those
+    /// 32-bit values are interpreted; `ThorVG` accepts only the four
+    /// 8888 spaces ([`ColorSpace::ABGR8888`], [`ColorSpace::ARGB8888`],
+    /// [`ColorSpace::ABGR8888S`], [`ColorSpace::ARGB8888S`]).
+    ///
+    /// The canvas must be in a synced state; if a previous
+    /// [`draw`](Self::draw) is still in flight, call [`sync`](Self::sync)
+    /// first. Resetting the target also resets the viewport to the new
+    /// target size.
     ///
     /// # Safety
     /// The caller must ensure that `buffer` remains valid and is not moved,
@@ -316,6 +494,17 @@ impl SwCanvas<'_> {
     /// `set_target` is called again with a different buffer). The canvas stores
     /// the pointer internally and writes to it during [`draw`](Self::draw) and
     /// [`sync`](Self::sync).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `stride < width`, if
+    /// `stride * height` overflows `u64`, or if `buffer` is shorter
+    /// than `stride * height` — these are checked by the wrapper before
+    /// the FFI call. `ThorVG` itself additionally returns
+    /// [`Error::InvalidArguments`] if any of `stride`, `width`, or
+    /// `height` is zero, [`Error::InsufficientCondition`] if the canvas
+    /// is currently rendering (not synced), and [`Error::NotSupported`]
+    /// if the software engine is unavailable.
     pub unsafe fn set_target(
         &mut self,
         buffer: &mut [u32],
@@ -380,6 +569,12 @@ impl GlCanvas<'_> {
     /// The caller must ensure the pointer fields of `target` are
     /// valid GL/EGL handles (or null where allowed; see
     /// [`GlTarget`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is
+    /// currently rendering (call [`sync`](Self::sync) first), or
+    /// [`Error::NotSupported`] if the GL engine is unavailable.
     pub unsafe fn set_target(&mut self, target: GlTarget) -> Result<()> {
         let GlTarget {
             display,
@@ -502,6 +697,12 @@ impl WgCanvas<'_> {
     /// The caller must ensure the pointer fields of `target` are
     /// valid WebGPU handles (or null where allowed; see
     /// [`WgTarget`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is
+    /// currently rendering (call [`sync`](Self::sync) first), or
+    /// [`Error::NotSupported`] if the WebGPU engine is unavailable.
     pub unsafe fn set_target(&mut self, target: WgTarget) -> Result<()> {
         let WgTarget {
             device,

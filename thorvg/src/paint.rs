@@ -1,3 +1,7 @@
+//! Paints, transforms, and the shared [`Paint`] trait.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use crate::error::{Error, Result};
 use crate::shape::Shape;
 use thorvg_sys as sys;
@@ -316,7 +320,10 @@ pub struct BorrowedPaint<'a> {
 }
 
 impl BorrowedPaint<'_> {
+    /// Wraps a raw handle as a read-only borrow.
+    ///
     /// # Safety
+    ///
     /// `raw` must be a valid paint handle whose owner outlives `'a`.
     pub(crate) unsafe fn from_raw(raw: sys::Tvg_Paint) -> Self {
         Self {
@@ -325,33 +332,51 @@ impl BorrowedPaint<'_> {
         }
     }
 
-    /// Returns the underlying raw handle.  Intended for use with
-    /// `thorvg-sys` C APIs not yet wrapped here; lifetime `'a` keeps
-    /// the borrow honest.
+    /// Returns the underlying raw handle.
+    ///
+    /// Intended for use with `thorvg-sys` C APIs not yet wrapped here; the
+    /// `'a` lifetime keeps the borrow honest. Do not use it to mutate the
+    /// paint — that would race with the owner.
     pub fn raw(&self) -> sys::Tvg_Paint {
         self.raw
     }
 
-    /// The runtime paint type of the borrowed handle.
+    /// Returns the runtime [`PaintType`] of the borrowed handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     pub fn paint_type(&self) -> Result<PaintType> {
         let mut t = sys::Tvg_Type::TVG_TYPE_UNDEF;
         Error::from_raw(unsafe { sys::tvg_paint_get_type(self.raw, &raw mut t) })?;
         Ok(PaintType::from_raw(t))
     }
 
-    /// The user-assigned id, or 0 if none was set.
+    /// Returns the user-assigned id, or `0` if none was set.
     pub fn id(&self) -> u32 {
         unsafe { sys::tvg_paint_get_id(self.raw) }
     }
 
-    /// The opacity (0..=255).
+    /// Returns the opacity, in the range `0..=255`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     pub fn opacity(&self) -> Result<u8> {
         let mut o: u8 = 0;
         Error::from_raw(unsafe { sys::tvg_paint_get_opacity(self.raw, &raw mut o) })?;
         Ok(o)
     }
 
-    /// The axis-aligned bounding box `(x, y, w, h)` in canvas space.
+    /// Returns the axis-aligned bounding box `(x, y, w, h)` in canvas space.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the bounds cannot be
+    /// computed (usually invalid path data), or [`Error::InvalidArguments`]
+    /// if the underlying handle is invalid.
     pub fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
         let (mut x, mut y, mut w, mut h) = (0f32, 0f32, 0f32, 0f32);
         Error::from_raw(unsafe {
@@ -420,56 +445,126 @@ pub(crate) mod sealed {
 /// This trait is **sealed**: only types defined in this crate may
 /// implement it.
 pub trait Paint: sealed::Sealed {
-    /// Returns the raw `Tvg_Paint` pointer.
+    /// Returns the underlying raw `Tvg_Paint` handle without transferring
+    /// ownership.
     fn raw(&self) -> sys::Tvg_Paint;
 
-    /// Consumes self and returns the raw pointer, transferring ownership.
+    /// Consumes `self` and returns the raw handle, transferring ownership.
+    ///
+    /// The caller becomes responsible for the handle; the Rust `Drop` that
+    /// would otherwise free it is suppressed.
     fn into_raw(self) -> sys::Tvg_Paint;
 
-    /// Sets the opacity of the paint object (0 = transparent, 255 = opaque).
+    /// Sets the opacity, where `0` is fully transparent and `255` is fully
+    /// opaque.
+    ///
+    /// Changing the opacity can force the engine into a multi-pass
+    /// composition, so prefer leaving it unchanged on hot paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn set_opacity(&mut self, opacity: u8) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_set_opacity(self.raw(), opacity) })
     }
 
-    /// Gets the opacity of the paint object.
+    /// Returns the opacity, in the range `0..=255`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn opacity(&self) -> Result<u8> {
         let mut opacity: u8 = 0;
         Error::from_raw(unsafe { sys::tvg_paint_get_opacity(self.raw(), &raw mut opacity) })?;
         Ok(opacity)
     }
 
-    /// Sets the visibility of the paint object.
+    /// Sets whether the paint is rendered.
+    ///
+    /// A hidden paint is excluded from the rendered output but is not
+    /// deactivated: it may still be processed during updates. To remove it
+    /// entirely, take it off the canvas instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn set_visible(&mut self, visible: bool) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_set_visible(self.raw(), visible) })
     }
 
-    /// Gets the visibility status of the paint object.
+    /// Returns `true` if the paint is rendered.
     fn visible(&self) -> bool {
         unsafe { sys::tvg_paint_get_visible(self.raw()) }
     }
 
-    /// Scales the paint object by the given factor.
+    /// Scales the paint uniformly by `factor`.
+    ///
+    /// This is an incremental helper layered on the paint's transform; for
+    /// non-uniform scaling build a [`Matrix`] and pass it to
+    /// [`set_transform`](Paint::set_transform).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if a custom transform has
+    /// already been set via [`set_transform`](Paint::set_transform), or
+    /// [`Error::InvalidArguments`] if the underlying handle is invalid.
     fn scale(&mut self, factor: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_scale(self.raw(), factor) })
     }
 
-    /// Rotates the paint object by the given angle in degrees.
+    /// Rotates the paint by `degree` degrees, clockwise about the origin.
+    ///
+    /// The rotation axis passes through the object's local origin `(0, 0)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if a custom transform has
+    /// already been set via [`set_transform`](Paint::set_transform), or
+    /// [`Error::InvalidArguments`] if the underlying handle is invalid.
     fn rotate(&mut self, degree: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_rotate(self.raw(), degree) })
     }
 
-    /// Translates the paint object by the given offset.
+    /// Translates the paint by `(x, y)`.
+    ///
+    /// The coordinate origin is the upper-left corner of the canvas, with
+    /// `x` increasing right and `y` increasing down.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if a custom transform has
+    /// already been set via [`set_transform`](Paint::set_transform), or
+    /// [`Error::InvalidArguments`] if the underlying handle is invalid.
     fn translate(&mut self, x: f32, y: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_translate(self.raw(), x, y) })
     }
 
-    /// Sets the affine transformation matrix.
+    /// Sets the affine transformation matrix, replacing any prior transform.
+    ///
+    /// Unlike [`scale`](Paint::scale), [`rotate`](Paint::rotate), and
+    /// [`translate`](Paint::translate) — which the engine rejects once a
+    /// custom transform exists — this overwrites the transform outright.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn set_transform(&mut self, m: &Matrix) -> Result<()> {
         let raw_m = m.to_raw();
         Error::from_raw(unsafe { sys::tvg_paint_set_transform(self.raw(), &raw const raw_m) })
     }
 
-    /// Gets the affine transformation matrix.
+    /// Returns the affine transformation matrix.
+    ///
+    /// If no transform was set, this is [`Matrix::IDENTITY`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn transform(&self) -> Result<Matrix> {
         let mut m = sys::Tvg_Matrix {
             e11: 0.0,
@@ -486,7 +581,17 @@ pub trait Paint: sealed::Sealed {
         Ok(Matrix::from_raw(m))
     }
 
-    /// Gets the axis-aligned bounding box (AABB): `(x, y, width, height)`.
+    /// Returns the axis-aligned bounding box `(x, y, width, height)` in
+    /// canvas space, with all transforms applied.
+    ///
+    /// The paint must have been updated on a canvas first (typically after
+    /// a draw/sync), otherwise the bounds reflect stale geometry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the bounds cannot be
+    /// computed (usually invalid path data), or [`Error::InvalidArguments`]
+    /// if the underlying handle is invalid.
     fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
         let mut x: f32 = 0.0;
         let mut y: f32 = 0.0;
@@ -498,7 +603,17 @@ pub trait Paint: sealed::Sealed {
         Ok((x, y, w, h))
     }
 
-    /// Gets the oriented bounding box (OBB) as 4 corner points.
+    /// Returns the oriented bounding box (OBB) as its four corner points in
+    /// canvas space.
+    ///
+    /// Unlike [`bounds`](Paint::bounds), the OBB preserves the object's
+    /// rotation: it is the local AABB with the object's transform applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the bounds cannot be
+    /// computed (usually invalid path data), or [`Error::InvalidArguments`]
+    /// if the underlying handle is invalid.
     fn bounds_obb(&self) -> Result<[Point; 4]> {
         let mut pts = [sys::Tvg_Point { x: 0.0, y: 0.0 }; 4];
         Error::from_raw(unsafe { sys::tvg_paint_get_obb(self.raw(), pts.as_mut_ptr()) })?;
@@ -522,17 +637,21 @@ pub trait Paint: sealed::Sealed {
         ])
     }
 
-    /// Clips the drawing region to the specified shape's paths.
+    /// Clips this paint's drawing region to the `clipper` shape's paths.
     ///
-    /// Consumes the `clipper` **on success**: the C side stores its raw
-    /// pointer in this paint's state and refcount-manages its lifetime via
-    /// the canvas's destruction, and we call `into_raw` to suppress the
-    /// Rust `Drop` that would otherwise double-free.
+    /// On success the `clipper` is consumed: the engine takes a reference
+    /// and ties its lifetime to this paint (released when the owning canvas
+    /// is destroyed), and the Rust `Drop` is suppressed to avoid a
+    /// double-free. On error the engine never touches the `clipper`, so it
+    /// is dropped normally and its allocation is released rather than
+    /// leaked.
     ///
-    /// On error the C side never touches `clipper` (the only error path
-    /// — `InsufficientCondition` when `clipper` already has a parent —
-    /// returns before any state change), so we let `clipper` `Drop`
-    /// normally to release the allocation rather than leaking it.
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if `clipper` already belongs
+    /// to another paint. (The C API also reports `NOT_SUPPORTED` for a
+    /// non-shape clipper, but the [`Shape`] argument type makes that
+    /// unreachable here.)
     fn set_clip(&mut self, clipper: Shape<'_>) -> Result<()> {
         let raw = clipper.raw();
         let r = Error::from_raw(unsafe { sys::tvg_paint_set_clip(self.raw(), raw) });
@@ -542,7 +661,11 @@ pub trait Paint: sealed::Sealed {
         r
     }
 
-    /// Gets the clip shape, if any.
+    /// Returns the clip shape set via [`set_clip`](Paint::set_clip), or
+    /// `None` if none is set.
+    ///
+    /// The returned [`Shape`] is a non-owning view: it does not free the
+    /// underlying clipper on drop.
     fn clip(&self) -> Option<Shape<'_>> {
         let raw = unsafe { sys::tvg_paint_get_clip(self.raw()) };
         if raw.is_null() {
@@ -552,19 +675,21 @@ pub trait Paint: sealed::Sealed {
         }
     }
 
-    /// Sets the masking target and method.
+    /// Masks this paint with `mask` using the given [`MaskMethod`].
     ///
-    /// Consumes the `mask` **on success**: the C side stores its raw
-    /// pointer in this paint's state and refcount-manages its lifetime
-    /// via the canvas's destruction, and we call `into_raw` to suppress
-    /// the Rust `Drop` that would otherwise double-free.
+    /// On success the `mask` is consumed: the engine takes a reference and
+    /// ties its lifetime to this paint (released when the owning canvas is
+    /// destroyed), and the Rust `Drop` is suppressed to avoid a
+    /// double-free. On error the engine does not take ownership, so `mask`
+    /// is dropped normally and its allocation is released rather than
+    /// leaked.
     ///
-    /// On error the C side does not take ownership of `mask` (the two
-    /// reachable error paths — `InsufficientCondition` when `mask` has
-    /// a parent, and `InvalidArguments` when `method == MaskMethod::None`
-    /// with a non-null target — both return before touching `mask`'s
-    /// refcount), so we let `mask` `Drop` normally to release the
-    /// allocation rather than leaking it.
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if `mask` already belongs to
+    /// another paint, or [`Error::InvalidArguments`] if `method` is
+    /// [`MaskMethod::None`] (passing a target with no masking method is
+    /// rejected — use a real method, or clear the mask through the engine).
     fn set_mask<P: Paint>(&mut self, mask: P, method: MaskMethod) -> Result<()> {
         let raw = mask.raw();
         let r = Error::from_raw(unsafe {
@@ -576,10 +701,10 @@ pub trait Paint: sealed::Sealed {
         r
     }
 
-    /// Gets the mask target and method, if a mask is set.
+    /// Returns the mask target and [`MaskMethod`] set via
+    /// [`set_mask`](Paint::set_mask), or `None` if no mask is attached.
     ///
-    /// Returns `None` when no mask is attached.  The returned
-    /// [`BorrowedPaint`] is read-only and tied to the source paint's
+    /// The returned [`BorrowedPaint`] is read-only and tied to this paint's
     /// lifetime — dropping the source invalidates the borrow.
     ///
     /// # Why a borrow rather than `Shape<'_>`
@@ -618,34 +743,61 @@ pub trait Paint: sealed::Sealed {
         ))
     }
 
-    /// Sets the blending method.
+    /// Sets the [`BlendMethod`] used to composite this paint over the layer
+    /// beneath it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn set_blend(&mut self, method: BlendMethod) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_set_blend_method(self.raw(), method.to_raw()) })
     }
 
-    /// Sets the paint ID.
+    /// Sets the paint's id, used to identify a paint instance within a scene.
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn set_id(&mut self, id: u32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_paint_set_id(self.raw(), id) })
     }
 
-    /// Gets the paint ID.
+    /// Returns the user-assigned id, or `0` if none was set.
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
     fn id(&self) -> u32 {
         unsafe { sys::tvg_paint_get_id(self.raw()) }
     }
 
-    /// Gets the concrete type of this paint object.
+    /// Returns the concrete [`PaintType`] of this paint.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the underlying handle is
+    /// invalid.
     fn paint_type(&self) -> Result<PaintType> {
         let mut t = sys::Tvg_Type::TVG_TYPE_UNDEF;
         Error::from_raw(unsafe { sys::tvg_paint_get_type(self.raw(), &raw mut t) })?;
         Ok(PaintType::from_raw(t))
     }
 
-    /// Checks whether a region intersects the filled area (hit-testing).
+    /// Returns `true` if the rectangle `(x, y, w, h)` intersects this paint's
+    /// filled area (hit-testing).
+    ///
+    /// To test a single point, use `w = 1, h = 1`; non-positive `w` or `h`
+    /// always returns `false`. The paint must have been updated on a canvas
+    /// first. Blending and masking are ignored, but hidden paints still
+    /// count.
     fn intersects(&self, x: i32, y: i32, w: i32, h: i32) -> bool {
         unsafe { sys::tvg_paint_intersects(self.raw(), x, y, w, h) }
     }
 
-    /// Duplicates this paint object.
+    /// Returns a deep copy of this paint with all properties preserved, or
+    /// `None` if duplication fails.
     fn duplicate(&self) -> Option<Self>
     where
         Self: Sized,
@@ -665,10 +817,13 @@ pub trait Paint: sealed::Sealed {
     // paint_unref(true)) causes double-free when Drop runs. Use
     // thorvg-sys directly if you need low-level refcount control.
 
-    /// Constructs a new owned instance from a raw `Tvg_Paint` pointer.
+    /// Constructs a new owned instance from a raw `Tvg_Paint` handle.
     ///
     /// # Safety
-    /// `raw` must be a valid, owned `Tvg_Paint`.
+    ///
+    /// `raw` must be a valid `Tvg_Paint` owned by the caller, and its
+    /// runtime [`PaintType`] must match `Self`. The returned value takes
+    /// ownership and frees the handle on drop.
     unsafe fn from_raw_paint(raw: sys::Tvg_Paint) -> Self
     where
         Self: Sized;

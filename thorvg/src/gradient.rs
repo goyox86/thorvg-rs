@@ -1,3 +1,7 @@
+//! Linear and radial gradient fills.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use alloc::vec::Vec;
 use core::mem;
 
@@ -14,7 +18,7 @@ use thorvg_sys as sys;
 pub struct ColorStop {
     /// Position along the gradient, normalised to `[0.0, 1.0]`.
     pub offset: f32,
-    /// Color at this stop.
+    /// Color at this stop. Each channel is in the range `0..=255`.
     pub color: Rgba,
 }
 
@@ -92,12 +96,17 @@ impl LinearGradient<'_> {
         })
     }
 
-    /// Sets the gradient bounds.
+    /// Sets the gradient bounds from `(x1, y1)` to `(x2, y2)`.
+    ///
+    /// The gradient runs along the line joining the two points; each
+    /// point anchors a line perpendicular to that axis. If the two
+    /// points coincide, the shape is filled with a single color (the
+    /// last stop given to [`set_color_stops`](Self::set_color_stops)).
     pub fn set_bounds(&mut self, x1: f32, y1: f32, x2: f32, y2: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_linear_gradient_set(self.raw, x1, y1, x2, y2) })
     }
 
-    /// Gets the gradient bounds.
+    /// Returns the gradient bounds as `(x1, y1, x2, y2)`.
     pub fn bounds(&self) -> Result<(f32, f32, f32, f32)> {
         let (mut x1, mut y1, mut x2, mut y2) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
         Error::from_raw(unsafe {
@@ -113,36 +122,41 @@ impl LinearGradient<'_> {
     }
 
     /// Sets the color stops.
+    ///
+    /// Replaces any existing stops. See [`ColorStop`] for the offset
+    /// and color conventions.
     pub fn set_color_stops(&mut self, stops: &[ColorStop]) -> Result<()> {
         set_color_stops_raw(self.raw, stops)
     }
 
-    /// Gets the color stops.
+    /// Returns the color stops.
     pub fn color_stops(&self) -> Result<Vec<ColorStop>> {
         get_color_stops_raw(self.raw)
     }
 
-    /// Sets the fill spread method.
+    /// Sets how the area outside the gradient bounds is filled.
     pub fn set_spread(&mut self, spread: FillSpread) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_gradient_set_spread(self.raw, spread.to_raw()) })
     }
 
-    /// Gets the fill spread method.
+    /// Returns the fill spread method.
     pub fn spread(&self) -> Result<FillSpread> {
         get_spread_raw(self.raw)
     }
 
-    /// Sets the affine transformation matrix.
+    /// Sets the affine transformation matrix applied to the gradient.
     pub fn set_transform(&mut self, m: &Matrix) -> Result<()> {
         set_transform_raw(self.raw, m)
     }
 
-    /// Gets the affine transformation matrix.
+    /// Returns the affine transformation matrix.
+    ///
+    /// The identity matrix is returned when none has been set.
     pub fn transform(&self) -> Result<Matrix> {
         get_transform_raw(self.raw)
     }
 
-    /// Gets the affine transformation matrix.
+    /// Returns the affine transformation matrix.
     #[deprecated(
         since = "0.3.0",
         note = "renamed to `transform` for consistency with `Paint::transform`"
@@ -151,12 +165,16 @@ impl LinearGradient<'_> {
         self.transform()
     }
 
-    /// Gets the gradient type.
+    /// Returns the gradient's type tag.
+    ///
+    /// Always [`PaintType::LinearGradient`](crate::PaintType::LinearGradient)
+    /// for this type.
     pub fn gradient_type(&self) -> Result<PaintType> {
         get_type_raw(self.raw)
     }
 
-    /// Duplicates this gradient.
+    /// Returns a deep copy of this gradient, or `None` if the engine
+    /// could not allocate the copy.
     pub fn duplicate(&self) -> Option<Self> {
         let raw = unsafe { sys::tvg_gradient_duplicate(self.raw) };
         if raw.is_null() {
@@ -188,6 +206,9 @@ impl Drop for LinearGradient<'_> {
 // ── RadialGradient ─────────────────────────────────────────────────
 
 /// A radial gradient fill.
+///
+/// The lifetime `'eng` ties this gradient to a [`Thorvg`](crate::Thorvg) engine
+/// instance. Create gradients via [`Thorvg::radial_gradient()`](crate::Thorvg::radial_gradient).
 pub struct RadialGradient<'eng> {
     raw: sys::Tvg_Gradient,
     _engine: core::marker::PhantomData<&'eng ()>,
@@ -206,7 +227,22 @@ impl RadialGradient<'_> {
         })
     }
 
-    /// Sets the radial gradient attributes.
+    /// Sets the radial gradient geometry.
+    ///
+    /// `(cx, cy)` and `r` define the end circle, whose edge aligns with
+    /// the stop at offset `1.0`. `(fx, fy)` and `fr` define the start
+    /// (focal) circle, whose edge aligns with the stop at offset `0.0`.
+    /// For a plain, non-focal radial gradient, place the focal point at
+    /// the center (`fx == cx`, `fy == cy`) with `fr == 0.0`.
+    ///
+    /// A focal point outside the end circle is projected onto its edge,
+    /// and a start circle that does not fit inside the end circle has
+    /// its `fr` reduced to fit. When `r` is `0.0`, the shape is filled
+    /// with the last stop's color.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `r` or `fr` is negative.
     pub fn set_radial(
         &mut self,
         cx: f32,
@@ -219,7 +255,10 @@ impl RadialGradient<'_> {
         Error::from_raw(unsafe { sys::tvg_radial_gradient_set(self.raw, cx, cy, r, fx, fy, fr) })
     }
 
-    /// Gets the radial gradient attributes: `(cx, cy, r, fx, fy, fr)`.
+    /// Returns the radial gradient geometry as `(cx, cy, r, fx, fy, fr)`.
+    ///
+    /// See [`set_radial`](Self::set_radial) for the meaning of each
+    /// component.
     pub fn radial(&self) -> Result<(f32, f32, f32, f32, f32, f32)> {
         let (mut cx, mut cy, mut r, mut fx, mut fy, mut fr) =
             (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
@@ -238,36 +277,41 @@ impl RadialGradient<'_> {
     }
 
     /// Sets the color stops.
+    ///
+    /// Replaces any existing stops. See [`ColorStop`] for the offset
+    /// and color conventions.
     pub fn set_color_stops(&mut self, stops: &[ColorStop]) -> Result<()> {
         set_color_stops_raw(self.raw, stops)
     }
 
-    /// Gets the color stops.
+    /// Returns the color stops.
     pub fn color_stops(&self) -> Result<Vec<ColorStop>> {
         get_color_stops_raw(self.raw)
     }
 
-    /// Sets the fill spread method.
+    /// Sets how the area outside the gradient bounds is filled.
     pub fn set_spread(&mut self, spread: FillSpread) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_gradient_set_spread(self.raw, spread.to_raw()) })
     }
 
-    /// Gets the fill spread method.
+    /// Returns the fill spread method.
     pub fn spread(&self) -> Result<FillSpread> {
         get_spread_raw(self.raw)
     }
 
-    /// Sets the affine transformation matrix.
+    /// Sets the affine transformation matrix applied to the gradient.
     pub fn set_transform(&mut self, m: &Matrix) -> Result<()> {
         set_transform_raw(self.raw, m)
     }
 
-    /// Gets the affine transformation matrix.
+    /// Returns the affine transformation matrix.
+    ///
+    /// The identity matrix is returned when none has been set.
     pub fn transform(&self) -> Result<Matrix> {
         get_transform_raw(self.raw)
     }
 
-    /// Gets the affine transformation matrix.
+    /// Returns the affine transformation matrix.
     #[deprecated(
         since = "0.3.0",
         note = "renamed to `transform` for consistency with `Paint::transform`"
@@ -276,12 +320,16 @@ impl RadialGradient<'_> {
         self.transform()
     }
 
-    /// Gets the gradient type.
+    /// Returns the gradient's type tag.
+    ///
+    /// Always [`PaintType::RadialGradient`](crate::PaintType::RadialGradient)
+    /// for this type.
     pub fn gradient_type(&self) -> Result<PaintType> {
         get_type_raw(self.raw)
     }
 
-    /// Duplicates this gradient.
+    /// Returns a deep copy of this gradient, or `None` if the engine
+    /// could not allocate the copy.
     pub fn duplicate(&self) -> Option<Self> {
         let raw = unsafe { sys::tvg_gradient_duplicate(self.raw) };
         if raw.is_null() {
@@ -401,7 +449,10 @@ impl BorrowedRadialGradient<'_> {
         }
     }
 
-    /// Returns the radial gradient attributes `(cx, cy, r, fx, fy, fr)`.
+    /// Returns the radial gradient geometry `(cx, cy, r, fx, fy, fr)`.
+    ///
+    /// See [`RadialGradient::set_radial`] for the meaning of each
+    /// component.
     pub fn radial(&self) -> Result<(f32, f32, f32, f32, f32, f32)> {
         let (mut cx, mut cy, mut r, mut fx, mut fy, mut fr) =
             (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);

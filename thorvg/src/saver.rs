@@ -1,3 +1,7 @@
+//! Exporting paints and animations to files (`.tvg`, `.gif`, …).
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use alloc::ffi::CString;
 
 use crate::animation::Animation;
@@ -6,6 +10,20 @@ use crate::paint::Paint;
 use thorvg_sys as sys;
 
 /// Exports paint objects or animations to files.
+///
+/// The output format is chosen from the file extension (e.g. `.tvg`,
+/// `.gif`); the supported set depends on how `ThorVG` was packaged. A
+/// saved file can later be reloaded with the [`Picture`](crate::Picture)
+/// module.
+///
+/// # Asynchronous saving
+///
+/// Saving runs asynchronously when the engine was initialized with more
+/// than one thread, so a successful return from a `save*` method does not
+/// guarantee the file is fully written. Call [`sync`](Self::sync) to block
+/// until the task completes. With a single-threaded engine the save is
+/// synchronous, but calling [`sync`](Self::sync) afterward is still
+/// correct.
 ///
 /// The lifetime `'eng` ties this saver to a [`Thorvg`](crate::Thorvg) engine
 /// instance. Create savers via [`Thorvg::saver()`](crate::Thorvg::saver).
@@ -31,7 +49,22 @@ impl Saver<'_> {
         })
     }
 
-    /// Saves a paint object to a file path string.
+    /// Saves a paint object to the file at `path`.
+    ///
+    /// `quality` is the encoder quality level, `0` (minimum) to `100`
+    /// (maximum, recommended). The save may complete asynchronously; call
+    /// [`sync`](Self::sync) to ensure the file is flushed (see the
+    /// [type-level docs](Self)).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `path` contains an interior NUL
+    ///   byte.
+    /// - [`Error::InsufficientCondition`] if another save is already in
+    ///   progress.
+    /// - [`Error::NotSupported`] if the extension is unknown or the format
+    ///   is unsupported.
+    /// - [`Error::Unknown`] if the paint is empty.
     ///
     /// # Runtime requirements
     ///
@@ -53,7 +86,10 @@ impl Saver<'_> {
         })
     }
 
-    /// Saves a paint object to a file.
+    /// Saves a paint object to a [`Path`](std::path::Path).
+    ///
+    /// Convenience wrapper over [`save_to_str`](Self::save_to_str); see it
+    /// for `quality`, async behavior, and errors.
     #[cfg(feature = "std")]
     pub fn save<P: Paint, Q: AsRef<std::path::Path>>(
         &mut self,
@@ -64,15 +100,29 @@ impl Saver<'_> {
         self.save_to_str(paint, &path.as_ref().to_string_lossy(), quality)
     }
 
-    /// Saves an animation to a file path string.
+    /// Saves an animation to the file at `path`.
     ///
-    /// Consumes the `Animation` — the C side takes ownership of the
+    /// `quality` is the encoder quality level, `0` to `100`; `fps` is the
+    /// target frame rate, or `0` to keep the source frame rate. The save
+    /// may complete asynchronously; call [`sync`](Self::sync) to ensure
+    /// the file is flushed (see the [type-level docs](Self)).
+    ///
+    /// Consumes the [`Animation`]: the C side takes ownership of the
     /// handle on every exit path where `picture()->refCnt() <= 1`
-    /// (which is the case for a freshly-constructed `Animation`).
-    /// See `tvgSaver.cpp:142-172`: the animation is `delete`d on
-    /// failure, and handed off to the save module on success.
-    /// Keeping the Rust `Drop` active would double-free.  Same
-    /// shape as `Paint::set_mask` / `Paint::set_clip`.
+    /// (the case for a freshly-constructed [`Animation`]) — it is
+    /// `delete`d on failure and handed off to the save module on success,
+    /// so keeping the Rust `Drop` active would double-free. Same shape as
+    /// `Paint::set_mask` / `Paint::set_clip`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `path` contains an interior NUL
+    ///   byte.
+    /// - [`Error::InsufficientCondition`] if another save is in progress
+    ///   or the animation has no frames.
+    /// - [`Error::NotSupported`] if the extension is unknown or the format
+    ///   is unsupported.
+    /// - [`Error::Unknown`] if the animation's paint is empty.
     ///
     /// # Runtime requirements
     ///
@@ -102,8 +152,12 @@ impl Saver<'_> {
         })
     }
 
-    /// Saves an animation to a file.  Consumes the `Animation` — see
-    /// [`save_animation_to_str`](Self::save_animation_to_str).
+    /// Saves an animation to a [`Path`](std::path::Path).
+    ///
+    /// Convenience wrapper over
+    /// [`save_animation_to_str`](Self::save_animation_to_str); see it for
+    /// `quality`/`fps`, ownership, async behavior, and errors. Consumes
+    /// the [`Animation`].
     #[cfg(feature = "std")]
     pub fn save_animation<P: AsRef<std::path::Path>>(
         &mut self,
@@ -115,7 +169,16 @@ impl Saver<'_> {
         self.save_animation_to_str(animation, &path.as_ref().to_string_lossy(), quality, fps)
     }
 
-    /// Waits for the saving task to finish.
+    /// Blocks until the pending save task has finished.
+    ///
+    /// Call this after a `save*` method to guarantee the output file is
+    /// fully written when saving runs asynchronously (multi-threaded
+    /// engine). It is safe to call when the save was synchronous.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if no save task is
+    /// running.
     pub fn sync(&mut self) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_saver_sync(self.raw) })
     }

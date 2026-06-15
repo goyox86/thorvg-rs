@@ -1,3 +1,8 @@
+//! Lottie-specific animation control: slots, markers, tweening, and
+//! audio resolution.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -6,14 +11,18 @@ use crate::animation::Animation;
 use crate::error::{Error, Result};
 use thorvg_sys as sys;
 
-/// Marker information for a Lottie animation segment.
+/// A named segment within a Lottie animation.
+///
+/// Markers map a name to a `[begin, end]` frame range and can be selected
+/// for playback via [`LottieAnimation::set_marker`]. Obtain them with
+/// [`LottieAnimation::marker_info`] or [`LottieAnimation::markers`].
 #[derive(Debug, Clone)]
 pub struct Marker {
     /// The marker name.
     pub name: String,
-    /// The starting frame.
+    /// The segment's starting frame.
     pub begin: f32,
-    /// The ending frame.
+    /// The segment's ending frame.
     pub end: f32,
 }
 
@@ -107,32 +116,28 @@ impl core::fmt::Debug for AudioInfo<'_> {
     }
 }
 
-/// A Lottie animation controller with Lottie-specific extensions.
+/// Lottie animation controller with Lottie-specific extensions.
 ///
-/// This wraps [`Animation`] and adds slots, markers, tweening,
-/// expression variables, and quality control.
-///
-/// All base [`Animation`] methods are available via `Deref`.
+/// Wraps [`Animation`] and adds slot overrides, named markers, frame
+/// tweening, effect-quality control, and audio-layer resolution. All
+/// base [`Animation`] methods (frame, segment, duration, …) are
+/// available through `Deref`.
 ///
 /// # Example
 ///
 /// ```no_run
-/// use thorvg::{Thorvg, ColorSpace};
+/// # fn main() -> Result<(), thorvg::Error> {
+/// use thorvg::Thorvg;
 ///
-/// // `Thorvg::init` takes a thread count under the default `threads` feature
-/// // and takes no arguments when that feature is disabled.
-/// let engine = Thorvg::init(0).unwrap();
-/// let mut canvas = engine.sw_canvas(Default::default()).unwrap();
-/// let mut buffer = vec![0u32; 800 * 600];
-/// unsafe {
-///     canvas
-///         .set_target(&mut buffer, 800, 800, 600, ColorSpace::ABGR8888)
-///         .unwrap()
-/// };
-///
-/// let mut lottie = engine.lottie_animation().unwrap();
-/// let pic = lottie.picture_mut();
-/// pic.load_from_str("animation.json").ok();
+/// // `Thorvg::init` takes a thread count under the default `threads`
+/// // feature and takes no arguments when that feature is disabled.
+/// let engine = Thorvg::init(0)?;
+/// let mut lottie = engine.lottie_animation()?;
+/// lottie.load_file("animation.json")?;
+/// lottie.set_size(800.0, 600.0)?;
+/// lottie.set_frame(0.0)?;
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// The lifetime `'eng` ties this animation to a [`Thorvg`](crate::Thorvg) engine
@@ -166,29 +171,41 @@ impl LottieAnimation<'_> {
 
     // ── Convenience loaders ──────────────────────────────────────────
 
-    /// Load a Lottie animation from a JSON byte slice.
+    /// Loads a Lottie animation from a JSON byte slice.
     ///
     /// Convenience wrapper around [`Picture::load_data`](crate::Picture::load_data) that uses the
     /// `"lottie"` mimetype and copies the data. For advanced use cases
-    /// (e.g. external asset `resource_path`), access the picture
+    /// (e.g. an external asset `resource_path`), access the picture
     /// directly via [`Animation::picture`].
+    ///
+    /// # Errors
+    ///
+    /// Propagates the errors of [`Picture::load_data`](crate::Picture::load_data).
     pub fn load_data(&mut self, data: &[u8]) -> Result<()> {
         let pic = self.picture_mut();
         pic.load_data(data, crate::picture::MimeType::Lottie, None)
     }
 
-    /// Load a Lottie animation from a file path string.
+    /// Loads a Lottie animation from a file path.
     ///
     /// Convenience wrapper around [`Picture::load_from_str`](crate::Picture::load_from_str).
+    ///
+    /// # Errors
+    ///
+    /// Propagates the errors of [`Picture::load_from_str`](crate::Picture::load_from_str).
     #[cfg(feature = "std")]
     pub fn load_file(&mut self, path: &str) -> Result<()> {
         let pic = self.picture_mut();
         pic.load_from_str(path)
     }
 
-    /// Set the render size of the animation picture.
+    /// Sets the render size of the animation picture.
     ///
     /// Convenience wrapper around [`Picture::set_size`](crate::Picture::set_size).
+    ///
+    /// # Errors
+    ///
+    /// Propagates the errors of [`Picture::set_size`](crate::Picture::set_size).
     pub fn set_size(&mut self, w: f32, h: f32) -> Result<()> {
         let pic = self.picture_mut();
         pic.set_size(w, h)
@@ -196,9 +213,14 @@ impl LottieAnimation<'_> {
 
     // ── Slots ──────────────────────────────────────────────────────
 
-    /// Generates a new slot from the given Lottie slot data (JSON format).
+    /// Generates a slot override from Lottie slot data in JSON format and
+    /// returns its ID.
     ///
-    /// Returns the generated slot ID, or `None` on failure.
+    /// A slot lets you override named properties (colors, images, text, …)
+    /// declared in the Lottie file. The returned ID is passed to
+    /// [`apply_slot`](Self::apply_slot) and [`del_slot`](Self::del_slot).
+    /// Returns `None` if the slot data is invalid (contains an interior
+    /// NUL byte) or `ThorVG` could not generate the slot.
     pub fn gen_slot(&mut self, slot_json: &str) -> Option<u32> {
         let c_slot = CString::new(slot_json).ok()?;
         let id = unsafe { sys::tvg_lottie_animation_gen_slot(self.inner.raw(), c_slot.as_ptr()) };
@@ -211,19 +233,37 @@ impl LottieAnimation<'_> {
 
     /// Applies a previously generated slot to the animation.
     ///
-    /// Pass `0` to reset all slots.
+    /// Pass `0` to reset all slots to their original Lottie values.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::InvalidArguments`] if `id` is not a valid slot ID.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn apply_slot(&mut self, id: u32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_lottie_animation_apply_slot(self.inner.raw(), id) })
     }
 
     /// Deletes a previously generated slot.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded or
+    ///   `id` is not a valid slot ID.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn del_slot(&mut self, id: u32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_lottie_animation_del_slot(self.inner.raw(), id) })
     }
 
     // ── Markers ────────────────────────────────────────────────────
 
-    /// Gets the number of markers in the animation.
+    /// Returns the number of markers defined in the animation.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] only if `ThorVG` rejects the output
+    ///   pointer, which cannot occur through this wrapper.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn markers_count(&self) -> Result<u32> {
         let mut cnt: u32 = 0;
         Error::from_raw(unsafe {
@@ -232,7 +272,14 @@ impl LottieAnimation<'_> {
         Ok(cnt)
     }
 
-    /// Gets the marker name at the given index.
+    /// Returns the marker name at the given zero-based index.
+    ///
+    /// Returns an empty `String` if `ThorVG` reports the name as null.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `idx` is out of range.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn marker_name(&self, idx: u32) -> Result<String> {
         let mut name_ptr: *const core::ffi::c_char = core::ptr::null();
         Error::from_raw(unsafe {
@@ -246,7 +293,16 @@ impl LottieAnimation<'_> {
             .into_owned())
     }
 
-    /// Gets full marker information (name, begin frame, end frame) at the given index.
+    /// Returns the full [`Marker`] (name, begin frame, end frame) at the
+    /// given zero-based index.
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `idx` is out of range.
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn marker_info(&self, idx: u32) -> Result<Marker> {
         let mut name_ptr: *const core::ffi::c_char = core::ptr::null();
         let mut begin: f32 = 0.0;
@@ -270,7 +326,17 @@ impl LottieAnimation<'_> {
         Ok(Marker { name, begin, end })
     }
 
-    /// Returns all markers in the animation.
+    /// Returns every [`Marker`] in the animation.
+    ///
+    /// Convenience over [`markers_count`](Self::markers_count) +
+    /// [`marker_info`](Self::marker_info).
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
+    /// # Errors
+    ///
+    /// Propagates the errors of [`markers_count`](Self::markers_count) and
+    /// [`marker_info`](Self::marker_info).
     pub fn markers(&self) -> Result<Vec<Marker>> {
         let count = self.markers_count()?;
         let mut markers = Vec::with_capacity(count as usize);
@@ -280,7 +346,17 @@ impl LottieAnimation<'_> {
         Ok(markers)
     }
 
-    /// Specifies a playback segment by marker name.
+    /// Restricts playback to the segment named by `marker`.
+    ///
+    /// Takes precedence over a range set via
+    /// [`Animation::set_segment`](crate::Animation::set_segment).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `marker` is unknown or contains an
+    ///   interior NUL byte.
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn set_marker(&mut self, marker: &str) -> Result<()> {
         let c_marker = CString::new(marker)?;
         Error::from_raw(unsafe {
@@ -290,7 +366,15 @@ impl LottieAnimation<'_> {
 
     // ── Tweening ───────────────────────────────────────────────────
 
-    /// Interpolates between two frames based on a progress value (0.0–1.0).
+    /// Interpolates between frame `from` and frame `to` by `progress`.
+    ///
+    /// `from` and `to` are frame numbers; `progress` ranges from `0.0`
+    /// (full `from`) to `1.0` (full `to`).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn tween(&mut self, from: f32, to: f32, progress: f32) -> Result<()> {
         Error::from_raw(unsafe {
             sys::tvg_lottie_animation_tween(self.inner.raw(), from, to, progress)
@@ -299,9 +383,16 @@ impl LottieAnimation<'_> {
 
     // ── Quality ────────────────────────────────────────────────────
 
-    /// Sets the quality level for Lottie effects (0–100).
+    /// Sets the rendering quality for Lottie effects (blur, shadows, …).
     ///
-    /// Lower values prioritize performance, higher values prioritize quality.
+    /// `value` ranges from `0` (lowest quality, best performance) to
+    /// `100` (highest quality, lowest performance); the default is `50`.
+    /// This is a hint whose effect depends on the render backend.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn set_quality(&mut self, value: u8) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_lottie_animation_set_quality(self.inner.raw(), value) })
     }
@@ -321,8 +412,14 @@ impl LottieAnimation<'_> {
     /// the animation's lifetime; calling `set_audio_resolver` again
     /// replaces (and drops) the previous closure.
     ///
-    /// *Experimental:* the underlying C API is marked experimental by
-    /// upstream and may change in a future `ThorVG` release.
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
+    ///
+    /// # Examples
     ///
     /// ```ignore
     /// lottie.set_audio_resolver(|info: &thorvg::AudioInfo| {
@@ -375,6 +472,14 @@ impl LottieAnimation<'_> {
     }
 
     /// Removes any previously installed audio resolver.
+    ///
+    /// Unregisters the callback from `ThorVG` and drops the stored
+    /// closure. Safe to call when no resolver is installed.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if Lottie support is not compiled in.
     pub fn clear_audio_resolver(&mut self) -> Result<()> {
         let r = Error::from_raw(unsafe {
             sys::tvg_lottie_animation_set_audio_resolver(

@@ -1,8 +1,17 @@
+//! Frame and playback control for animatable content such as Lottie.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use crate::error::{Error, Result};
 use crate::picture::Picture;
 use thorvg_sys as sys;
 
-/// An animation controller for animated content (e.g., Lottie).
+/// Controller for animatable content such as Lottie.
+///
+/// Drives frame selection, duration queries, and playback segments over
+/// the [`Picture`] the animation owns. Load animation data into that
+/// picture (via [`picture_mut`](Self::picture_mut)), add it to a canvas,
+/// then advance frames with [`set_frame`](Self::set_frame).
 ///
 /// The lifetime `'eng` ties this animation to a [`Thorvg`](crate::Thorvg) engine
 /// instance. Create animations via [`Thorvg::animation()`](crate::Thorvg::animation).
@@ -76,50 +85,112 @@ impl<'eng> Animation<'eng> {
         Ok(unsafe { Self::from_raw(raw) })
     }
 
-    /// Returns a borrow of the picture managed by this animation.
-    /// Cheap — the wrapper is built once in `new` and re-borrowed
-    /// on each call (no C call, no allocation).
+    /// Returns the [`Picture`] this animation owns.
+    ///
+    /// The wrapper is built once at construction and re-borrowed on each
+    /// call, so this performs no C call and no allocation. The picture is
+    /// owned by the animation and is released when the animation is
+    /// dropped.
     pub fn picture(&self) -> &Picture<'eng> {
         &self.picture
     }
 
-    /// Mutable counterpart to [`picture`](Self::picture).
+    /// Returns a mutable borrow of the [`Picture`] this animation owns.
+    ///
+    /// Use this to load animation data (e.g. via
+    /// [`Picture::load_data`](crate::Picture::load_data)) and to configure
+    /// render size before playback.
     pub fn picture_mut(&mut self) -> &mut Picture<'eng> {
         &mut self.picture
     }
 
-    /// Sets the current animation frame.
+    /// Displays the frame at the given (possibly fractional) index.
+    ///
+    /// Frame numbering is zero-based; `frame` should be less than
+    /// [`total_frame`](Self::total_frame). Fractional values are
+    /// supported and interpolated by the loader.
+    ///
+    /// For efficiency, `ThorVG` ignores the update when `frame` differs
+    /// from the current frame by less than `0.001`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if `frame` is the same as the
+    ///   current frame (difference below `0.001`).
+    /// - [`Error::NotSupported`] if the loaded picture data is not
+    ///   animatable.
     pub fn set_frame(&mut self, frame: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_animation_set_frame(self.raw, frame) })
     }
 
-    /// Gets the current animation frame.
+    /// Returns the current frame index.
+    ///
+    /// The value lies between `0` and [`total_frame`](Self::total_frame)
+    /// minus one, or `0` if the picture is not properly configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] only if `ThorVG` rejects the
+    /// output pointer, which cannot occur through this wrapper.
     pub fn frame(&self) -> Result<f32> {
         let mut frame: f32 = 0.0;
         Error::from_raw(unsafe { sys::tvg_animation_get_frame(self.raw, &raw mut frame) })?;
         Ok(frame)
     }
 
-    /// Gets the total number of frames.
+    /// Returns the total number of frames in the animation.
+    ///
+    /// Returns `0.0` if the picture is not properly configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] only if `ThorVG` rejects the
+    /// output pointer, which cannot occur through this wrapper.
     pub fn total_frame(&self) -> Result<f32> {
         let mut cnt: f32 = 0.0;
         Error::from_raw(unsafe { sys::tvg_animation_get_total_frame(self.raw, &raw mut cnt) })?;
         Ok(cnt)
     }
 
-    /// Gets the animation duration in seconds.
+    /// Returns the animation duration in seconds.
+    ///
+    /// Returns `0.0` if the picture is not properly configured.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] only if `ThorVG` rejects the
+    /// output pointer, which cannot occur through this wrapper.
     pub fn duration(&self) -> Result<f32> {
         let mut duration: f32 = 0.0;
         Error::from_raw(unsafe { sys::tvg_animation_get_duration(self.raw, &raw mut duration) })?;
         Ok(duration)
     }
 
-    /// Sets the playback segment.
+    /// Restricts playback to the frame range `[begin, end]`.
+    ///
+    /// `begin` and `end` are frame indices, not normalized values, and
+    /// must lie within `0.0` to [`total_frame`](Self::total_frame).
+    /// After setting a segment, [`total_frame`](Self::total_frame) and
+    /// [`duration`](Self::duration) are remapped so the segment spans
+    /// the full range. A marker set via
+    /// [`LottieAnimation::set_marker`](crate::LottieAnimation::set_marker)
+    /// takes precedence and causes this range to be ignored.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::InvalidArguments`] if `begin` is greater than `end`.
+    /// - [`Error::NotSupported`] if the content is not animatable.
     pub fn set_segment(&mut self, begin: f32, end: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_animation_set_segment(self.raw, begin, end) })
     }
 
-    /// Gets the current playback segment.
+    /// Returns the current playback segment as `(begin, end)` frame indices.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InsufficientCondition`] if no animation is loaded.
+    /// - [`Error::NotSupported`] if the content is not animatable.
     pub fn segment(&self) -> Result<(f32, f32)> {
         let (mut begin, mut end) = (0.0f32, 0.0f32);
         Error::from_raw(unsafe {

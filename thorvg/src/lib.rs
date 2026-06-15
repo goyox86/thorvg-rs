@@ -3,6 +3,11 @@
 //! `ThorVG` is a production-ready vector graphics engine supporting SVG, Lottie animations,
 //! shapes, text, gradients, effects, and more.
 //!
+//! These bindings wrap the [`ThorVG` C API](https://www.thorvg.org/c-native);
+//! consult it for the authoritative engine semantics. The bindings themselves
+//! are a work in progress: not every `ThorVG` API is wrapped yet, and the
+//! surface here may change between releases.
+//!
 //! # `no_std` Support
 //!
 //! This crate is `no_std` compatible (requires `alloc`). The `std` feature (enabled by default)
@@ -30,6 +35,24 @@
 //! `no_std`: it makes a panic terminate deterministically instead of
 //! depending on `#[panic_handler]` behaviour, and bare-metal targets
 //! usually require it to link anyway (no `eh_personality`).
+//!
+//! # Cargo Features
+//!
+//! Each feature is forwarded to `thorvg-sys`, controlling which
+//! `ThorVG` loaders and capabilities are compiled into the static
+//! library. All listed features are enabled by default.
+//!
+//! | Feature       | Default | Effect                                                              |
+//! |---------------|---------|---------------------------------------------------------------------|
+//! | `vendored`    | yes     | Builds the bundled `ThorVG` source instead of linking a system one. |
+//! | `std`         | yes     | Enables `std` and the `Path`-based file APIs (implies `file-io`).   |
+//! | `file-io`     | yes     | Enables `ThorVG`'s file-based loaders and savers.                   |
+//! | `threads`     | yes     | Multi-threaded rendering; changes [`Thorvg::init`] to take a thread count. |
+//! | `svg`         | yes     | SVG loader.                                                         |
+//! | `lottie`      | yes     | Lottie animation loader.                                            |
+//! | `png`         | yes     | PNG image loader.                                                   |
+//! | `fonts`       | yes     | Scalable font (TTF) support for text.                              |
+//! | `expressions` | yes     | Lottie expression evaluation.                                       |
 //!
 //! # Quick Start
 //!
@@ -133,10 +156,11 @@ mod tests_no_threads {
     }
 }
 
-/// RAII guard for the `ThorVG` engine lifetime.
+/// RAII guard owning the `ThorVG` engine lifetime.
 ///
-/// The engine is terminated when this guard is dropped.
-/// Not `Send` or `Sync` — initialize and terminate the engine on the same thread.
+/// Created by [`Thorvg::init`]; the engine is terminated when the
+/// guard is dropped. Not `Send` or `Sync` — initialize, use, and drop
+/// the engine on the same thread.
 ///
 /// All `ThorVG` objects ([`Shape`], [`SwCanvas`], [`Scene`], etc.) borrow from this
 /// guard via a lifetime parameter, ensuring the engine cannot be terminated while
@@ -160,16 +184,25 @@ pub struct Thorvg {
 }
 
 impl Thorvg {
-    /// Initialize the `ThorVG` engine.
+    /// Initializes the `ThorVG` engine and returns an owning guard.
     ///
     /// Available when the `threads` feature is enabled (the default).
-    /// `threads` specifies the number of worker threads; use `0` for single-threaded mode.
+    /// `threads` is the number of worker threads to spawn; `0` uses
+    /// only the calling thread. When the `threads` feature is
+    /// disabled (e.g. bare-metal builds), this function takes no
+    /// arguments — see the no-arg variant below.
     ///
-    /// When the `threads` feature is disabled (e.g. bare-metal builds), this
-    /// function takes no arguments — see the no-arg variant below.
+    /// The returned [`Thorvg`] guard terminates the engine when
+    /// dropped; create all `ThorVG` objects via methods on it.
     ///
-    /// Returns a guard that will terminate the engine when dropped.
-    /// Create all `ThorVG` objects via methods on this guard.
+    /// The engine uses internal reference counting, so nested
+    /// initializations are safe; however, the thread count is fixed
+    /// on the first initialization and ignored thereafter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unknown`] if `ThorVG` fails to build its
+    /// version info or initialize its loader manager.
     #[cfg(feature = "threads")]
     pub fn init(threads: u32) -> Result<Self> {
         let result = unsafe { sys::tvg_engine_init(threads) };
@@ -179,13 +212,18 @@ impl Thorvg {
         })
     }
 
-    /// Initialize the `ThorVG` engine in single-threaded mode.
+    /// Initializes the `ThorVG` engine in single-threaded mode and
+    /// returns an owning guard.
     ///
-    /// Available when the `threads` feature is disabled (e.g. bare-metal builds).
-    /// All work runs synchronously on the calling thread.
+    /// Available when the `threads` feature is disabled (e.g.
+    /// bare-metal builds). All work runs synchronously on the calling
+    /// thread. The returned [`Thorvg`] guard terminates the engine
+    /// when dropped; create all `ThorVG` objects via methods on it.
     ///
-    /// Returns a guard that will terminate the engine when dropped.
-    /// Create all `ThorVG` objects via methods on this guard.
+    /// # Errors
+    ///
+    /// Returns [`Error::Unknown`] if `ThorVG` fails to build its
+    /// version info or initialize its loader manager.
     #[cfg(not(feature = "threads"))]
     pub fn init() -> Result<Self> {
         let result = unsafe { sys::tvg_engine_init(0) };
@@ -195,7 +233,18 @@ impl Thorvg {
         })
     }
 
-    /// Get the `ThorVG` engine version.
+    /// Returns the `ThorVG` engine version as
+    /// `(major, minor, micro, version_string)`.
+    ///
+    /// The string is formatted `"major.minor.micro"`, or empty if
+    /// `ThorVG` reports no version. Unlike the other engine APIs, this
+    /// is an associated function and does not require an initialized
+    /// engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] only if the underlying `tvg_engine_version`
+    /// call fails; in practice it always succeeds.
     pub fn version() -> Result<(u32, u32, u32, alloc::string::String)> {
         let mut major: u32 = 0;
         let mut minor: u32 = 0;
@@ -225,80 +274,138 @@ impl Thorvg {
 
     // ── Paint factories ────────────────────────────────────────────
 
-    /// Creates a new [`Shape`] tied to this engine.  Returns
-    /// `Err(Error::FailedAllocation)` when the underlying C handle
-    /// allocation fails.
+    /// Creates a new [`Shape`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the shape.
     pub fn shape(&self) -> Result<Shape<'_>> {
         Shape::new()
     }
 
-    /// Creates a new [`Scene`] tied to this engine.
+    /// Creates a new [`Scene`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the scene.
     pub fn scene(&self) -> Result<Scene<'_>> {
         Scene::new()
     }
 
-    /// Creates a new [`Picture`] tied to this engine.
+    /// Creates a new [`Picture`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the picture.
     pub fn picture(&self) -> Result<Picture<'_>> {
         Picture::new()
     }
 
-    /// Creates a new [`Text`] object tied to this engine.
+    /// Creates a new [`Text`] object bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the text object.
     pub fn text(&self) -> Result<Text<'_>> {
         Text::new()
     }
 
     // ── Gradient factories ─────────────────────────────────────────
 
-    /// Creates a new [`LinearGradient`] tied to this engine.
+    /// Creates a new [`LinearGradient`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the gradient.
     pub fn linear_gradient(&self) -> Result<LinearGradient<'_>> {
         LinearGradient::new()
     }
 
-    /// Creates a new [`RadialGradient`] tied to this engine.
+    /// Creates a new [`RadialGradient`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the gradient.
     pub fn radial_gradient(&self) -> Result<RadialGradient<'_>> {
         RadialGradient::new()
     }
 
     // ── Canvas factories ───────────────────────────────────────────
 
-    /// Creates a new software-rendered [`SwCanvas`] tied to this engine.
+    /// Creates a new software-rendered [`SwCanvas`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unknown`] if `ThorVG` cannot create the canvas.
     pub fn sw_canvas(&self, option: EngineOption) -> Result<SwCanvas<'_>> {
         SwCanvas::new(option)
     }
 
-    /// Creates a new OpenGL-rendered [`GlCanvas`] tied to this engine.
+    /// Creates a new OpenGL-rendered [`GlCanvas`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unknown`] if `ThorVG` cannot create the canvas.
     pub fn gl_canvas(&self, option: EngineOption) -> Result<GlCanvas<'_>> {
         GlCanvas::new(option)
     }
 
-    /// Creates a new WebGPU-rendered [`WgCanvas`] tied to this engine.
+    /// Creates a new WebGPU-rendered [`WgCanvas`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unknown`] if `ThorVG` cannot create the canvas.
     pub fn wg_canvas(&self, option: EngineOption) -> Result<WgCanvas<'_>> {
         WgCanvas::new(option)
     }
 
     // ── Animation factories ────────────────────────────────────────
 
-    /// Creates a new [`Animation`] controller tied to this engine.
+    /// Creates a new [`Animation`] controller bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the animation.
     pub fn animation(&self) -> Result<Animation<'_>> {
         Animation::new()
     }
 
-    /// Creates a new [`LottieAnimation`] controller tied to this engine.
+    /// Creates a new [`LottieAnimation`] controller bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the animation.
     pub fn lottie_animation(&self) -> Result<LottieAnimation<'_>> {
         LottieAnimation::new()
     }
 
     // ── Utility factories ──────────────────────────────────────────
 
-    /// Creates a new [`Saver`] tied to this engine.
+    /// Creates a new [`Saver`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the saver.
     pub fn saver(&self) -> Result<Saver<'_>> {
         Saver::new()
     }
 
     // ── Font registry (engine-global) ──────────────────────────────
 
-    /// Loads a font from a file path string into the engine's font
-    /// registry, keyed by the path.  Fonts persist for the engine's
+    /// Loads a font from a file path into the engine's font registry,
+    /// keyed by the path.
+    ///
+    /// `ThorVG` caches the loaded data under `path`, so loading the
+    /// same file again reuses it. Fonts persist for the engine's
     /// lifetime or until [`unload_font_from_str`](Self::unload_font_from_str).
     ///
     /// # Runtime requirements
@@ -308,28 +415,63 @@ impl Thorvg {
     /// compiles under `no_std`.  On bare-metal targets with no libc
     /// filesystem it returns an error; embed the font and use
     /// [`load_font_data_static`](Self::load_font_data_static) instead.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `path` is empty, invalid, or
+    ///   contains an interior NUL byte.
+    /// - [`Error::NotSupported`] if the file extension is not a
+    ///   recognized font format.
     pub fn load_font_from_str(&self, path: &str) -> Result<()> {
         let c_path = alloc::ffi::CString::new(path)?;
         Error::from_raw(unsafe { sys::tvg_font_load(c_path.as_ptr()) })
     }
 
-    /// Loads a font from a file path.
+    /// Loads a font from a filesystem [`Path`](std::path::Path).
+    ///
+    /// Convenience wrapper over
+    /// [`load_font_from_str`](Self::load_font_from_str); the path is
+    /// lossily converted to UTF-8.
+    ///
+    /// # Errors
+    ///
+    /// Same conditions as
+    /// [`load_font_from_str`](Self::load_font_from_str).
     #[cfg(feature = "std")]
     pub fn load_font<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
         self.load_font_from_str(&path.as_ref().to_string_lossy())
     }
 
-    /// Unloads a previously loaded font by path string.
+    /// Unloads a previously loaded font by path, releasing its
+    /// registry entry.
     ///
     /// As with [`load_font_from_str`](Self::load_font_from_str), the
     /// path keys into thorvg's registry; this needs the same working
-    /// filesystem at runtime under `no_std`.
+    /// filesystem at runtime under `no_std`. If the font is still in
+    /// use it is not freed immediately.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `path` contains an interior
+    ///   NUL byte.
+    /// - [`Error::InsufficientCondition`] if the font loader is not
+    ///   initialized (no font has been loaded).
     pub fn unload_font_from_str(&self, path: &str) -> Result<()> {
         let c_path = alloc::ffi::CString::new(path)?;
         Error::from_raw(unsafe { sys::tvg_font_unload(c_path.as_ptr()) })
     }
 
-    /// Unloads a previously loaded font.
+    /// Unloads a previously loaded font by
+    /// [`Path`](std::path::Path).
+    ///
+    /// Convenience wrapper over
+    /// [`unload_font_from_str`](Self::unload_font_from_str); the path
+    /// is lossily converted to UTF-8.
+    ///
+    /// # Errors
+    ///
+    /// Same conditions as
+    /// [`unload_font_from_str`](Self::unload_font_from_str).
     #[cfg(feature = "std")]
     pub fn unload_font<P: AsRef<std::path::Path>>(&self, path: P) -> Result<()> {
         self.unload_font_from_str(&path.as_ref().to_string_lossy())
@@ -338,11 +480,18 @@ impl Thorvg {
     /// Loads a font from memory, copying `data` into thorvg's
     /// internal registry.
     ///
-    /// The font is registered under `name` and remains usable for
-    /// the engine's lifetime.  Use this variant for owned or
-    /// non-`'static` buffers; for zero-copy registration of
-    /// `'static` data (e.g. `include_bytes!(...)`), use
-    /// [`load_font_data_static`](Self::load_font_data_static).
+    /// The font is registered under `name` and remains usable for the
+    /// engine's lifetime. `mimetype` (e.g. `"ttf"`) selects the
+    /// loader; `None` lets thorvg detect it automatically. Use this
+    /// variant for owned or non-`'static` buffers; for zero-copy
+    /// registration of `'static` data (e.g. `include_bytes!(...)`),
+    /// use [`load_font_data_static`](Self::load_font_data_static).
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::InvalidArguments`] if `name` is empty, `data` is
+    ///   empty, or `name`/`mimetype` contains an interior NUL byte.
+    /// - [`Error::NotSupported`] if the font format cannot be loaded.
     pub fn load_font_data(&self, name: &str, data: &[u8], mimetype: Option<&str>) -> Result<()> {
         load_font_data_inner(name, data, mimetype, /* copy = */ true)
     }
@@ -354,6 +503,11 @@ impl Thorvg {
     /// call, so the buffer must outlive the engine — the `'static`
     /// bound enforces this at compile time.  Typical use:
     /// `engine.load_font_data_static("Roboto", include_bytes!("Roboto.ttf"), None)`.
+    ///
+    /// # Errors
+    ///
+    /// Same conditions as
+    /// [`load_font_data`](Self::load_font_data).
     ///
     /// # Compile-time safety
     ///
@@ -374,7 +528,12 @@ impl Thorvg {
         load_font_data_inner(name, data, mimetype, /* copy = */ false)
     }
 
-    /// Creates a new [`Accessor`] tied to this engine.
+    /// Creates a new [`Accessor`] bound to this engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FailedAllocation`] if `ThorVG` cannot allocate
+    /// the accessor.
     pub fn accessor(&self) -> Result<Accessor<'_>> {
         Accessor::new()
     }

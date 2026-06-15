@@ -1,3 +1,7 @@
+//! Shapes, primitives, and stroke/fill properties.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use crate::color::Rgba;
 use crate::error::{Error, Result};
 use crate::gradient::{BorrowedGradient, LinearGradient, RadialGradient};
@@ -176,6 +180,9 @@ impl FillRule {
 
 /// Stroke line cap style.
 ///
+/// Drawn at the ends of open stroked sub-paths. The engine default is
+/// [`Square`](Self::Square).
+///
 /// Exhaustive: the C header documents all three values
 /// (`Tvg_Stroke_Cap`) and has not grown.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -207,6 +214,9 @@ impl StrokeCap {
 }
 
 /// Stroke line join style.
+///
+/// Applied where two stroked segments meet. The engine default is
+/// [`Bevel`](Self::Bevel).
 ///
 /// Exhaustive: the C header documents all three values
 /// (`Tvg_Stroke_Join`) and has not grown.
@@ -272,7 +282,7 @@ pub struct Shape<'eng> {
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
-// SAFETY: Same rationale as other ThorVG handle types — exclusive
+// SAFETY: Same rationale as other `ThorVG` handle types — exclusive
 // ownership of a C heap object; global state is mutex-protected.
 unsafe impl Send for Shape<'_> {}
 
@@ -293,7 +303,9 @@ impl Shape<'_> {
     /// Wraps an existing raw paint pointer.
     ///
     /// # Safety
-    /// The pointer must be a valid `Tvg_Paint` of type Shape.
+    /// `raw` must be a valid `Tvg_Paint` of runtime type Shape. When
+    /// `owned` is `true` the returned value frees the handle on drop,
+    /// so the caller must not also release it.
     pub(crate) unsafe fn from_raw(raw: sys::Tvg_Paint, owned: bool) -> Self {
         Self {
             raw,
@@ -304,22 +316,31 @@ impl Shape<'_> {
 
     // ── Path commands ──────────────────────────────────────────────
 
-    /// Resets the shape path. Retains color, fill, and stroke properties.
+    /// Resets the shape's path, clearing all sub-paths.
+    ///
+    /// Color, fill, and stroke properties are retained. The path-data
+    /// storage is kept allocated for reuse rather than freed.
     pub fn reset(&mut self) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_reset(self.raw) })
     }
 
-    /// Sets the starting point of a new sub-path.
+    /// Begins a new sub-path at `(x, y)`, setting the current point.
     pub fn move_to(&mut self, x: f32, y: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_move_to(self.raw, x, y) })
     }
 
     /// Draws a line from the current point to `(x, y)`.
+    ///
+    /// If this is the first command in the path it behaves like
+    /// [`move_to`](Self::move_to). The current point becomes `(x, y)`.
     pub fn line_to(&mut self, x: f32, y: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_line_to(self.raw, x, y) })
     }
 
-    /// Draws a cubic Bézier curve.
+    /// Draws a cubic Bézier curve from the current point to `(x, y)`.
+    ///
+    /// `(cx1, cy1)` and `(cx2, cy2)` are the first and second control
+    /// points. The current point becomes `(x, y)`.
     pub fn cubic_to(
         &mut self,
         cx1: f32,
@@ -332,7 +353,10 @@ impl Shape<'_> {
         Error::from_raw(unsafe { sys::tvg_shape_cubic_to(self.raw, cx1, cy1, cx2, cy2, x, y) })
     }
 
-    /// Closes the current sub-path.
+    /// Closes the current sub-path with a line back to its start point.
+    ///
+    /// The current point is reset to that start point. Has no effect if
+    /// the sub-path contains no points.
     pub fn close(&mut self) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_close(self.raw) })
     }
@@ -346,13 +370,17 @@ impl Shape<'_> {
     /// translations allocate a temporary `Vec`; the original
     /// `Path` is left intact.
     ///
-    /// thorvg's C-side path builder reads `points` lock-step with
-    /// `commands` according to [`PathCommand::points_consumed`].
-    /// Passing a `Path` whose `points` vector is shorter than the
-    /// command arities require is rejected by the engine with an
-    /// error result rather than read past the buffer; constructing
-    /// such a [`Path`] is still permitted on the Rust side so the
-    /// boundary can be tested.
+    /// `ThorVG`'s C-side path builder reads `points` lock-step with
+    /// `commands` according to [`PathCommand::points_consumed`]. If the
+    /// `points` vector does not supply exactly as many points as the
+    /// commands require, the sub-path is appended but the shape does
+    /// not render — this is not reported as an error. Constructing such
+    /// a [`Path`] is permitted on the Rust side.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if either `commands` or
+    /// `points` is empty.
     #[allow(clippy::cast_possible_truncation)]
     pub fn append_path(&mut self, path: &Path) -> Result<()> {
         let raw_cmds: alloc::vec::Vec<sys::Tvg_Path_Command> =
@@ -455,7 +483,11 @@ impl Shape<'_> {
 
     /// Appends a rectangle (optionally rounded) to the path.
     ///
-    /// See [`Rect`] for the parameter layout.
+    /// Starts a new sub-path; it is not connected to the previous one.
+    /// See [`Rect`] for the parameter layout. When `rx` and `ry` each
+    /// reach or exceed half the width and half the height
+    /// respectively, the rounded rectangle degenerates into an
+    /// ellipse.
     pub fn append_rect(&mut self, rect: Rect) -> Result<()> {
         let Rect {
             x,
@@ -471,9 +503,11 @@ impl Shape<'_> {
         })
     }
 
-    /// Appends an ellipse to the path.  See [`Circle`] for the
-    /// parameter layout — `Circle::new` for true circles,
-    /// `Circle::ellipse` for elliptical shapes.
+    /// Appends an ellipse to the path.
+    ///
+    /// Starts a new sub-path; it is not connected to the previous one.
+    /// See [`Circle`] for the parameter layout — [`Circle::new`] for
+    /// true circles, [`Circle::ellipse`] for elliptical shapes.
     pub fn append_circle(&mut self, circle: Circle) -> Result<()> {
         let Circle { cx, cy, rx, ry, cw } = circle;
         Error::from_raw(unsafe { sys::tvg_shape_append_circle(self.raw, cx, cy, rx, ry, cw) })
@@ -481,13 +515,23 @@ impl Shape<'_> {
 
     // ── Fill ───────────────────────────────────────────────────────
 
-    /// Sets the fill color.
+    /// Sets the shape's solid fill color.
+    ///
+    /// Each channel is in the range `0..=255`; `a` of `0` is fully
+    /// transparent and `255` fully opaque. A shape carries either a
+    /// solid fill or a gradient fill — whichever was set last wins, so
+    /// this overrides any gradient set via
+    /// [`set_linear_gradient`](Self::set_linear_gradient) /
+    /// [`set_radial_gradient`](Self::set_radial_gradient).
     pub fn set_fill_color(&mut self, color: Rgba) -> Result<()> {
         let Rgba { r, g, b, a } = color;
         Error::from_raw(unsafe { sys::tvg_shape_set_fill_color(self.raw, r, g, b, a) })
     }
 
-    /// Gets the fill color.
+    /// Returns the shape's solid fill color.
+    ///
+    /// Defaults to fully transparent black (`0, 0, 0, 0`) on a freshly
+    /// created shape.
     pub fn fill_color(&self) -> Result<Rgba> {
         let (mut r, mut g, mut b, mut a) = (0u8, 0u8, 0u8, 0u8);
         Error::from_raw(unsafe {
@@ -497,23 +541,34 @@ impl Shape<'_> {
     }
 
     /// Sets the fill rule.
+    ///
+    /// Determines how the interior is computed when the path
+    /// self-intersects. The engine default is [`FillRule::NonZero`].
     pub fn set_fill_rule(&mut self, rule: FillRule) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_fill_rule(self.raw, rule.to_raw()) })
     }
 
-    /// Gets the fill rule.
+    /// Returns the current fill rule.
     pub fn fill_rule(&self) -> Result<FillRule> {
         let mut rule = sys::Tvg_Fill_Rule::TVG_FILL_RULE_NON_ZERO;
         Error::from_raw(unsafe { sys::tvg_shape_get_fill_rule(self.raw, &raw mut rule) })?;
         Ok(FillRule::from_raw(rule))
     }
 
-    /// Sets a linear gradient fill.
+    /// Sets a linear gradient fill, taking ownership of `grad`.
+    ///
+    /// Overrides any solid color set via
+    /// [`set_fill_color`](Self::set_fill_color): a shape carries either
+    /// a solid fill or a gradient fill, whichever was set last.
     pub fn set_linear_gradient(&mut self, grad: LinearGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_gradient(self.raw, grad.into_raw()) })
     }
 
-    /// Sets a radial gradient fill.
+    /// Sets a radial gradient fill, taking ownership of `grad`.
+    ///
+    /// Overrides any solid color set via
+    /// [`set_fill_color`](Self::set_fill_color), as with
+    /// [`set_linear_gradient`](Self::set_linear_gradient).
     pub fn set_radial_gradient(&mut self, grad: RadialGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_gradient(self.raw, grad.into_raw()) })
     }
@@ -548,25 +603,39 @@ impl Shape<'_> {
 
     // ── Stroke ─────────────────────────────────────────────────────
 
-    /// Sets the stroke width.
+    /// Sets the stroke width in pixels.
+    ///
+    /// A width of `0.0` (the engine default) disables the stroke.
     pub fn set_stroke_width(&mut self, width: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_width(self.raw, width) })
     }
 
-    /// Gets the stroke width.
+    /// Returns the stroke width in pixels.
     pub fn stroke_width(&self) -> Result<f32> {
         let mut width: f32 = 0.0;
         Error::from_raw(unsafe { sys::tvg_shape_get_stroke_width(self.raw, &raw mut width) })?;
         Ok(width)
     }
 
-    /// Sets the stroke color.
+    /// Sets the stroke's solid color.
+    ///
+    /// Each channel is in the range `0..=255`. The stroke is invisible
+    /// while the stroke width is `0.0` (the default), regardless of
+    /// color. As with the fill, the stroke carries either a solid
+    /// color or a gradient ([`set_stroke_linear_gradient`](Self::set_stroke_linear_gradient) /
+    /// [`set_stroke_radial_gradient`](Self::set_stroke_radial_gradient)) —
+    /// whichever was set last.
     pub fn set_stroke_color(&mut self, color: Rgba) -> Result<()> {
         let Rgba { r, g, b, a } = color;
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_color(self.raw, r, g, b, a) })
     }
 
-    /// Gets the stroke color.
+    /// Returns the stroke's solid color.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if no stroke has been
+    /// set on the shape.
     pub fn stroke_color(&self) -> Result<Rgba> {
         let (mut r, mut g, mut b, mut a) = (0u8, 0u8, 0u8, 0u8);
         Error::from_raw(unsafe {
@@ -578,11 +647,13 @@ impl Shape<'_> {
     }
 
     /// Sets the stroke line cap style.
+    ///
+    /// The engine default is [`StrokeCap::Square`].
     pub fn set_stroke_cap(&mut self, cap: StrokeCap) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_cap(self.raw, cap.to_raw()) })
     }
 
-    /// Gets the stroke line cap style.
+    /// Returns the stroke line cap style.
     pub fn stroke_cap(&self) -> Result<StrokeCap> {
         let mut cap = sys::Tvg_Stroke_Cap::TVG_STROKE_CAP_BUTT;
         Error::from_raw(unsafe { sys::tvg_shape_get_stroke_cap(self.raw, &raw mut cap) })?;
@@ -590,11 +661,13 @@ impl Shape<'_> {
     }
 
     /// Sets the stroke line join style.
+    ///
+    /// The engine default is [`StrokeJoin::Bevel`].
     pub fn set_stroke_join(&mut self, join: StrokeJoin) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_join(self.raw, join.to_raw()) })
     }
 
-    /// Gets the stroke line join style.
+    /// Returns the stroke line join style.
     pub fn stroke_join(&self) -> Result<StrokeJoin> {
         let mut join = sys::Tvg_Stroke_Join::TVG_STROKE_JOIN_MITER;
         Error::from_raw(unsafe { sys::tvg_shape_get_stroke_join(self.raw, &raw mut join) })?;
@@ -602,11 +675,19 @@ impl Shape<'_> {
     }
 
     /// Sets the stroke miter limit.
+    ///
+    /// Caps how far a [`StrokeJoin::Miter`] join may extend before it
+    /// is converted to a bevel; ignored for other join styles. The
+    /// engine default is `4.0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `miterlimit` is negative.
     pub fn set_stroke_miterlimit(&mut self, miterlimit: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_miterlimit(self.raw, miterlimit) })
     }
 
-    /// Gets the stroke miter limit.
+    /// Returns the stroke miter limit.
     pub fn stroke_miterlimit(&self) -> Result<f32> {
         let mut ml: f32 = 0.0;
         Error::from_raw(unsafe { sys::tvg_shape_get_stroke_miterlimit(self.raw, &raw mut ml) })?;
@@ -614,6 +695,20 @@ impl Shape<'_> {
     }
 
     /// Sets the stroke dash pattern.
+    ///
+    /// `pattern` holds alternating dash and gap lengths; `offset`
+    /// shifts the starting point within the repeating pattern. Negative
+    /// entries are treated as `0.0`, and if every entry is `<= 0.0` the
+    /// dash is ignored. An odd-length `pattern` is repeated once so
+    /// dashes and gaps stay alternating.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] when `pattern` is empty: the
+    /// engine rejects a non-`null` pointer paired with a count of zero,
+    /// and a Rust empty slice yields exactly that. To clear an existing
+    /// dash pattern, set a single-element pattern of `0.0` (which the
+    /// engine then ignores) rather than passing an empty slice.
     #[allow(clippy::cast_possible_truncation)]
     pub fn set_stroke_dash(&mut self, pattern: &[f32], offset: f32) -> Result<()> {
         Error::from_raw(unsafe {
@@ -621,7 +716,9 @@ impl Shape<'_> {
         })
     }
 
-    /// Gets the stroke dash pattern and offset.
+    /// Returns the stroke dash pattern and offset.
+    ///
+    /// The pattern is empty when no dashing is set.
     pub fn stroke_dash(&self) -> Result<(alloc::vec::Vec<f32>, f32)> {
         let mut ptr: *const f32 = core::ptr::null();
         let mut cnt: u32 = 0;
@@ -664,17 +761,26 @@ impl Shape<'_> {
     /// Sets a radial gradient as the stroke fill.
     ///
     /// Companion to [`set_radial_gradient`](Self::set_radial_gradient)
-    /// on the fill side.  The underlying C call
+    /// on the fill side. The underlying C call
     /// (`tvg_shape_set_stroke_gradient`) takes a polymorphic
-    /// `Tvg_Gradient` and the C++ implementation
-    /// (`Shape::strokeFill(Fill*)`) accepts both gradient kinds —
-    /// the Rust binding previously restricted the input type to
-    /// linear by oversight.
+    /// `Tvg_Gradient`, so both gradient kinds are accepted as a stroke
+    /// fill.
     pub fn set_stroke_radial_gradient(&mut self, grad: RadialGradient<'_>) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_stroke_gradient(self.raw, grad.into_raw()) })
     }
 
-    /// Sets the trim path (visible segment along the path).
+    /// Sets the visible segment of the path via trimming.
+    ///
+    /// `begin` and `end` are normalised positions along the path,
+    /// where `0.0` is the start and `1.0` the end. Values outside
+    /// `[0.0, 1.0]` wrap around circularly (like angle wrapping)
+    /// rather than being clamped.
+    ///
+    /// When a shape has multiple sub-paths, `simultaneous` controls
+    /// how they are trimmed. `true` (the engine default) applies the
+    /// trim to every sub-path independently; `false` treats them as a
+    /// single concatenated path whose total length is the sum of the
+    /// individual lengths.
     pub fn set_trimpath(&mut self, begin: f32, end: f32, simultaneous: bool) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_shape_set_trimpath(self.raw, begin, end, simultaneous) })
     }

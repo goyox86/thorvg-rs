@@ -1,3 +1,7 @@
+//! Scene-tree traversal for inspecting node structure and names.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use alloc::ffi::CString;
 use alloc::string::String;
 
@@ -5,11 +9,14 @@ use crate::error::{Error, Result};
 use crate::paint::{BorrowedPaint, Paint};
 use thorvg_sys as sys;
 
-/// Scene tree traversal helper.
+/// Scene-tree traversal helper.
 ///
-/// Iterates through all descendants of a paint (scene) and invokes
-/// a closure on each.  Create accessors via
+/// Walks every descendant of a scene paint and invokes a closure on each,
+/// for inspecting structure and node properties. Create accessors via
 /// [`Thorvg::accessor()`](crate::Thorvg::accessor).
+///
+/// The lifetime `'eng` ties the accessor to a [`Thorvg`](crate::Thorvg)
+/// engine instance.
 pub struct Accessor<'eng> {
     raw: sys::Tvg_Accessor,
     _engine: core::marker::PhantomData<&'eng ()>,
@@ -28,18 +35,31 @@ impl Accessor<'_> {
         })
     }
 
-    /// Iterates through every descendant of `paint`, invoking `func`
-    /// on each visited node.
+    /// Visits every descendant of `paint`, invoking `func` on each node.
     ///
     /// The closure receives:
     ///   * a [`BorrowedAccessor`] view over `self`, exposing
-    ///     `get_name(id)` — only meaningful here, since the C side
-    ///     populates the id→name index only for the duration of
-    ///     this call;
+    ///     [`get_name`](BorrowedAccessor::get_name) — meaningful only
+    ///     here, since the C side populates the id-to-name index for the
+    ///     duration of this call;
     ///   * a [`BorrowedPaint`] view over the visited node, exposing
     ///     `id` / `paint_type` / `opacity` / `bounds`.
     ///
-    /// Returning `false` from the closure stops iteration early.
+    /// Returning `false` from the closure stops iteration early; `true`
+    /// continues to the next node.
+    ///
+    /// # Panics
+    ///
+    /// Does not panic. A panic inside `func` is caught at the FFI
+    /// boundary (crossing it would be undefined behavior) and treated as
+    /// a `false` return, stopping iteration; under `no_std` the crate
+    /// requires `panic = "abort"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Error`] mapped from `ThorVG`'s status if it rejects
+    /// the traversal request; succeeds with `Ok(())` once the walk
+    /// completes (including early stop).
     pub fn for_each<P, F>(&mut self, paint: &P, func: F) -> Result<()>
     where
         P: Paint,
@@ -83,8 +103,10 @@ impl Accessor<'_> {
 
     /// Generates a unique ID (hash key) from a name string.
     ///
-    /// Pure hashing function — no engine state involved; the name
-    /// → id mapping is purely textual.
+    /// A pure hashing function: the name-to-id mapping is purely textual
+    /// and involves no engine state. Use it to match a node's `id`
+    /// against a known name during traversal. Returns `None` if `name`
+    /// contains an interior NUL byte.
     pub fn generate_id(name: &str) -> Option<u32> {
         let c_name = CString::new(name).ok()?;
         Some(unsafe { sys::tvg_accessor_generate_id(c_name.as_ptr()) })
@@ -146,9 +168,13 @@ impl BorrowedAccessor<'_> {
 
     /// Looks up the original name string for a visited paint's id.
     ///
-    /// Requires the iterated picture to have been marked accessible
-    /// via `Picture::set_accessible(true)`.  Returns `None` for ids
-    /// not present in the active picture's name index.
+    /// Requires the iterated picture to have been marked accessible via
+    /// [`Picture::set_accessible`](crate::Picture::set_accessible) with
+    /// `true`. Returns `None` for ids not present in the active picture's
+    /// name index, or when the name is unavailable. Only valid inside an
+    /// [`Accessor::for_each`] callback.
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
     pub fn get_name(&self, id: u32) -> Option<String> {
         let ptr = unsafe { sys::tvg_accessor_get_name(self.raw, id) };
         if ptr.is_null() {

@@ -6,6 +6,8 @@
 //! they consume.  Walking the data is done through
 //! [`Path::segments`], which yields typed [`Segment`]s and removes
 //! the need for callers to track a separate points cursor.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
 
 use alloc::vec::Vec;
 
