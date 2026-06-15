@@ -95,7 +95,7 @@ jobs:
             --buildtype=release \
             -Dbindings=capi -Dengines=cpu \
             -Dloaders="svg, png, lottie, ttf, otf" \
-            -Dthreads=true -Dfile=true
+            -Dthreads=true -Dfile=true -Dextra=lottie_exp
           sudo meson install -C /tmp/tvg
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2

@@ -228,6 +228,12 @@ fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build
     // it behind feature-test macros.
     build.define("_DEFAULT_SOURCE", None);
 
+    // The vendored build is always linked as a static archive
+    // (`cargo:rustc-link-lib=static=thorvg`), so the C API must carry no
+    // Windows dllimport/dllexport decoration — otherwise MSVC rejects the
+    // definitions as `dllimport` (C2491). Mirrors meson's `-DTVG_STATIC`.
+    build.define("TVG_STATIC", None);
+
     // MSVC: the Windows SDK defines `min`/`max` as macros, which mangle
     // tvgMath.h's `Point min(...)` / `max(...)` declarations (C2059).
     // NOMINMAX suppresses them; /EHsc selects the standard C++ exception
