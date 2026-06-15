@@ -1,3 +1,7 @@
+//! Scenes: grouping paints and applying post-processing effects.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use crate::color::{Rgb, Rgba};
 use crate::error::{Error, Result};
 use crate::paint::Paint;
@@ -8,23 +12,20 @@ use thorvg_sys as sys;
 /// Maps to the raw `int direction` parameter of the underlying C call
 /// `tvg_scene_add_effect_gaussian_blur`, whose documented values are:
 ///
-/// | C value | Variant           |
-/// |---------|-------------------|
+/// | C value | Variant                          |
+/// |---------|----------------------------------|
 /// | `0`     | [`Both`](Self::Both)             |
 /// | `1`     | [`Horizontal`](Self::Horizontal) |
 /// | `2`     | [`Vertical`](Self::Vertical)     |
 ///
-/// thorvg's C API takes a bare `int` here — there is no `Tvg_*`
+/// `ThorVG`'s C API takes a bare `int` here — there is no `Tvg_*`
 /// typedef — so the wrapper carries the encoding rather than
-/// re-exporting a C enum.
-///
-/// Exhaustive: the C header documents the full set
-/// (`tvg_scene_add_effect_gaussian_blur`'s `direction` parameter) and
-/// has not grown since the function was introduced.
+/// re-exporting a C enum. The header documents the full set, so this
+/// enum mirrors it exactly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(i32)]
 pub enum BlurDirection {
-    /// Blur on both axes (the default in upstream).
+    /// Blur on both axes.
     Both = 0,
     /// Blur along the horizontal axis only.
     Horizontal = 1,
@@ -38,24 +39,24 @@ impl BlurDirection {
     }
 }
 
-/// Edge-sampling behaviour for [`Scene::add_gaussian_blur_effect`].
+/// Edge-sampling behavior for [`Scene::add_gaussian_blur_effect`].
 ///
 /// Maps to the raw `int border` parameter of the underlying C call
 /// `tvg_scene_add_effect_gaussian_blur`:
 ///
-/// | C value | Variant                          |
-/// |---------|----------------------------------|
-/// | `0`     | [`Duplicate`](Self::Duplicate)   |
-/// | `1`     | [`Wrap`](Self::Wrap)             |
+/// | C value | Variant                        |
+/// |---------|--------------------------------|
+/// | `0`     | [`Duplicate`](Self::Duplicate) |
+/// | `1`     | [`Wrap`](Self::Wrap)           |
 ///
-/// Exhaustive: the C header documents both values and has not grown.
+/// The C header documents both values, so this enum mirrors it exactly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(i32)]
 pub enum BlurBorder {
-    /// Replicate the edge pixel when the kernel reaches outside the
+    /// Replicates the edge pixel when the kernel reaches outside the
     /// scene bounds.
     Duplicate = 0,
-    /// Wrap the sampling window around to the opposite edge.
+    /// Wraps the sampling window around to the opposite edge.
     Wrap = 1,
 }
 
@@ -72,23 +73,23 @@ impl BlurBorder {
 /// bundling the four arguments into one value with the same builder
 /// ergonomics as [`DropShadow`].
 ///
-/// Same three construction styles as [`DropShadow`] are supported
+/// The same three construction styles as [`DropShadow`] are supported
 /// (struct literal, `..Default::default()`, builder).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GaussianBlur {
-    /// Blur radius (sigma).  Must be `> 0` or the engine rejects the
-    /// effect.
+    /// Blur radius (sigma). Must be `> 0` or the engine rejects the
+    /// effect with [`Error::InvalidArguments`].
     pub sigma: f64,
     /// Axis (or axes) the kernel sweeps.
     pub direction: BlurDirection,
-    /// Edge-sampling behaviour outside the scene bounds.
+    /// Edge-sampling behavior outside the scene bounds.
     pub border: BlurBorder,
-    /// Blur quality level, `[0, 100]` (clamped by the engine).
+    /// Blur quality level, in `0..=100`.
     pub quality: u8,
 }
 
 impl GaussianBlur {
-    /// Returns a blur with sensible defaults that render:
+    /// Returns a blur with sensible defaults that render.
     ///
     /// | Field       | Value                     |
     /// |-------------|---------------------------|
@@ -109,7 +110,7 @@ impl GaussianBlur {
         }
     }
 
-    /// Sets the blur radius (sigma).  Must be `> 0`.
+    /// Sets the blur radius (sigma). Must be `> 0`.
     #[must_use]
     pub const fn sigma(mut self, sigma: f64) -> Self {
         self.sigma = sigma;
@@ -123,14 +124,14 @@ impl GaussianBlur {
         self
     }
 
-    /// Sets the edge-sampling behaviour.
+    /// Sets the edge-sampling behavior.
     #[must_use]
     pub const fn border(mut self, border: BlurBorder) -> Self {
         self.border = border;
         self
     }
 
-    /// Sets the blur quality level, `[0, 100]`.
+    /// Sets the blur quality level, in `0..=100`.
     #[must_use]
     pub const fn quality(mut self, quality: u8) -> Self {
         self.quality = quality;
@@ -171,32 +172,33 @@ impl Default for GaussianBlur {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DropShadow {
-    /// Shadow color (RGBA, 0..=255 per channel).
+    /// Shadow color, `0..=255` per channel. The alpha channel acts as
+    /// the shadow opacity.
     pub color: Rgba,
-    /// Shadow direction in degrees, `[0, 360]`.
+    /// Shadow direction in degrees, in `0.0..=360.0`.
     pub angle: f64,
-    /// Distance of the shadow from the original object.
+    /// Distance of the shadow from the original object, in user units.
     pub distance: f64,
-    /// Gaussian blur sigma for the shadow.  Must be `> 0`.
+    /// Gaussian blur sigma for the shadow. Must be `> 0`.
     pub sigma: f64,
-    /// Blur quality level, `[0, 100]`.
+    /// Blur quality level, in `0..=100`.
     pub quality: u8,
 }
 
 impl DropShadow {
     /// Returns a shadow with sensible defaults that the engine
-    /// accepts (opaque black, angled downward, modest blur).
+    /// accepts (opaque black, modest offset and blur).
     ///
-    /// | Field      | Value                  |
-    /// |------------|------------------------|
+    /// | Field      | Value                                    |
+    /// |------------|------------------------------------------|
     /// | `color`    | `Rgba::new(0, 0, 0, 255)` (opaque black) |
-    /// | `angle`    | `0.0` (downward)       |
-    /// | `distance` | `4.0`                  |
-    /// | `sigma`    | `2.0`                  |
-    /// | `quality`  | `50`                   |
+    /// | `angle`    | `0.0`                                    |
+    /// | `distance` | `4.0`                                    |
+    /// | `sigma`    | `2.0`                                    |
+    /// | `quality`  | `50`                                     |
     ///
-    /// All defaults are non-zero so the effect actually renders
-    /// (the engine rejects `sigma <= 0`).
+    /// `sigma` is non-zero so the effect actually renders (the engine
+    /// rejects `sigma <= 0`).
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -215,7 +217,7 @@ impl DropShadow {
         self
     }
 
-    /// Sets the shadow direction in degrees, `[0, 360]`.
+    /// Sets the shadow direction in degrees, in `0.0..=360.0`.
     #[must_use]
     pub const fn angle(mut self, angle: f64) -> Self {
         self.angle = angle;
@@ -229,14 +231,14 @@ impl DropShadow {
         self
     }
 
-    /// Sets the Gaussian blur sigma (must be `> 0`).
+    /// Sets the Gaussian blur sigma. Must be `> 0`.
     #[must_use]
     pub const fn sigma(mut self, sigma: f64) -> Self {
         self.sigma = sigma;
         self
     }
 
-    /// Sets the blur quality level, `[0, 100]`.
+    /// Sets the blur quality level, in `0..=100`.
     #[must_use]
     pub const fn quality(mut self, quality: u8) -> Self {
         self.quality = quality;
@@ -256,18 +258,18 @@ impl Default for DropShadow {
 /// `tvg_scene_add_effect_tritone(scene, shadow_r, shadow_g, shadow_b, midtone_r, midtone_g, midtone_b, highlight_r, highlight_g, highlight_b, blend)`,
 /// grouping the three RGB triplets into named [`Rgb`] fields.
 ///
-/// Same three construction styles as [`DropShadow`] are supported
+/// The same three construction styles as [`DropShadow`] are supported
 /// (struct literal, `..Default::default()`, builder).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Tritone {
-    /// Shadow color.
+    /// Color the darkest scene pixels map to.
     pub shadow: Rgb,
-    /// Midtone color.
+    /// Color the mid-brightness scene pixels map to.
     pub midtone: Rgb,
-    /// Highlight color.
+    /// Color the brightest scene pixels map to.
     pub highlight: Rgb,
     /// Blend factor between the original color and the tritone
-    /// palette, `[0, 255]`.
+    /// palette, in `0..=255`.
     pub blend: u8,
 }
 
@@ -312,7 +314,7 @@ impl Tritone {
     }
 
     /// Sets the blend factor between the original color and the
-    /// tritone palette, `[0, 255]`.
+    /// tritone palette, in `0..=255`.
     #[must_use]
     pub const fn blend(mut self, blend: u8) -> Self {
         self.blend = blend;
@@ -332,7 +334,7 @@ impl Default for Tritone {
 /// `tvg_scene_add_effect_tint(scene, black_r, black_g, black_b, white_r, white_g, white_b, intensity)`,
 /// grouping the two RGB endpoints into named [`Rgb`] fields.
 ///
-/// Same three construction styles as [`DropShadow`] are supported
+/// The same three construction styles as [`DropShadow`] are supported
 /// (struct literal, `..Default::default()`, builder).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Tint {
@@ -340,8 +342,8 @@ pub struct Tint {
     pub black: Rgb,
     /// Color the brightest scene pixels map to.
     pub white: Rgb,
-    /// Tint intensity, `[0, 100]`.  `0` leaves the original
-    /// colors untouched; `100` is full tint.
+    /// Tint intensity, in `0.0..=100.0`. `0.0` leaves the original
+    /// colors untouched; `100.0` is full tint.
     pub intensity: f64,
 }
 
@@ -376,7 +378,7 @@ impl Tint {
         self
     }
 
-    /// Sets the tint intensity, `[0, 100]`.
+    /// Sets the tint intensity, in `0.0..=100.0`.
     #[must_use]
     pub const fn intensity(mut self, intensity: f64) -> Self {
         self.intensity = intensity;
@@ -392,6 +394,14 @@ impl Default for Tint {
 
 /// A scene that groups multiple paint objects.
 ///
+/// Paints are rendered in the order they are added; add them
+/// back-to-front for the intended layering.
+///
+/// Post-processing effects (Gaussian blur, drop shadow, fill, tint,
+/// tritone) are applied after the scene is rendered, cumulatively and
+/// in the order they are added. [`clear_effects`](Self::clear_effects)
+/// removes them all.
+///
 /// The lifetime `'eng` ties this scene to a [`Thorvg`](crate::Thorvg) engine
 /// instance. Create scenes via [`Thorvg::scene()`](crate::Thorvg::scene).
 pub struct Scene<'eng> {
@@ -400,7 +410,7 @@ pub struct Scene<'eng> {
     _engine: core::marker::PhantomData<&'eng ()>,
 }
 
-// SAFETY: Same rationale as other ThorVG handle types — exclusive
+// SAFETY: Same rationale as other `ThorVG` handle types — exclusive
 // ownership of a C heap object; global state is mutex-protected.
 unsafe impl Send for Scene<'_> {}
 
@@ -418,34 +428,76 @@ impl Scene<'_> {
         })
     }
 
-    /// Adds a paint object to the scene (appended at the end).
+    /// Appends a paint object to the end of the scene.
+    ///
+    /// Ownership of `paint` is transferred to the scene.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// paint handle.
     pub fn add<P: Paint>(&mut self, paint: P) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_scene_add(self.raw, paint.into_raw()) })
     }
 
-    /// Inserts a paint object before another existing paint in the scene.
+    /// Inserts a paint object immediately before another paint already
+    /// in the scene.
+    ///
+    /// Ownership of `target` is transferred to the scene. `at` must be
+    /// a paint that is already part of this scene.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects either
+    /// handle (for example, if `at` is not present in the scene).
     pub fn insert<P: Paint, Q: Paint>(&mut self, target: P, at: &Q) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_scene_insert(self.raw, target.into_raw(), at.raw()) })
     }
 
-    /// Removes a paint from the scene.
+    /// Removes a single paint from the scene.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// paint handle.
     pub fn remove<P: Paint>(&mut self, paint: &P) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_scene_remove(self.raw, paint.raw()) })
     }
 
     /// Removes all paints from the scene.
+    ///
+    /// Wraps `tvg_scene_remove` with a null paint, which the C API
+    /// interprets as "remove every paint".
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// request.
     pub fn clear(&mut self) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_scene_remove(self.raw, core::ptr::null_mut()) })
     }
 
-    /// Clears all scene effects.
+    /// Removes all previously added scene effects.
+    ///
+    /// Restores the scene to its un-post-processed state.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// request.
     pub fn clear_effects(&mut self) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_scene_clear_effects(self.raw) })
     }
 
-    /// Adds a Gaussian blur effect.
+    /// Adds a Gaussian blur effect to the scene's effect pipeline.
     ///
-    /// See [`GaussianBlur`] for the parameter layout.
+    /// See [`GaussianBlur`] for the parameter layout. The effect is
+    /// applied after the scene is rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// parameters (notably `sigma <= 0`).
     pub fn add_gaussian_blur_effect(&mut self, params: GaussianBlur) -> Result<()> {
         let GaussianBlur {
             sigma,
@@ -464,9 +516,15 @@ impl Scene<'_> {
         })
     }
 
-    /// Adds a drop shadow effect.
+    /// Adds a drop shadow effect to the scene's effect pipeline.
     ///
-    /// See [`DropShadow`] for the parameter layout.
+    /// See [`DropShadow`] for the parameter layout. The effect is
+    /// applied after the scene is rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// parameters (notably `sigma <= 0`).
     pub fn add_drop_shadow_effect(&mut self, params: DropShadow) -> Result<()> {
         let DropShadow {
             color: Rgba { r, g, b, a },
@@ -490,7 +548,16 @@ impl Scene<'_> {
         })
     }
 
-    /// Adds a fill color effect (overrides scene content color).
+    /// Adds a fill color effect, overriding the scene's content color.
+    ///
+    /// Each channel of `color` is in `0..=255`; the alpha channel acts
+    /// as the fill opacity. The effect is applied after the scene is
+    /// rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// parameters.
     pub fn add_fill_effect(&mut self, color: Rgba) -> Result<()> {
         let Rgba { r, g, b, a } = color;
         Error::from_raw(unsafe {
@@ -504,9 +571,15 @@ impl Scene<'_> {
         })
     }
 
-    /// Adds a tint effect.
+    /// Adds a tint effect to the scene's effect pipeline.
     ///
-    /// See [`Tint`] for the parameter layout.
+    /// See [`Tint`] for the parameter layout. The effect is applied
+    /// after the scene is rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// parameters.
     pub fn add_tint_effect(&mut self, params: Tint) -> Result<()> {
         let Tint {
             black,
@@ -527,9 +600,15 @@ impl Scene<'_> {
         })
     }
 
-    /// Adds a tritone color effect.
+    /// Adds a tritone color effect to the scene's effect pipeline.
     ///
-    /// See [`Tritone`] for the parameter layout.
+    /// See [`Tritone`] for the parameter layout. The effect is applied
+    /// after the scene is rendered.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if the engine rejects the
+    /// parameters.
     pub fn add_tritone_effect(&mut self, params: Tritone) -> Result<()> {
         let Tritone {
             shadow,

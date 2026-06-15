@@ -1,3 +1,8 @@
+//! Pictures: loading and displaying SVG, PNG, JPG, Lottie, and raw
+//! images.
+//!
+//! Wraps the [`ThorVG` C API](https://www.thorvg.org/c-native).
+
 use alloc::ffi::CString;
 
 use crate::error::{Error, Result};
@@ -126,7 +131,7 @@ unsafe fn drop_resolver<F>(data: core::ptr::NonNull<()>) {
     drop(unsafe { alloc::boxed::Box::from_raw(data.as_ptr().cast::<F>()) });
 }
 
-// SAFETY: `Picture` exclusively owns (or borrows) a heap-allocated ThorVG
+// SAFETY: `Picture` exclusively owns (or borrows) a heap-allocated `ThorVG`
 // paint handle.  Shared global state is mutex-protected in C++.  Sole
 // ownership transfer to another thread is safe.
 unsafe impl Send for Picture<'_> {}
@@ -161,6 +166,10 @@ impl Picture<'_> {
 
     /// Loads a picture from a file path string.
     ///
+    /// The loader is chosen from the file extension. `ThorVG` caches the
+    /// decoded data keyed by `path`, so reloading the same file reuses
+    /// the cached result.
+    ///
     /// # Runtime requirements
     ///
     /// thorvg reads the file with the C runtime (`fopen`/`fread`), so
@@ -168,12 +177,25 @@ impl Picture<'_> {
     /// compiles under `no_std`. On bare-metal targets with no libc
     /// filesystem it returns an error; embed the asset and use
     /// [`load_data_static`](Self::load_data_static) instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `path` is empty or
+    /// contains an interior NUL byte, or [`Error::NotSupported`] if the
+    /// extension is unknown or its loader was not compiled in.
     pub fn load_from_str(&mut self, path: &str) -> Result<()> {
         let c_path = CString::new(path)?;
         Error::from_raw(unsafe { sys::tvg_picture_load(self.raw, c_path.as_ptr()) })
     }
 
     /// Loads a picture from a file path.
+    ///
+    /// Lossy-converts `path` to a string and forwards to
+    /// [`load_from_str`](Self::load_from_str).
+    ///
+    /// # Errors
+    ///
+    /// Same conditions as [`load_from_str`](Self::load_from_str).
     #[cfg(feature = "std")]
     pub fn load<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<()> {
         self.load_from_str(&path.as_ref().to_string_lossy())
@@ -183,10 +205,17 @@ impl Picture<'_> {
     ///
     /// `mime` selects the loader (see [`MimeType`]). `resource_path`
     /// is the base directory for SVG external assets; pass `None`
-    /// for self-contained content.
+    /// for self-contained content. Because `copy` is `true`, the
+    /// caller's `data` may be freed as soon as this returns.
     ///
     /// For zero-copy loading of `'static` buffers (e.g.
     /// `include_bytes!(...)`), use [`load_data_static`](Self::load_data_static).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `data` is empty or
+    /// `resource_path` contains an interior NUL byte, or
+    /// [`Error::NotSupported`] if the selected loader is unavailable.
     pub fn load_data(
         &mut self,
         data: &[u8],
@@ -198,9 +227,14 @@ impl Picture<'_> {
 
     /// Loads a picture from `'static` memory without copying.
     ///
-    /// thorvg borrows `data`; the `'static` bound enforces at the type
-    /// level that the buffer outlives the picture. Typical use:
+    /// thorvg borrows `data` (the underlying call passes `copy =
+    /// false`); the `'static` bound enforces at the type level that the
+    /// buffer outlives the picture. Typical use:
     /// `pic.load_data_static(include_bytes!("logo.svg"), MimeType::Svg, None)`.
+    ///
+    /// # Errors
+    ///
+    /// Same conditions as [`load_data`](Self::load_data).
     ///
     /// # Compile-time safety
     ///
@@ -220,10 +254,24 @@ impl Picture<'_> {
         load_data_inner(self.raw, data, mime, resource_path, /* copy = */ false)
     }
 
-    /// Loads raw image data (pixel buffer), copying `data` into thorvg.
+    /// Loads raw image data (a `w` x `h` pixel buffer), copying `data`
+    /// into thorvg.
+    ///
+    /// Each element of `data` is one 32-bit pixel interpreted per `cs`,
+    /// laid out row-major with no padding; `data` must therefore hold
+    /// at least `w * h` elements. Because `copy` is `true`, the
+    /// caller's buffer may be freed as soon as this returns.
     ///
     /// For zero-copy loading of `'static` buffers, use
     /// [`load_raw_static`](Self::load_raw_static).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `w * h` overflows `u64`
+    /// or if `data` is shorter than `w * h` — both checked by the
+    /// wrapper before the FFI call, since thorvg's raw loader
+    /// `memcpy`s `w * h` pixels unchecked. `ThorVG` additionally returns
+    /// [`Error::InvalidArguments`] if `w` or `h` is zero.
     pub fn load_raw(
         &mut self,
         data: &[u32],
@@ -236,8 +284,14 @@ impl Picture<'_> {
 
     /// Loads raw image data from `'static` memory without copying.
     ///
-    /// thorvg borrows `data`; the `'static` bound enforces at the type
-    /// level that the buffer outlives the picture.
+    /// thorvg borrows `data` (the underlying call passes `copy =
+    /// false`); the `'static` bound enforces at the type level that the
+    /// buffer outlives the picture. Layout requirements match
+    /// [`load_raw`](Self::load_raw).
+    ///
+    /// # Errors
+    ///
+    /// Same conditions as [`load_raw`](Self::load_raw).
     pub fn load_raw_static(
         &mut self,
         data: &'static [u32],
@@ -248,36 +302,83 @@ impl Picture<'_> {
         load_raw_inner(self.raw, data, w, h, cs, /* copy = */ false)
     }
 
-    /// Resizes the picture content.
+    /// Resizes the picture content to fit `w` x `h`, preserving aspect
+    /// ratio.
+    ///
+    /// A scale factor is computed for each dimension and the smaller of
+    /// the two is applied to both, so the content fits within the
+    /// requested box without distortion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn set_size(&mut self, w: f32, h: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_picture_set_size(self.raw, w, h) })
     }
 
-    /// Gets the size of the loaded picture.
+    /// Returns the size of the loaded picture as `(width, height)` in
+    /// pixels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn size(&self) -> Result<(f32, f32)> {
         let (mut w, mut h) = (0.0f32, 0.0f32);
         Error::from_raw(unsafe { sys::tvg_picture_get_size(self.raw, &raw mut w, &raw mut h) })?;
         Ok((w, h))
     }
 
-    /// Sets the normalized origin point.
+    /// Sets the normalized origin point, in `0.0..=1.0` coordinates
+    /// relative to the picture's bounds.
+    ///
+    /// `(0.0, 0.0)` is the top-left corner, `(0.5, 0.5)` the center,
+    /// and `(1.0, 1.0)` the bottom-right. The origin is the reference
+    /// point used when positioning and transforming the picture.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn set_origin(&mut self, x: f32, y: f32) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_picture_set_origin(self.raw, x, y) })
     }
 
-    /// Gets the normalized origin point.
+    /// Returns the normalized origin point as `(x, y)`.
+    ///
+    /// See [`set_origin`](Self::set_origin) for the coordinate
+    /// convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn origin(&self) -> Result<(f32, f32)> {
         let (mut x, mut y) = (0.0f32, 0.0f32);
         Error::from_raw(unsafe { sys::tvg_picture_get_origin(self.raw, &raw mut x, &raw mut y) })?;
         Ok((x, y))
     }
 
-    /// Sets the image filtering method.
+    /// Sets the image filtering method applied when the picture is
+    /// scaled or transformed.
+    ///
+    /// The default is [`FilterMethod::Bilinear`].
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn set_filter(&mut self, method: FilterMethod) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_picture_set_filter(self.raw, method.to_raw()) })
     }
 
-    /// Enables or disables accessible mode for efficient ID-based lookup.
+    /// Enables or disables accessible mode.
+    ///
+    /// When enabled, the picture maintains an internal mapping of
+    /// ID-accessible nodes (such as SVG elements), making
+    /// [`get_paint`](Self::get_paint) lookups more efficient.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn set_accessible(&mut self, accessible: bool) -> Result<()> {
         Error::from_raw(unsafe { sys::tvg_picture_set_accessible(self.raw, accessible) })
     }
@@ -295,8 +396,14 @@ impl Picture<'_> {
     /// the picture's lifetime; calling `set_asset_resolver` again
     /// replaces the previous closure (and drops it).
     ///
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
     /// Must be called **before** [`Picture::load`] /
-    /// [`Picture::load_from_str`] for asset resolution to kick in.
+    /// [`Picture::load_from_str`]: installing a resolver after the
+    /// document is loaded has no effect on that document's assets, and
+    /// thorvg reports it as [`Error::InsufficientCondition`]. If the
+    /// closure returns `None`, thorvg falls back to its built-in
+    /// resolution mechanism for that asset.
     ///
     /// ```ignore
     /// pic.set_asset_resolver(|src| {
@@ -305,6 +412,19 @@ impl Picture<'_> {
     /// })?;
     /// pic.load_from_str("scene.svg")?;
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// A panic from `resolver` does not propagate across the C/C++
+    /// boundary. Under the `std` feature it is caught and treated as an
+    /// unresolved asset (returns `None`); in `no_std` builds, which the
+    /// crate docs require to use `panic = "abort"`, the panic aborts
+    /// the process.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the picture is
+    /// already loaded.
     pub fn set_asset_resolver<F>(&mut self, resolver: F) -> Result<()>
     where
         F: FnMut(&str) -> Option<(alloc::vec::Vec<u8>, MimeType)> + Send + 'static,
@@ -349,6 +469,13 @@ impl Picture<'_> {
     }
 
     /// Removes any previously installed asset resolver.
+    ///
+    /// Unregisters the callback from thorvg and drops the stored
+    /// closure. Calling this when no resolver is installed is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the underlying engine reports a failure.
     pub fn clear_asset_resolver(&mut self) -> Result<()> {
         let r = Error::from_raw(unsafe {
             sys::tvg_picture_set_asset_resolver(self.raw, None, core::ptr::null_mut())
