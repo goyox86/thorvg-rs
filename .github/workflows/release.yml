@@ -1,0 +1,74 @@
+name: Release
+
+# Publishing to crates.io stays manual (see RELEASING below). This only
+# automates the GitHub release: on a version tag it slices the matching
+# CHANGELOG section and creates the release. The tag prefix selects the
+# crate, which also encodes the publish ordering (sys before thorvg).
+#
+# RELEASING (manual):
+#   cargo publish -p thorvg-sys && git tag thorvg-sys-v0.X.Y
+#   cargo publish -p thorvg     && git tag thorvg-v0.A.B
+#   git push --tags   # <- triggers this workflow
+
+on:
+  push:
+    tags:
+      - "thorvg-v*"
+      - "thorvg-sys-v*"
+
+permissions:
+  contents: write # create GitHub releases
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve crate, version, and changelog from tag
+        id: meta
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          case "$tag" in
+            thorvg-sys-v*)
+              version="${tag#thorvg-sys-v}"
+              echo "changelog=thorvg-sys/CHANGELOG.md" >> "$GITHUB_OUTPUT"
+              echo "title=thorvg-sys ${version}" >> "$GITHUB_OUTPUT"
+              echo "latest=false" >> "$GITHUB_OUTPUT"
+              ;;
+            thorvg-v*)
+              version="${tag#thorvg-v}"
+              echo "changelog=thorvg/CHANGELOG.md" >> "$GITHUB_OUTPUT"
+              echo "title=thorvg ${version}" >> "$GITHUB_OUTPUT"
+              echo "latest=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unrecognized tag '$tag'"
+              exit 1
+              ;;
+          esac
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Slice changelog section
+        id: notes
+        run: |
+          # The sys header is '## [0.2.0+thorvg-1.0.6] - ...' while the tag
+          # carries only '0.2.0', so match '## [<version>' as a prefix.
+          awk -v v="## [${{ steps.meta.outputs.version }}" '
+            index($0, v) == 1 { f = 1; next }
+            /^## \[/ { f = 0 }
+            f
+          ' "${{ steps.meta.outputs.changelog }}" > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::No changelog entry found for ${{ steps.meta.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${{ steps.meta.outputs.title }}" \
+            --notes-file notes.md \
+            --latest=${{ steps.meta.outputs.latest }}
