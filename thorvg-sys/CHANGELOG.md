@@ -11,6 +11,26 @@ bundling ThorVG `1.0.5`. Because the crate is `0.x`, a **minor** bump is
 breaking; the safe [`thorvg`](../thorvg/CHANGELOG.md) crate's dependency
 moves in lockstep.
 
+## [0.2.1+thorvg-1.0.6] - 2026-06-15
+
+Build-system and portability fixes; still bundles **ThorVG 1.0.6**. No
+API change — a patch bump.
+
+### Fixed
+
+- **System (non-vendored) build now finds ThorVG 1.x.** `link_system`
+  probed the unversioned `thorvg` pkg-config module, but ThorVG 1.x
+  installs `thorvg-1` (meson `filebase: 'thorvg-' + vmaj`). Probe
+  `thorvg-1` first, falling back to `thorvg` for distros that ship the
+  unversioned name.
+- **MSVC vendored build.** Define `NOMINMAX` — the Windows SDK's
+  `min`/`max` macros mangled `tvgMath.h`'s `Point min(...)` / `max(...)`
+  declarations (C2059) — and pass `/EHsc` for the standard C++ exception
+  model.
+- **Static linkage on MSVC.** Define `TVG_STATIC`: the vendored library
+  is linked as a static archive, but without it the C API expanded to
+  `__declspec(dllimport)` and MSVC rejected the definitions (C2491).
+
 ## [0.2.0+thorvg-1.0.6] - 2026-06-15
 
 Bundles **ThorVG 1.0.6**. The minor bump reflects a breaking change to
