@@ -228,6 +228,15 @@ fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build
     // it behind feature-test macros.
     build.define("_DEFAULT_SOURCE", None);
 
+    // MSVC: the Windows SDK defines `min`/`max` as macros, which mangle
+    // tvgMath.h's `Point min(...)` / `max(...)` declarations (C2059).
+    // NOMINMAX suppresses them; /EHsc selects the standard C++ exception
+    // model (exceptions are not disabled on MSVC, unlike the flags below).
+    if target.is_msvc {
+        build.define("NOMINMAX", None);
+        build.flag("/EHsc");
+    }
+
     // JerryScript's JERRY_VLA fallback uses alloca() without including
     // <alloca.h>.  Redirect to C99 VLAs.
     if cfg!(feature = "expressions") {
