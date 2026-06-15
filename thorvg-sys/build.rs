@@ -989,14 +989,23 @@ fn write_config_h(out_dir: &Path) {
 // ---------------------------------------------------------------------------
 
 /// Link against a system-installed thorvg via pkg-config.
+///
+/// ThorVG 1.x installs its pkg-config module as `thorvg-1` (meson
+/// `filebase: 'thorvg-' + vmaj`).  Some distributions also ship an
+/// unversioned `thorvg`, so try the versioned name first and fall back.
 fn link_system() {
-    pkg_config::Config::new()
-        .atleast_version("1.0.0")
-        .probe("thorvg")
-        .expect(
-            "Could not find system thorvg >= 1.0.0 via pkg-config. \
-             Either install thorvg or enable the `vendored` feature.",
+    let probe = |name| {
+        pkg_config::Config::new()
+            .atleast_version("1.0.0")
+            .probe(name)
+    };
+    if probe("thorvg-1").is_err() && probe("thorvg").is_err() {
+        panic!(
+            "Could not find system thorvg >= 1.0.0 via pkg-config \
+             (tried `thorvg-1` and `thorvg`). Either install thorvg or \
+             enable the `vendored` feature."
         );
+    }
 }
 
 // ---------------------------------------------------------------------------
