@@ -10,6 +10,26 @@ version (`0.y`), per SemVer's `0.x` rule.
 The companion `thorvg-sys` FFI crate is versioned independently — see
 [`thorvg-sys/CHANGELOG.md`](../thorvg-sys/CHANGELOG.md).
 
+## [0.4.2] - 2026-06-15
+
+Documentation-only release. No code, API, or behavior change — a patch
+bump so the revised docs render on [docs.rs](https://docs.rs/thorvg).
+
+### Documentation
+
+- Reviewed every public item against the ThorVG C API (`thorvg_capi.h`
+  contracts and `tvgCapi.cpp` behavior) and corrected inaccuracies in
+  error conditions, parameter units/ranges, ownership/lifetime claims,
+  defaults, and experimental status. Notable fixes: `TextMetrics::advance`
+  is the vertical line advance (not a horizontal run advance); the `Scene`
+  drop-shadow default direction claim was removed; `Shape` stroke defaults,
+  the empty-dash-slice error, and circular trim-path wrapping are now
+  documented.
+- Normalized the rustdoc to one style — terse summaries, `# Errors` /
+  `# Safety` / `# Panics` sections, intra-doc links, sharpened safety and
+  reliability contracts, and a per-module link to the upstream
+  [C API docs](https://www.thorvg.org/c-native).
+
 ## [0.4.1] - 2026-06-15
 
 Portability and documentation fixes. No API change — a patch bump.
