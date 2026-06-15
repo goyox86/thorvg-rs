@@ -71,6 +71,10 @@ impl PathCommand {
     /// callers (currently only [`Path`]'s decoder) can decide how
     /// to react to an unrecognised command rather than silently
     /// coercing it to a default kind.
+    // The constant `as u32` casts are no-ops where bindgen types these as
+    // `c_uint`, but real `c_int` -> `u32` conversions on MSVC. clippy only
+    // sees the current target, so silence its same-type-cast lint here.
+    #[allow(clippy::unnecessary_cast)]
     pub(crate) fn from_raw(c: sys::Tvg_Path_Command) -> Option<Self> {
         // bindgen types these constants as `c_uint` on some targets and
         // `c_int` on others (MSVC). Normalise them to `u32` consts so the
@@ -79,7 +83,7 @@ impl PathCommand {
         const MOVE_TO: u32 = sys::TVG_PATH_COMMAND_MOVE_TO as u32;
         const LINE_TO: u32 = sys::TVG_PATH_COMMAND_LINE_TO as u32;
         const CUBIC_TO: u32 = sys::TVG_PATH_COMMAND_CUBIC_TO as u32;
-        match c as u32 {
+        match u32::from(c) {
             CLOSE => Some(Self::Close),
             MOVE_TO => Some(Self::MoveTo),
             LINE_TO => Some(Self::LineTo),
