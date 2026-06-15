@@ -10,7 +10,7 @@ version (`0.y`), per SemVer's `0.x` rule.
 The companion `thorvg-sys` FFI crate is versioned independently — see
 [`thorvg-sys/CHANGELOG.md`](../thorvg-sys/CHANGELOG.md).
 
-## [0.4.0] - 2026-06-14
+## [0.4.0] - 2026-06-15
 
 Tracks **ThorVG 1.0.6** (via `thorvg-sys` 0.2). Picks up the upstream
 API changes that affect the safe surface.

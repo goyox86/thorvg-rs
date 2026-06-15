@@ -11,7 +11,7 @@ bundling ThorVG `1.0.5`. Because the crate is `0.x`, a **minor** bump is
 breaking; the safe [`thorvg`](../thorvg/CHANGELOG.md) crate's dependency
 moves in lockstep.
 
-## [0.2.0+thorvg-1.0.6] - 2026-06-14
+## [0.2.0+thorvg-1.0.6] - 2026-06-15
 
 Bundles **ThorVG 1.0.6**. The minor bump reflects a breaking change to
 the generated FFI surface (a removed C API symbol).
