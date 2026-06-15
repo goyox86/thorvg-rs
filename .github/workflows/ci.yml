@@ -14,16 +14,27 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Vendored (static, compiled-from-source) build across Intel/x86_64 OSes.
   test:
-    name: test (stable)
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-13, windows-latest] # all Intel x86_64
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive # thorvg + picolibc
       # build.rs drives bindgen, which calls libclang directly.
-      - name: Install libclang
+      - name: Install libclang (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang
+      - name: Point bindgen at libclang (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+      # macOS: libclang ships with the Xcode command-line tools.
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-targets
@@ -54,29 +65,43 @@ jobs:
   # pkg-config instead of compiling the vendored sources. Needs a real
   # libthorvg.so built with the C API (-Dbindings=capi) so the tvg_* symbols
   # exist to link against.
+  # Non-vendored path across Intel/x86_64 Unix OSes: link a system ThorVG
+  # shared library via pkg-config instead of compiling the vendored sources.
+  # Needs a real lib built with the C API (-Dbindings=capi) so the tvg_*
+  # symbols exist to link against. Windows is excluded: pkg-config-based
+  # system linking is a Unix convention (Windows uses the vendored build).
   system-lib:
-    name: system lib (non-vendored)
-    runs-on: ubuntu-latest
+    name: system lib (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-13] # Intel x86_64
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive # capi header (bindgen) + meson sources
-      - name: Install build deps
-        run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang meson ninja-build
+      - name: Install build deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang meson ninja-build pkg-config
+      - name: Install build deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install meson ninja pkg-config
+      # Default meson prefix (/usr/local) puts the pkgconfig file at
+      # /usr/local/lib/pkgconfig on both OSes.
       - name: Build & install system thorvg (shared, C API)
         run: |
           meson setup /tmp/tvg thorvg-sys/thorvg \
-            --prefix=/usr --libdir=lib --buildtype=release \
+            --buildtype=release \
             -Dbindings=capi -Dengines=cpu \
             -Dloaders="svg, png, lottie, ttf, otf" \
             -Dthreads=true -Dfile=true
           sudo meson install -C /tmp/tvg
-          sudo ldconfig
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build against the shared library
         env:
-          PKG_CONFIG_PATH: /usr/lib/pkgconfig
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
         run: >
           cargo build -p thorvg
           --no-default-features
