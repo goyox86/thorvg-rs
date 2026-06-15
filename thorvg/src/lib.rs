@@ -1,6 +1,6 @@
 //! Safe, idiomatic Rust bindings to the [ThorVG](https://github.com/thorvg/thorvg) vector graphics library.
 //!
-//! `ThorVG` is a lightweight vector graphics engine supporting SVG, Lottie animations,
+//! `ThorVG` is a production-ready vector graphics engine supporting SVG, Lottie animations,
 //! shapes, text, gradients, effects, and more.
 //!
 //! # `no_std` Support
