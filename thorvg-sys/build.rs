@@ -228,6 +228,21 @@ fn configure_thorvg_build(target: &TargetInfo, multilib: &[String]) -> cc::Build
     // it behind feature-test macros.
     build.define("_DEFAULT_SOURCE", None);
 
+    // The vendored build is always linked as a static archive
+    // (`cargo:rustc-link-lib=static=thorvg`), so the C API must carry no
+    // Windows dllimport/dllexport decoration — otherwise MSVC rejects the
+    // definitions as `dllimport` (C2491). Mirrors meson's `-DTVG_STATIC`.
+    build.define("TVG_STATIC", None);
+
+    // MSVC: the Windows SDK defines `min`/`max` as macros, which mangle
+    // tvgMath.h's `Point min(...)` / `max(...)` declarations (C2059).
+    // NOMINMAX suppresses them; /EHsc selects the standard C++ exception
+    // model (exceptions are not disabled on MSVC, unlike the flags below).
+    if target.is_msvc {
+        build.define("NOMINMAX", None);
+        build.flag("/EHsc");
+    }
+
     // JerryScript's JERRY_VLA fallback uses alloca() without including
     // <alloca.h>.  Redirect to C99 VLAs.
     if cfg!(feature = "expressions") {
@@ -989,14 +1004,23 @@ fn write_config_h(out_dir: &Path) {
 // ---------------------------------------------------------------------------
 
 /// Link against a system-installed thorvg via pkg-config.
+///
+/// ThorVG 1.x installs its pkg-config module as `thorvg-1` (meson
+/// `filebase: 'thorvg-' + vmaj`).  Some distributions also ship an
+/// unversioned `thorvg`, so try the versioned name first and fall back.
 fn link_system() {
-    pkg_config::Config::new()
-        .atleast_version("1.0.0")
-        .probe("thorvg")
-        .expect(
-            "Could not find system thorvg >= 1.0.0 via pkg-config. \
-             Either install thorvg or enable the `vendored` feature.",
+    let probe = |name| {
+        pkg_config::Config::new()
+            .atleast_version("1.0.0")
+            .probe(name)
+    };
+    if probe("thorvg-1").is_err() && probe("thorvg").is_err() {
+        panic!(
+            "Could not find system thorvg >= 1.0.0 via pkg-config \
+             (tried `thorvg-1` and `thorvg`). Either install thorvg or \
+             enable the `vendored` feature."
         );
+    }
 }
 
 // ---------------------------------------------------------------------------

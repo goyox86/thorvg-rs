@@ -1,0 +1,45 @@
+name: Fuzz
+
+# The fuzz crate is a standalone workspace (excluded from the main one),
+# so it rots silently — it has already drifted against API changes once.
+# Build (don't run) every target on PRs to keep it compiling.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "thorvg-sys/**"
+      - "thorvg/**"
+      - "fuzz/**"
+      - ".github/workflows/fuzz.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: cargo fuzz build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # thorvg + picolibc
+      - name: Install libclang
+        run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      # Pin the gnu host target: recent cargo-fuzz defaults to musl, whose
+      # C++ cross-compiler (x86_64-linux-musl-g++) isn't on the runner.
+      - name: Build all fuzz targets
+        working-directory: fuzz
+        run: cargo +nightly fuzz build --target x86_64-unknown-linux-gnu

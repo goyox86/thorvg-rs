@@ -1,6 +1,9 @@
 [submodule "thorvg-sys/thorvg"]
 	path = thorvg-sys/thorvg
-	url = https://github.com/thorvg/thorvg.git
+	# Fork of thorvg/thorvg carrying the bare-metal patch series on top of
+	# the upstream release tag; the pinned commit lives only on the fork.
+	url = https://github.com/goyox86/thorvg.git
+	branch = bare-metal/v1.0.6
 [submodule "thorvg-sys/picolibc"]
 	path = thorvg-sys/picolibc
 	url = https://github.com/picolibc/picolibc.git

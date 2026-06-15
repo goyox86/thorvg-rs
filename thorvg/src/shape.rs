@@ -341,7 +341,7 @@ impl Shape<'_> {
     ///
     /// Closes the round-trip with [`path`](Self::path): a value
     /// returned by that getter can be re-applied here verbatim.
-    /// Commands are translated through [`PathCommand::to_raw`] and
+    /// Commands are translated through `PathCommand::to_raw` and
     /// points are repacked as `Tvg_Point` for the C call.  Both
     /// translations allocate a temporary `Vec`; the original
     /// `Path` is left intact.

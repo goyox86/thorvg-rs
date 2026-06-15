@@ -1,0 +1,61 @@
+name: Bare-metal
+
+# Exercises the no_std + picolibc path in build.rs by cross-compiling for
+# a bare-metal RISC-V target. The ESP32-C6 / Xtensa path needs the esp
+# toolchain (export-esp.sh) and is validated locally, not here.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "thorvg-sys/**"
+      - "thorvg/**"
+      - ".github/workflows/bare-metal.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  riscv-none:
+    name: riscv32imac-unknown-none-elf
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # thorvg + picolibc
+      - name: Install libclang (for host bindgen)
+        run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang
+      # ThorVG is C++ and needs libstdc++ headers even on bare metal.
+      # build.rs's picolibc header isolation is tuned to Espressif's
+      # riscv32-esp-elf toolchain (the one documented in thorvg-sys/README),
+      # so use it rather than a generic bare-metal GCC.
+      - name: Install riscv32-esp-elf toolchain (Espressif)
+        run: |
+          url=$(curl -fsSL https://api.github.com/repos/espressif/crosstool-NG/releases/latest \
+            | grep -oE 'https://[^"]*riscv32-esp-elf[^"]*x86_64-linux-gnu\.tar\.xz' | head -1)
+          echo "Downloading $url"
+          curl -fsSL "$url" -o /tmp/riscv-esp.tar.xz
+          sudo mkdir -p /opt/esp
+          sudo tar -xf /tmp/riscv-esp.tar.xz -C /opt/esp
+          echo "/opt/esp/riscv32-esp-elf/bin" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: riscv32imac-unknown-none-elf
+      - uses: Swatinem/rust-cache@v2
+      # std-gated features (std, threads, file-io) stay off on bare metal.
+      # build.rs honours the cc CC_/CXX_<triple> contract to pick the
+      # cross compiler (no vendor binary name is hardcoded).
+      - name: Build (no_std + picolibc)
+        env:
+          CC_riscv32imac_unknown_none_elf: riscv32-esp-elf-gcc
+          CXX_riscv32imac_unknown_none_elf: riscv32-esp-elf-g++
+        run: >
+          cargo build -p thorvg
+          --target riscv32imac-unknown-none-elf
+          --no-default-features
+          --features vendored,lottie,svg,png,fonts
