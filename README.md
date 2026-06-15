@@ -1,6 +1,9 @@
 # thorvg-rs
 
+[![crates.io](https://img.shields.io/crates/v/thorvg.svg)](https://crates.io/crates/thorvg)
+[![docs.rs](https://docs.rs/thorvg/badge.svg)](https://docs.rs/thorvg)
 [![CI](https://github.com/goyox86/thorvg-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/goyox86/thorvg-rs/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/crates/l/thorvg.svg)](LICENSE)
 
 > **⚠️ Work in progress** — This crate is under active development and not yet ready for production use. APIs may change without notice.
 
