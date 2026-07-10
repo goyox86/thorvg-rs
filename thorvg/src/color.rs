@@ -68,10 +68,11 @@ impl Rgba {
 /// Pixel layout of a rendering buffer.
 ///
 /// Names the byte order and alpha convention of a canvas target
-/// buffer; passed to the canvas `set_target` APIs. Each variant is a
-/// 32-bit-per-pixel format. The `S` suffix denotes straight
-/// (non-premultiplied) alpha; the unsuffixed variants use
-/// premultiplied alpha.
+/// buffer; passed to the canvas `set_target` APIs. The four `8888`
+/// variants are 32-bit-per-pixel formats where the `S` suffix denotes
+/// straight (non-premultiplied) alpha and the unsuffixed variants use
+/// premultiplied alpha; [`Grayscale8`](Self::Grayscale8) is a single
+/// 8-bit channel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ColorSpace {
@@ -85,6 +86,9 @@ pub enum ColorSpace {
     /// Channels in alpha, red, green, blue order; straight
     /// (non-premultiplied) alpha.
     ARGB8888S,
+    /// Single 8-bit grayscale channel, one byte per pixel. (since
+    /// `ThorVG` 1.0.7)
+    Grayscale8,
 }
 
 impl ColorSpace {
@@ -94,6 +98,7 @@ impl ColorSpace {
             ColorSpace::ARGB8888 => sys::Tvg_Colorspace::TVG_COLORSPACE_ARGB8888,
             ColorSpace::ABGR8888S => sys::Tvg_Colorspace::TVG_COLORSPACE_ABGR8888S,
             ColorSpace::ARGB8888S => sys::Tvg_Colorspace::TVG_COLORSPACE_ARGB8888S,
+            ColorSpace::Grayscale8 => sys::Tvg_Colorspace::TVG_COLORSPACE_GRAYSCALE8,
         }
     }
 }

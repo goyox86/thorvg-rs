@@ -117,7 +117,8 @@ mod text;
 pub use accessor::{Accessor, BorrowedAccessor};
 pub use animation::Animation;
 pub use canvas::{
-    Canvas, EngineOption, GlCanvas, GlTarget, SwCanvas, WgCanvas, WgTarget, WgTargetType,
+    Canvas, EngineOption, GlCanvas, GlTarget, SwCanvas, WgCanvas, WgContext, WgContextTarget,
+    WgTarget, WgTargetType,
 };
 pub use error::{Error, Result};
 pub use gradient::{

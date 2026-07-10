@@ -10,6 +10,36 @@ version (`0.y`), per SemVer's `0.x` rule.
 The companion `thorvg-sys` FFI crate is versioned independently — see
 [`thorvg-sys/CHANGELOG.md`](../thorvg-sys/CHANGELOG.md).
 
+## [0.5.0] - 2026-07-10
+
+Tracks **ThorVG 1.0.7** via `thorvg-sys 0.3.0`. The crate's own API is
+purely additive, but this is a **minor** (breaking) bump: `thorvg`
+re-exposes `thorvg-sys` handle types through the `Paint::raw` /
+`Paint::into_raw` escape hatches, so moving the `thorvg-sys` dependency
+across its breaking `0.2 → 0.3` boundary is breaking for downstream code
+that also uses `thorvg-sys` directly.
+
+### Added
+
+- **`Text::glyph_metrics_iter`** — iterates the `GlyphMetrics` of every
+  glyph in a string, pairing each with its byte `Range<usize>` in the
+  source. The spans come from ThorVG 1.0.7's new glyph-metrics cursor
+  (the engine's own UTF-8 segmentation), so this maps metrics back to
+  source positions for hit-testing and caret placement, and allocates a
+  single `CString` rather than one per character.
+- **`ColorSpace::Grayscale8`** — single 8-bit grayscale channel.
+- **`WgContext`** and **`WgCanvas::set_target_with_context`** (with the
+  `WgContextTarget` parameter struct) — set a WebGPU canvas target from
+  an explicit instance / adapter / device context.
+
+### Changed
+
+- **`thorvg-sys` dependency `0.2.1` → `0.3.0`** (now bundles ThorVG
+  1.0.7).
+- Corrected the `WgTarget::colorspace` documentation: as of ThorVG
+  1.0.7 `tvg_wgcanvas_set_target` accepts `ColorSpace::ABGR8888` in
+  addition to `ColorSpace::ABGR8888S`.
+
 ## [0.4.2] - 2026-06-15
 
 Documentation-only release. No code, API, or behavior change — a patch
