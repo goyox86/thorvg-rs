@@ -4,6 +4,7 @@
 
 use alloc::ffi::CString;
 use alloc::string::String;
+use core::ops::Range;
 
 use crate::color::Rgb;
 use crate::error::{Error, Result};
@@ -360,30 +361,147 @@ impl Text<'_> {
     /// size has been set yet.
     pub fn glyph_metrics(&self, ch: &str) -> Result<GlyphMetrics> {
         let c_ch = CString::new(ch)?;
-        let mut m = sys::Tvg_Glyph_Metrics {
-            advance: 0.0,
-            bearing: 0.0,
-            min: sys::Tvg_Point { x: 0.0, y: 0.0 },
-            max: sys::Tvg_Point { x: 0.0, y: 0.0 },
-        };
+        let mut m = zeroed_glyph_metrics();
+        // The `next` out-param (a cursor to the following glyph, since
+        // thorvg 1.0.7) is unused here — this measures a single glyph.
+        // See [`Text::glyph_metrics_iter`] to walk a whole string.
         Error::from_raw(unsafe {
-            sys::tvg_text_get_glyph_metrics(self.raw, c_ch.as_ptr(), &raw mut m)
+            sys::tvg_text_get_glyph_metrics(self.raw, c_ch.as_ptr(), &raw mut m, core::ptr::null_mut())
         })?;
-        Ok(GlyphMetrics {
-            advance: m.advance,
-            bearing: m.bearing,
-            min: Point {
-                x: m.min.x,
-                y: m.min.y,
-            },
-            max: Point {
-                x: m.max.x,
-                y: m.max.y,
-            },
+        Ok(glyph_metrics_from_raw(&m))
+    }
+
+    /// Iterates the [`GlyphMetrics`] of every glyph in `text`, in order.
+    ///
+    /// Each item pairs a glyph's metrics with its **byte range** in
+    /// `text` (a [`Range<usize>`] you can slice directly:
+    /// `&text[range]`). The range comes from the engine's own UTF-8
+    /// segmentation cursor, so it reflects exactly what the engine
+    /// consumed for that glyph — useful for hit-testing, caret
+    /// placement, and mapping metrics back to source positions.
+    ///
+    /// A single `CString` is allocated for `text` up front and the
+    /// engine cursor is advanced in place, so this is cheaper than
+    /// calling [`glyph_metrics`](Self::glyph_metrics) per character.
+    ///
+    /// Iteration stops after yielding the first [`Err`] (e.g. an
+    /// unsupported glyph, or [`Error::InsufficientCondition`] if no
+    /// font or size has been set).
+    ///
+    /// *Experimental in `ThorVG`; the API may change.*
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidArguments`] if `text` contains an
+    /// interior NUL byte.
+    pub fn glyph_metrics_iter(&self, text: &str) -> Result<GlyphMetricsIter<'_>> {
+        let text = CString::new(text)?;
+        let len = text.as_bytes().len();
+        Ok(GlyphMetricsIter {
+            raw: self.raw,
+            text,
+            offset: 0,
+            len,
+            done: false,
+            _borrow: core::marker::PhantomData,
         })
     }
 
     // Font loading is engine-global state — see [`Thorvg::load_font_data`].
+}
+
+/// A freshly zeroed raw glyph-metrics struct for the engine to fill.
+fn zeroed_glyph_metrics() -> sys::Tvg_Glyph_Metrics {
+    sys::Tvg_Glyph_Metrics {
+        advance: 0.0,
+        bearing: 0.0,
+        min: sys::Tvg_Point { x: 0.0, y: 0.0 },
+        max: sys::Tvg_Point { x: 0.0, y: 0.0 },
+    }
+}
+
+/// Converts an engine-filled raw glyph-metrics struct into the public
+/// [`GlyphMetrics`].
+fn glyph_metrics_from_raw(m: &sys::Tvg_Glyph_Metrics) -> GlyphMetrics {
+    GlyphMetrics {
+        advance: m.advance,
+        bearing: m.bearing,
+        min: Point {
+            x: m.min.x,
+            y: m.min.y,
+        },
+        max: Point {
+            x: m.max.x,
+            y: m.max.y,
+        },
+    }
+}
+
+/// Iterator over the per-glyph [`GlyphMetrics`] of a string.
+///
+/// Created by [`Text::glyph_metrics_iter`]. Each item is a
+/// `(GlyphMetrics, Range<usize>)` where the range is the glyph's byte
+/// span in the original string. Owns a `CString` copy of the text and
+/// borrows the [`Text`] it measures against.
+pub struct GlyphMetricsIter<'t> {
+    raw: sys::Tvg_Paint,
+    text: CString,
+    /// Byte offset of the next glyph to measure, into `text`.
+    offset: usize,
+    /// Byte length of `text` (excluding the trailing NUL).
+    len: usize,
+    /// Set once an error is yielded, or the cursor stops advancing.
+    done: bool,
+    _borrow: core::marker::PhantomData<&'t Text<'t>>,
+}
+
+impl Iterator for GlyphMetricsIter<'_> {
+    type Item = Result<(GlyphMetrics, Range<usize>)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done || self.offset >= self.len {
+            return None;
+        }
+        let start = self.offset;
+        let base = self.text.as_ptr();
+        // SAFETY: `start < len`, so this stays within the CString buffer
+        // (and its trailing NUL), yielding a valid NUL-terminated pointer.
+        let cur = unsafe { base.add(start) };
+
+        let mut m = zeroed_glyph_metrics();
+        let mut next: *const core::ffi::c_char = core::ptr::null();
+        let res = unsafe {
+            sys::tvg_text_get_glyph_metrics(self.raw, cur, &raw mut m, &raw mut next)
+        };
+        if let Err(e) = Error::from_raw(res) {
+            self.done = true;
+            return Some(Err(e));
+        }
+
+        // On success the engine sets `next` to a pointer just past the
+        // consumed glyph; derive the byte offset to close the range.
+        let end = if next.is_null() {
+            self.len
+        } else {
+            // SAFETY: `next` points into the same CString buffer as `base`.
+            let diff = unsafe { next.offset_from(base) };
+            // A cursor pointing before the buffer can't happen; bail
+            // rather than trust it.
+            let Ok(end) = usize::try_from(diff) else {
+                self.done = true;
+                return None;
+            };
+            end
+        };
+        // Guard against a non-advancing cursor so iteration can't loop
+        // forever on unexpected engine behaviour.
+        if end <= start || end > self.len {
+            self.done = true;
+            return None;
+        }
+        self.offset = end;
+        Some(Ok((glyph_metrics_from_raw(&m), start..end)))
+    }
 }
 
 impl crate::paint::sealed::Sealed for Text<'_> {}

@@ -726,6 +726,136 @@ impl WgCanvas<'_> {
             )
         })
     }
+
+    /// Sets the WebGPU drawing target from an explicit [`WgContext`].
+    ///
+    /// Like [`set_target`](Self::set_target), but takes a caller-owned
+    /// WebGPU context (instance, adapter, device) instead of just a
+    /// device/instance pair. See [`WgContextTarget`] for the parameter
+    /// layout.
+    ///
+    /// *Experimental in `ThorVG` (since 1.0.7); the API may change.*
+    ///
+    /// # Safety
+    /// The caller must ensure the pointer fields of `target` (both the
+    /// [`WgContext`] handles and the target handle) are valid WebGPU
+    /// objects.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InsufficientCondition`] if the canvas is
+    /// currently rendering (call [`sync`](Self::sync) first), or
+    /// [`Error::NotSupported`] if the WebGPU engine is unavailable.
+    pub unsafe fn set_target_with_context(&mut self, target: WgContextTarget) -> Result<()> {
+        let WgContextTarget {
+            context,
+            target: target_handle,
+            width,
+            height,
+            colorspace,
+            target_type,
+        } = target;
+        let ctx = sys::Tvg_WgContext {
+            instance: context.instance,
+            adapter: context.adapter,
+            device: context.device,
+        };
+        Error::from_raw(unsafe {
+            sys::tvg_wgcanvas_set_target_with_context(
+                self.raw,
+                &raw const ctx,
+                target_handle,
+                width,
+                height,
+                colorspace.to_raw(),
+                target_type as i32,
+            )
+        })
+    }
+}
+
+/// A caller-owned WebGPU context for [`WgCanvas::set_target_with_context`].
+///
+/// Mirrors the C `Tvg_WgContext` struct: the WebGPU objects used to
+/// initialize the rendering backend. All fields are opaque WebGPU
+/// handles.
+///
+/// *Experimental in `ThorVG` (since 1.0.7); the API may change.*
+#[derive(Debug, Clone, Copy)]
+pub struct WgContext {
+    /// `WGPUInstance`, the context for all other wgpu objects.
+    pub instance: *mut core::ffi::c_void,
+    /// `WGPUAdapter`, the adapter associated with the rendering device.
+    pub adapter: *mut core::ffi::c_void,
+    /// `WGPUDevice`, the handle for the wgpu device.
+    pub device: *mut core::ffi::c_void,
+}
+
+impl WgContext {
+    /// Builds a [`WgContext`] from its instance, adapter, and device
+    /// handles.
+    #[must_use]
+    pub fn new(
+        instance: *mut core::ffi::c_void,
+        adapter: *mut core::ffi::c_void,
+        device: *mut core::ffi::c_void,
+    ) -> Self {
+        Self {
+            instance,
+            adapter,
+            device,
+        }
+    }
+}
+
+/// Parameters for [`WgCanvas::set_target_with_context`].
+///
+/// Bundles the arguments of the underlying
+/// `tvg_wgcanvas_set_target_with_context(context, target, w, h, cs, type)`
+/// call.  The pointer fields are opaque WebGPU handles; the
+/// `set_target_with_context` method is `unsafe` because the caller is
+/// responsible for handle validity.
+#[derive(Debug, Clone, Copy)]
+pub struct WgContextTarget {
+    /// The WebGPU context (instance, adapter, device).
+    pub context: WgContext,
+    /// Presentable target: either a `WGPUSurface` or a `WGPUTexture`,
+    /// discriminated by [`target_type`](Self::target_type).
+    pub target: *mut core::ffi::c_void,
+    /// Target width in pixels.
+    pub width: u32,
+    /// Target height in pixels.
+    pub height: u32,
+    /// Pixel format.  thorvg currently accepts [`ColorSpace::ABGR8888`]
+    /// and [`ColorSpace::ABGR8888S`].
+    pub colorspace: ColorSpace,
+    /// Whether [`target`](Self::target) is a surface or texture.
+    pub target_type: WgTargetType,
+}
+
+impl WgContextTarget {
+    /// Builds a [`WgContextTarget`] from its required fields.
+    ///
+    /// See [`GlTarget::new`] for the rationale on positional vs
+    /// struct-literal construction.
+    #[must_use]
+    pub fn new(
+        context: WgContext,
+        target: *mut core::ffi::c_void,
+        width: u32,
+        height: u32,
+        colorspace: ColorSpace,
+        target_type: WgTargetType,
+    ) -> Self {
+        Self {
+            context,
+            target,
+            width,
+            height,
+            colorspace,
+            target_type,
+        }
+    }
 }
 
 /// Parameters for [`WgCanvas::set_target`].
@@ -749,8 +879,8 @@ pub struct WgTarget {
     pub width: u32,
     /// Target height in pixels.
     pub height: u32,
-    /// Pixel format.  thorvg currently accepts only
-    /// [`ColorSpace::ABGR8888S`] (mapped to `WGPUTextureFormat_RGBA8Unorm`).
+    /// Pixel format.  thorvg currently accepts [`ColorSpace::ABGR8888`]
+    /// and [`ColorSpace::ABGR8888S`].
     pub colorspace: ColorSpace,
     /// Whether [`target`](Self::target) is a surface or texture.
     pub target_type: WgTargetType,

@@ -792,6 +792,55 @@ fn test_text_set_color_and_outline_accept_rgb() {
     text.set_outline(2.0, Rgb::new(0, 0, 0)).unwrap();
 }
 
+#[test]
+fn test_glyph_metrics_iter_walks_every_glyph_with_byte_ranges() {
+    // `glyph_metrics_iter` yields one item per glyph, pairing metrics
+    // with the glyph's byte span in the source string. The spans come
+    // from the engine's `next` cursor (thorvg 1.0.7) and must tile the
+    // input contiguously so that `&s[range]` recovers each glyph.
+    static FONT: &[u8] = include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf");
+    let engine = Thorvg::init(0).unwrap();
+    engine.load_font_data_static("Arial", FONT, None).unwrap();
+
+    let mut text = engine.text().unwrap();
+    text.set_font("Arial").unwrap();
+    text.set_size(24.0).unwrap();
+
+    // Mix ASCII and a 2-byte codepoint to exercise variable-width UTF-8.
+    let s = "Aé1";
+    let items: alloc::vec::Vec<_> = text
+        .glyph_metrics_iter(s)
+        .unwrap()
+        .map(|r| r.unwrap())
+        .collect();
+
+    // One item per Unicode scalar; ranges tile the string with no gaps.
+    assert_eq!(items.len(), s.chars().count());
+    let mut cursor = 0;
+    for (metrics, range) in &items {
+        assert_eq!(range.start, cursor, "ranges must be contiguous");
+        assert!(range.end > range.start, "each glyph consumes >= 1 byte");
+        // The span is a valid char boundary sliceable back to one char.
+        assert_eq!(s[range.clone()].chars().count(), 1);
+        assert!(metrics.advance >= 0.0);
+        cursor = range.end;
+    }
+    assert_eq!(cursor, s.len(), "ranges must cover the whole string");
+
+    // The single-glyph API agrees with the first iterator item.
+    let first = text.glyph_metrics("A").unwrap();
+    assert_eq!(first.advance, items[0].0.advance);
+}
+
+#[test]
+fn test_glyph_metrics_iter_rejects_interior_nul() {
+    // The whole string is turned into a CString up front, so an
+    // interior NUL fails immediately rather than mid-iteration.
+    let engine = Thorvg::init(0).unwrap();
+    let text = engine.text().unwrap();
+    assert!(text.glyph_metrics_iter("a\0b").is_err());
+}
+
 // ── Text font loading ──────────────────────────────────────────────
 
 #[test]

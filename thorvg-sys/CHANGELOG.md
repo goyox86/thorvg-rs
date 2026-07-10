@@ -11,6 +11,31 @@ bundling ThorVG `1.0.5`. Because the crate is `0.x`, a **minor** bump is
 breaking; the safe [`thorvg`](../thorvg/CHANGELOG.md) crate's dependency
 moves in lockstep.
 
+## [0.3.0+thorvg-1.0.7] - 2026-07-10
+
+Bumps the vendored engine to **ThorVG 1.0.7** and regenerates the FFI. A
+**minor** (breaking) bump: the regenerated bindings change a public
+function signature and add an enum variant.
+
+### Changed
+
+- **Bundled ThorVG 1.0.6 → 1.0.7.** The vendored submodule tracks the
+  rebased `bare-metal/v1.0.7` patch branch; `THORVG_VERSION_STRING` is
+  updated to match.
+- **`tvg_text_get_glyph_metrics` gained a fourth parameter** — a
+  `const char** next` out-pointer that receives the position just past
+  the processed UTF-8 character. Existing three-argument call sites no
+  longer compile.
+- **`Tvg_Colorspace` gained the `TVG_COLORSPACE_GRAYSCALE8` variant**
+  (single 8-bit channel). As a `rustified_enum`, an added variant breaks
+  exhaustive matches.
+
+### Added
+
+- **`Tvg_WgContext`** struct (WebGPU instance / adapter / device) and
+  **`tvg_wgcanvas_set_target_with_context`** for setting a WgCanvas
+  target from an explicit WebGPU context.
+
 ## [0.2.1+thorvg-1.0.6] - 2026-06-15
 
 Build-system and portability fixes; still bundles **ThorVG 1.0.6**. No
