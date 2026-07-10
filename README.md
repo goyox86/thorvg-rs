@@ -65,14 +65,14 @@ canvas.sync().unwrap();
 
 ```toml
 [dependencies]
-thorvg = "0.4"
+thorvg = "0.5"
 ```
 
 ### Embedded / `no_std` (pick only what you need)
 
 ```toml
 [dependencies]
-thorvg = { version = "0.4", default-features = false, features = ["vendored", "lottie", "svg"] }
+thorvg = { version = "0.5", default-features = false, features = ["vendored", "lottie", "svg"] }
 ```
 
 This gives you Lottie + SVG playback with no threads, no JerryScript,
