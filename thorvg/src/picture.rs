@@ -361,8 +361,6 @@ impl Picture<'_> {
     ///
     /// The default is [`FilterMethod::Bilinear`].
     ///
-    /// *Experimental in `ThorVG`; the API may change.*
-    ///
     /// # Errors
     ///
     /// Returns an [`Error`] if the underlying engine reports a failure.

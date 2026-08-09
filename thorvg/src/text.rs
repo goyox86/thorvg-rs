@@ -260,8 +260,6 @@ impl Text<'_> {
     /// Reflects the current [`set_wrap`](Self::set_wrap) configuration
     /// and is also increased by explicit line-feed (`\n`) characters in
     /// the text.
-    ///
-    /// *Experimental in `ThorVG`; the API may change.*
     pub fn line_count(&self) -> u32 {
         unsafe { sys::tvg_text_line_count(self.raw) }
     }

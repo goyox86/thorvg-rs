@@ -10,6 +10,37 @@ version (`0.y`), per SemVer's `0.x` rule.
 The companion `thorvg-sys` FFI crate is versioned independently — see
 [`thorvg-sys/CHANGELOG.md`](../thorvg-sys/CHANGELOG.md).
 
+## [0.5.1] - 2026-08-17
+
+Tracks **ThorVG 1.1.0** via `thorvg-sys 0.3.1`. A **patch**
+(non-breaking) bump: the crate's own API is unchanged, and `thorvg-sys`
+stays within `0.3`, so the `Paint::raw` / `Paint::into_raw` escape
+hatches keep re-exposing a compatible `thorvg-sys` for downstream code
+that also depends on it directly.
+
+### Fixed
+
+Inherited from the engine bump, all on the CPU (software) path:
+
+- Outdated gradient fill on transform-only updates.
+- Hit-test miss on retained axis-aligned shapes.
+- Lottie point-text vertical alignment.
+
+### Changed
+
+- **`Text::line_count`, `Picture::set_filter` and `Accessor::get_name`
+  are no longer documented as experimental.** ThorVG 1.1.0 promoted all
+  three from `@note Experimental API` to `@since 1.1`, so the "the API
+  may change" caveat has been dropped from their rustdoc. Signatures and
+  behaviour are unchanged. `WgCanvas`'s context-based target and
+  `Picture::set_asset_resolver` remain experimental upstream and keep
+  their caveats.
+- **Test fonts follow upstream.** ThorVG 1.1.0 removed `Arial.ttf` and
+  `NanumGothicCoding.ttf` from its test resources, so the integration
+  tests that borrow a TTF from the vendored tree now use the
+  `PublicSans-Regular.ttf` that replaced them. Test-only; no effect on
+  the published API.
+
 ## [0.5.0] - 2026-07-10
 
 Tracks **ThorVG 1.0.7** via `thorvg-sys 0.3.0`. The crate's own API is

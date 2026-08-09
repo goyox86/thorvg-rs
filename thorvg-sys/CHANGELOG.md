@@ -11,6 +11,50 @@ bundling ThorVG `1.0.5`. Because the crate is `0.x`, a **minor** bump is
 breaking; the safe [`thorvg`](../thorvg/CHANGELOG.md) crate's dependency
 moves in lockstep.
 
+## [0.3.1+thorvg-1.1.0] - 2026-08-17
+
+Bumps the vendored engine to **ThorVG 1.1.0** and regenerates the FFI. A
+**patch** (non-breaking) bump: the regenerated bindings only add symbols
+— nothing was removed and no signature or enum changed.
+
+### Changed
+
+- **Bundled ThorVG 1.0.7 → 1.1.0.** The vendored submodule tracks the
+  rebased `bare-metal/v1.1.0` patch branch; `THORVG_VERSION_STRING` is
+  updated to match.
+- **The bare-metal patch series shrank from 5 files to 4.** Upstream 1.1
+  replaced `tvgSwRenderer.cpp`'s file-scope `static mutex _rendererMtx`
+  with a `StrictKey`, whose no-thread form is inert — so the downstream
+  `_NullMutex` shim is no longer needed. `tvgLock.h` still drops
+  `StrictKey`'s mutex member outright rather than relying on upstream's
+  `__STDCPP_THREADS__` guard, so the bare-metal guarantee does not depend
+  on how the cross toolchain defines that macro.
+
+### Added
+
+- **`tvg_paint_intersects_region`** — hit-test variant of
+  `tvg_paint_intersects` taking a `visibleOnly` flag that excludes hidden
+  paints from the test.
+- **`tvg_lottie_animation_tween_go`** and
+  **`tvg_lottie_animation_tween_to`** — progress- and target-based
+  tweening entry points alongside the existing
+  `tvg_lottie_animation_tween`.
+
+### Fixed
+
+Inherited from the engine bump, all on the CPU (software) path this
+crate builds:
+
+- Outdated gradient fill on transform-only updates.
+- Hit-test miss on retained axis-aligned shapes.
+- Lottie point-text vertical alignment.
+
+### Note
+
+`tvg_lottie_animation_get_marker` is marked deprecated upstream. bindgen
+does not propagate the attribute, so the generated binding is unchanged
+and no deprecation warning is emitted.
+
 ## [0.3.0+thorvg-1.0.7] - 2026-07-10
 
 Bumps the vendored engine to **ThorVG 1.0.7** and regenerates the FFI. A
