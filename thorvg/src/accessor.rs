@@ -173,8 +173,6 @@ impl BorrowedAccessor<'_> {
     /// `true`. Returns `None` for ids not present in the active picture's
     /// name index, or when the name is unavailable. Only valid inside an
     /// [`Accessor::for_each`] callback.
-    ///
-    /// *Experimental in `ThorVG`; the API may change.*
     pub fn get_name(&self, id: u32) -> Option<String> {
         let ptr = unsafe { sys::tvg_accessor_get_name(self.raw, id) };
         if ptr.is_null() {

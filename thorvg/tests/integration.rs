@@ -798,12 +798,15 @@ fn test_glyph_metrics_iter_walks_every_glyph_with_byte_ranges() {
     // with the glyph's byte span in the source string. The spans come
     // from the engine's `next` cursor (thorvg 1.0.7) and must tile the
     // input contiguously so that `&s[range]` recovers each glyph.
-    static FONT: &[u8] = include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf");
+    static FONT: &[u8] =
+        include_bytes!("../../thorvg-sys/thorvg/test/resources/PublicSans-Regular.ttf");
     let engine = Thorvg::init(0).unwrap();
-    engine.load_font_data_static("Arial", FONT, None).unwrap();
+    engine
+        .load_font_data_static("PublicSans", FONT, None)
+        .unwrap();
 
     let mut text = engine.text().unwrap();
-    text.set_font("Arial").unwrap();
+    text.set_font("PublicSans").unwrap();
     text.set_size(24.0).unwrap();
 
     // Mix ASCII and a 2-byte codepoint to exercise variable-width UTF-8.
@@ -852,9 +855,9 @@ fn test_load_font_data_owned_buffer_is_safe() {
     // and trip heap-use-after-free if the copy hadn't happened.
     let engine = Thorvg::init(0).unwrap();
     let font_bytes: alloc::vec::Vec<u8> =
-        include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf").to_vec();
+        include_bytes!("../../thorvg-sys/thorvg/test/resources/PublicSans-Regular.ttf").to_vec();
     engine
-        .load_font_data("Arial-Owned", &font_bytes, None)
+        .load_font_data("PublicSans-Owned", &font_bytes, None)
         .unwrap();
     drop(font_bytes); // C side has its own copy — no dangling reference.
 }
@@ -865,10 +868,11 @@ fn test_load_font_data_static_zero_copy() {
     // returns &'static [u8; N], so it coerces to &'static [u8] and
     // thorvg can borrow the buffer for the engine's lifetime
     // without copying.
-    static FONT: &[u8] = include_bytes!("../../thorvg-sys/thorvg/test/resources/Arial.ttf");
+    static FONT: &[u8] =
+        include_bytes!("../../thorvg-sys/thorvg/test/resources/PublicSans-Regular.ttf");
     let engine = Thorvg::init(0).unwrap();
     engine
-        .load_font_data_static("Arial-Static", FONT, None)
+        .load_font_data_static("PublicSans-Static", FONT, None)
         .unwrap();
 }
 
