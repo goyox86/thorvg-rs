@@ -36,8 +36,13 @@ jobs:
       # so use it rather than a generic bare-metal GCC.
       - name: Install riscv32-esp-elf toolchain (Espressif)
         run: |
-          url=$(curl -fsSL https://api.github.com/repos/espressif/crosstool-NG/releases/latest \
-            | grep -oE 'https://[^"]*riscv32-esp-elf[^"]*x86_64-linux-gnu\.tar\.xz' | head -1)
+          # Pinned crosstool-NG release. A direct asset download avoids the
+          # GitHub API: unauthenticated `releases/latest` is rate-limited
+          # (HTTP 403) on shared Actions runner IPs, which left the URL
+          # empty and failed the build. Pinning is also reproducible and
+          # matches the toolchain thorvg-sys is validated against locally.
+          ver="esp-14.2.0_20241119"
+          url="https://github.com/espressif/crosstool-NG/releases/download/${ver}/riscv32-esp-elf-${ver#esp-}-x86_64-linux-gnu.tar.xz"
           echo "Downloading $url"
           curl -fsSL "$url" -o /tmp/riscv-esp.tar.xz
           sudo mkdir -p /opt/esp
@@ -59,3 +64,58 @@ jobs:
           --target riscv32imac-unknown-none-elf
           --no-default-features
           --features vendored,lottie,svg,png,fonts
+
+  # Regression guard for the crates.io package `include` allowlist.
+  # The job above builds the workspace tree, which has the full picolibc
+  # submodule on disk — so it CANNOT catch files missing from the packaged
+  # crate (this is how 0.3.2's picolibc omission shipped). Here we
+  # `cargo package` thorvg-sys and build the resulting tarball for bare
+  # metal, exercising the include list against `target_os = "none"`.
+  packaged-riscv-none:
+    name: packaged crate → riscv32imac-unknown-none-elf
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # thorvg + picolibc
+      - name: Install libclang (for host bindgen)
+        run: sudo apt-get update && sudo apt-get install -y llvm-dev libclang-dev clang
+      - name: Install riscv32-esp-elf toolchain (Espressif)
+        run: |
+          # Pinned crosstool-NG release. A direct asset download avoids the
+          # GitHub API: unauthenticated `releases/latest` is rate-limited
+          # (HTTP 403) on shared Actions runner IPs, which left the URL
+          # empty and failed the build. Pinning is also reproducible and
+          # matches the toolchain thorvg-sys is validated against locally.
+          ver="esp-14.2.0_20241119"
+          url="https://github.com/espressif/crosstool-NG/releases/download/${ver}/riscv32-esp-elf-${ver#esp-}-x86_64-linux-gnu.tar.xz"
+          echo "Downloading $url"
+          curl -fsSL "$url" -o /tmp/riscv-esp.tar.xz
+          sudo mkdir -p /opt/esp
+          sudo tar -xf /tmp/riscv-esp.tar.xz -C /opt/esp
+          echo "/opt/esp/riscv32-esp-elf/bin" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: riscv32imac-unknown-none-elf
+      - uses: Swatinem/rust-cache@v2
+      # `--no-verify` skips the redundant host verify build; we want the
+      # bare-metal build below, which is what actually exercises picolibc.
+      - name: Package thorvg-sys
+        run: cargo package -p thorvg-sys --no-verify --allow-dirty
+      - name: Build the packaged crate (no_std + picolibc)
+        env:
+          CC_riscv32imac_unknown_none_elf: riscv32-esp-elf-gcc
+          CXX_riscv32imac_unknown_none_elf: riscv32-esp-elf-g++
+        run: |
+          set -euo pipefail
+          crate=$(find target/package -maxdepth 1 -name 'thorvg-sys-*.crate' | head -1)
+          echo "Extracting $crate"
+          # Extract OUTSIDE the workspace: a crate unpacked under the repo
+          # is treated as a workspace member and won't build standalone.
+          tar -xf "$crate" -C "$RUNNER_TEMP"
+          dir=$(find "$RUNNER_TEMP" -maxdepth 1 -type d -name 'thorvg-sys-*' | head -1)
+          echo "Building packaged crate at $dir for bare metal"
+          cargo build --manifest-path "$dir/Cargo.toml" \
+            --target riscv32imac-unknown-none-elf \
+            --no-default-features \
+            --features vendored,lottie,svg,png,fonts

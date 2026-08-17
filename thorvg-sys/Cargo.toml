@@ -4,7 +4,7 @@ name = "thorvg-sys"
 # release is recorded as build metadata (`+thorvg-X.Y.Z`); it is not the
 # crate version. 0.x: a minor bump is breaking, so the safe `thorvg`
 # crate's dependency moves in lockstep.
-version = "0.3.1+thorvg-1.1.0"
+version = "0.3.2+thorvg-1.1.0"
 edition = "2024"
 license = "MIT"
 description = "Raw FFI bindings to the ThorVG vector graphics library"
@@ -27,6 +27,19 @@ include = [
     "thorvg/**/*.h",
     "thorvg/**/*.c",
     "thorvg/**/LICENSE",
+    # Vendored picolibc (bare-metal libc for `target_os = "none"` builds).
+    # Without these the crates.io package omits picolibc entirely and any
+    # bare-metal build fails in build.rs (host/system builds don't use it).
+    # Include whole `libc/` + `libm/` trees rather than enumerate
+    # extensions: picolibc sources `#include` `.h`, `.c`, `.t`, and `.cat`
+    # table files, and `libc/` headers reach into `libm/` (e.g.
+    # `stdio/dtoa.h` -> `../../libm/common/math_config.h`). build.rs
+    # compiles only `libc/` subtrees but needs `libm/` headers on the
+    # include path. The 28 MB `test/` tree is intentionally excluded.
+    "picolibc/COPYING.picolibc",
+    "picolibc/libc/**",
+    "picolibc/libm/**",
+    "picolibc-config/**",
 ]
 
 [features]
