@@ -9,8 +9,8 @@ For a safe, idiomatic Rust API, use the [`thorvg`](https://crates.io/crates/thor
 ## Versioning
 
 This crate carries its own SemVer; the bundled ThorVG C++ release is
-recorded as build metadata. For example, `0.3.1+thorvg-1.1.0` is crate
-`0.3.1` bundling ThorVG `1.1.0`. See [`CHANGELOG.md`](CHANGELOG.md).
+recorded as build metadata. For example, `0.3.2+thorvg-1.1.0` is crate
+`0.3.2` bundling ThorVG `1.1.0`. See [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Build modes
 

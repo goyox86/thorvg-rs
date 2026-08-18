@@ -11,7 +11,33 @@ bundling ThorVG `1.0.5`. Because the crate is `0.x`, a **minor** bump is
 breaking; the safe [`thorvg`](../thorvg/CHANGELOG.md) crate's dependency
 moves in lockstep.
 
-## [0.3.1+thorvg-1.1.0] - 2026-08-17
+## [0.3.2+thorvg-1.1.0] - 2026-08-18
+
+Packaging fix; same **ThorVG 1.1.0** engine and identical FFI as
+`0.3.1`. A **patch** bump — no API, symbol, or behaviour change.
+
+### Fixed
+
+- **Bare-metal builds from crates.io failed: the published package
+  omitted the vendored picolibc tree entirely.** The `include` allowlist
+  in `Cargo.toml` listed the `thorvg/**` sources but no `picolibc/` or
+  `picolibc-config/` entries, so `cargo package` shipped no picolibc.
+  Host and system-lib builds were unaffected (picolibc is only compiled
+  for `target_os = "none"`), which is why it went unnoticed until an
+  embedded crate consumed the package from crates.io rather than via a
+  path dependency. Added `picolibc/libc/**`, `picolibc/libm/**`
+  (`libc/` headers reach into `libm/`), `picolibc/COPYING.picolibc`, and
+  `picolibc-config/**` to the include list. Affected `0.3.1` and earlier
+  bare-metal-capable releases.
+
+### CI
+
+- **Added a regression guard** (`bare-metal.yml`) that `cargo package`s
+  the crate and builds the resulting tarball for
+  `riscv32imac-unknown-none-elf` — exercising the package `include` list
+  against a `target_os = "none"` target, which the existing
+  workspace-tree build cannot do.
+
 
 Bumps the vendored engine to **ThorVG 1.1.0** and regenerates the FFI. A
 **patch** (non-breaking) bump: the regenerated bindings only add symbols
