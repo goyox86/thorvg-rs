@@ -1037,10 +1037,10 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
 
     println!("cargo:rerun-if-changed={}", capi_header.display());
 
-    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
     let host = env::var("HOST").unwrap_or_default();
     let target = env::var("TARGET").unwrap_or_default();
     let is_cross = !target.is_empty() && target != host;
+    let target_info = TargetInfo::from_env();
 
     let mut builder = bindgen::Builder::default()
         .header(capi_header.to_string_lossy())
@@ -1078,25 +1078,23 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
     //
     //   * On cross builds, forward the cross sysroot's `include/`
     //     dir so headers like `<stdint.h>` resolve.
-    //   * Always set `--target=`.  libclang's default target can
-    //     disagree with Rust's `HOST` (e.g. a 32-bit ABI on a
-    //     64-bit machine if only an i386 libclang is on the library
-    //     path), which trips bindgen's debug-assert that
-    //     `target_pointer_size() == size_of::<*mut ()>()`.
-    if is_cross {
-        if let Some(inc) = cross_sysroot_include() {
-            builder = builder.clang_arg(format!("-I{}", inc.display()));
-        }
-        // libclang doesn't recognise vendor-specific OS fields in Rust
-        // triples; strip to `<arch>-none-elf`, the LLVM triple it
-        // understands across embedded targets.  Arch is the only field
-        // that affects sizeof/alignof for `uint32_t` etc.
-        builder = builder.clang_arg(format!("--target={target_arch}-none-elf"));
-    } else {
-        // Host build: pass Rust's full triple so libclang matches
-        // the actual ABI.
-        builder = builder.clang_arg(format!("--target={target}"));
+    //   * Always set `--target=`. ARM Linux keeps Rust's full triple
+    //     because its environment field selects the soft- or hard-float
+    //     ABI. Other cross targets retain the previous architecture-only
+    //     fallback because some Rust triples are not valid Clang triples.
+    if is_cross && let Some(inc) = cross_sysroot_include() {
+        builder = builder.clang_arg(format!("-I{}", inc.display()));
     }
+
+    let uses_arm_linux_abi = target_info.arch == "arm"
+        && target_info.os == "linux"
+        && matches!(target_info.env.as_str(), "gnu" | "musl");
+    let clang_target = if !is_cross || uses_arm_linux_abi {
+        target
+    } else {
+        format!("{}-none-elf", target_info.arch)
+    };
+    builder = builder.clang_arg(format!("--target={clang_target}"));
 
     let bindings = builder.generate().expect("Unable to generate bindings");
 
