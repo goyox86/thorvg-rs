@@ -1120,14 +1120,19 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
     // host compiler, so libclang's defaults — not Rust's — drive the
     // include search list and target ABI.  Two corrections:
     //
-    //   * On cross builds, forward the cross sysroot's `include/`
-    //     dir so headers like `<stdint.h>` resolve.
+    //   * On cross builds to a non-hosted target, forward the cross
+    //     sysroot's `include/` dir so headers like `<stdint.h>` resolve.
     //   * Always set `--target=`.  libclang's default target can
     //     disagree with Rust's `HOST` (e.g. a 32-bit ABI on a
     //     64-bit machine if only an i386 libclang is on the library
     //     path), which trips bindgen's debug-assert that
     //     `target_pointer_size() == size_of::<*mut ()>()`.
-    if is_cross {
+    //
+    // Hosted cross builds (e.g. Linux -> `x86_64-pc-windows-msvc` with
+    // cargo-xwin) bring the target's own system headers through
+    // `BINDGEN_EXTRA_CLANG_ARGS_<target>`, so libclang must parse them
+    // with the full triple, as on a host build.
+    if is_cross && !TargetInfo::from_env().is_hosted {
         if let Some(inc) = cross_sysroot_include() {
             builder = builder.clang_arg(format!("-I{}", inc.display()));
         }
@@ -1137,8 +1142,8 @@ fn generate_bindings(thorvg_src: &Path, out_dir: &Path) {
         // that affects sizeof/alignof for `uint32_t` etc.
         builder = builder.clang_arg(format!("--target={target_arch}-none-elf"));
     } else {
-        // Host build: pass Rust's full triple so libclang matches
-        // the actual ABI.
+        // Host or hosted cross build: pass Rust's full triple so
+        // libclang matches the actual ABI.
         builder = builder.clang_arg(format!("--target={target}"));
     }
 
