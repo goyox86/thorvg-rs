@@ -1016,6 +1016,16 @@ fn cross_runtime_libs(wanted: &[&str], extra_args: &[String]) -> Vec<(PathBuf, S
     out
 }
 
+/// The SIMD ThorVG's CPU engine draws with: NEON on aarch64, where every processor has it and it
+/// needs no compiler flags (meson's `simd` option, on by default, turns it on there too). Its
+/// `config.h` define, or None: other arches and bare metal are built without SIMD, as before.
+fn simd_define(target: &TargetInfo) -> Option<&'static str> {
+    if target.is_bare_metal {
+        return None;
+    }
+    (target.arch == "aarch64").then_some("THORVG_NEON_SUPPORT")
+}
+
 /// Write `config.h` based on enabled cargo features.
 fn write_config_h(out_dir: &Path, target: &TargetInfo) {
     let mut config = String::from(
@@ -1051,6 +1061,9 @@ fn write_config_h(out_dir: &Path, target: &TargetInfo) {
     }
     if target.has_video_backend() {
         config.push_str("#define THORVG_MEDIA_LOADER_SUPPORT 1\n");
+    }
+    if let Some(simd) = simd_define(target) {
+        config.push_str(&format!("#define {simd} 1\n"));
     }
 
     std::fs::write(out_dir.join("config.h"), config).expect("failed to write config.h");
