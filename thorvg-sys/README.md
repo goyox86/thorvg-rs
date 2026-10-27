@@ -81,6 +81,22 @@ cargo build -p thorvg-sys
 `build.rs` regenerates `bindings.rs` and recompiles the C++ archive
 on changes to either submodule.
 
+### Building another ThorVG checkout
+
+Set `THORVG_SRC` to the absolute path of a ThorVG source tree to build
+and bind that one instead of the `thorvg` submodule, such as a fork
+carrying patches of your own. It must be a ThorVG version these
+bindings support. In a consumer crate, `.cargo/config.toml` can set it
+relative to the workspace:
+
+```toml
+[env]
+THORVG_SRC = { value = "vendor/thorvg", relative = true }
+```
+
+A change to the variable rebuilds the crate, as does a change under
+its `src/`.
+
 ## License
 
 MIT — same as [ThorVG](https://github.com/thorvg/thorvg/blob/main/LICENSE). The vendored submodules ship their own license files (BSD-3-Clause for picolibc); see [`THIRD-PARTY-LICENSES.md`](../THIRD-PARTY-LICENSES.md) in the workspace root.

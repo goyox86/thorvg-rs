@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let thorvg_src = manifest_dir.join("thorvg");
+    let thorvg_src = thorvg_source_dir(&manifest_dir);
 
     if cfg!(feature = "vendored") {
         build_vendored_cc(&thorvg_src, &manifest_dir, &out_dir);
@@ -13,6 +13,29 @@ fn main() {
     }
 
     generate_bindings(&thorvg_src, &out_dir);
+}
+
+/// The ThorVG source tree to build and bind: `THORVG_SRC` when set (a
+/// checkout of the caller's own, such as a fork with patches), otherwise
+/// the vendored `thorvg` submodule.
+fn thorvg_source_dir(manifest_dir: &Path) -> PathBuf {
+    println!("cargo:rerun-if-env-changed=THORVG_SRC");
+    match env::var_os("THORVG_SRC") {
+        Some(dir) => {
+            let dir = PathBuf::from(dir);
+            assert!(
+                dir.join("src")
+                    .join("bindings")
+                    .join("capi")
+                    .join("thorvg_capi.h")
+                    .is_file(),
+                "THORVG_SRC={} is not a ThorVG source tree (no src/bindings/capi/thorvg_capi.h)",
+                dir.display(),
+            );
+            dir
+        }
+        None => manifest_dir.join("thorvg"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +91,7 @@ fn build_vendored_cc(thorvg_src: &Path, manifest_dir: &Path, out_dir: &Path) {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
     }
-    println!("cargo:rerun-if-changed=thorvg/src");
+    println!("cargo:rerun-if-changed={}", src.display());
 }
 
 // ---------------------------------------------------------------------------
